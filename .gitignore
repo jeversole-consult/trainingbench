@@ -1,0 +1,56 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Models (too large for git)
+models/base/*
+models/fine-tuned/*
+!models/base/.gitkeep
+!models/fine-tuned/.gitkeep
+
+# Datasets (too large for git)
+datasets/*/data/
+datasets/*/*.csv
+datasets/*/*.json
+datasets/*/*.jsonl
+datasets/*/*.parquet
+!datasets/**/README.md
+
+# Experiment outputs
+experiments/logs/*.log
+experiments/metrics/*.pkl
+experiments/before_after/*.txt
+
+# Publication drafts (optional)
+publication/drafts/*.docx
+publication/drafts/*.pdf
+
+# System
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Weights & Biases
+wandb/
+
+# HuggingFace cache
+.cache/
