@@ -13,8 +13,9 @@ from threading import Lock
 from typing import Dict, Optional
 
 
-SETTINGS_PATH = Path("app_settings.json")
-AUDIT_LOG_PATH = Path("logs") / "demo_mode_audit.jsonl"
+# Tunable file paths (env-overridable).
+SETTINGS_PATH = Path(os.getenv("APP_SETTINGS_PATH", "app_settings.json"))
+AUDIT_LOG_PATH = Path(os.getenv("DEMO_MODE_AUDIT_LOG_PATH", "logs/demo_mode_audit.jsonl"))
 
 
 class AppSettings:

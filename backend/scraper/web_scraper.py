@@ -13,10 +13,23 @@ from pathlib import Path
 import time
 
 
+# Tunable defaults (env-overridable). Constructor arguments still win.
+DEFAULT_SCRAPER_MAX_PAGES = int(os.getenv("SCRAPER_MAX_PAGES", "50"))
+DEFAULT_SCRAPER_REQUEST_DELAY_SECONDS = float(os.getenv("SCRAPER_REQUEST_DELAY_SECONDS", "1.0"))
+SCRAPER_REQUEST_TIMEOUT_SECONDS = int(os.getenv("SCRAPER_REQUEST_TIMEOUT_SECONDS", "30"))
+# Threshold below which we assume a PDF is scanned (and therefore needs OCR
+# rather than pypdf text extraction).
+OCR_FALLBACK_MIN_CHARS = int(os.getenv("OCR_FALLBACK_MIN_CHARS", "100"))
+
+
 class WebScraper:
     """Web scraper that extracts content from HTML pages and PDFs."""
 
-    def __init__(self, max_pages: int = 50, delay: float = 1.0):
+    def __init__(
+        self,
+        max_pages: int = DEFAULT_SCRAPER_MAX_PAGES,
+        delay: float = DEFAULT_SCRAPER_REQUEST_DELAY_SECONDS,
+    ):
         """
         Initialize the web scraper.
 
@@ -68,7 +81,7 @@ class WebScraper:
         except Exception as e:
             print(f"Error extracting text from PDF {pdf_path}: {e}")
 
-        if len(text.strip()) < 100:
+        if len(text.strip()) < OCR_FALLBACK_MIN_CHARS:
             print(f"OCR fallback for {pdf_path} (pypdf returned {len(text.strip())} chars)")
             try:
                 from document_processor import DocumentProcessor
@@ -96,7 +109,7 @@ class WebScraper:
         filepath = os.path.join(save_dir, filename)
 
         try:
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=SCRAPER_REQUEST_TIMEOUT_SECONDS)
             response.raise_for_status()
 
             with open(filepath, 'wb') as f:
@@ -110,7 +123,7 @@ class WebScraper:
     def scrape_page(self, url: str) -> Dict:
         """Scrape a single page and return its content."""
         try:
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=SCRAPER_REQUEST_TIMEOUT_SECONDS)
             response.raise_for_status()
         except requests.exceptions.MissingSchema:
             self.last_error = f"URL '{url}' is missing a scheme (e.g. add 'https://' in front)."
@@ -242,7 +255,7 @@ class WebScraper:
                 # If it's HTML, find more links to crawl
                 if page_data['type'] == 'html':
                     try:
-                        response = requests.get(url, timeout=30)
+                        response = requests.get(url, timeout=SCRAPER_REQUEST_TIMEOUT_SECONDS)
                         links = self.find_links(response.text, url)
 
                         for link in links:

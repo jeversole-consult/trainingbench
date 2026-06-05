@@ -4,10 +4,16 @@ Session tracking system for monitoring user login/logout events.
 Tracks session duration, IP addresses, and user agents.
 """
 
+import os
 import sqlite3
 from typing import Optional, Dict, List
 from datetime import datetime
 from pathlib import Path
+
+
+# Tunable defaults (env-overridable). Constructor / method arguments still win.
+DEFAULT_SESSIONS_DB_PATH = os.getenv("SESSIONS_DB_PATH", "sessions.db")
+DEFAULT_SESSION_RETENTION_DAYS = int(os.getenv("SESSION_RETENTION_DAYS", "90"))
 
 
 class SessionTracker:
@@ -22,7 +28,7 @@ class SessionTracker:
     - Supports querying by user, date range, and session status
     """
 
-    def __init__(self, db_path: str = "sessions.db"):
+    def __init__(self, db_path: str = DEFAULT_SESSIONS_DB_PATH):
         """Initialize session tracker with database."""
         self.db_path = db_path
         self._init_database()
@@ -353,7 +359,7 @@ class SessionTracker:
             print(f"Error getting session stats: {e}")
             return {}
 
-    def cleanup_old_sessions(self, days: int = 90) -> Dict:
+    def cleanup_old_sessions(self, days: int = DEFAULT_SESSION_RETENTION_DAYS) -> Dict:
         """
         Delete session records older than specified days.
 
