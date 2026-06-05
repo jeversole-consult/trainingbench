@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Gate - TrainingBench</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .gate-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .gate-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .gate-header h1 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .gate-header p {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+            border-left: 4px solid #c62828;
+        }
+
+        .info-message {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            border-left: 4px solid #667eea;
+            font-size: 0.9em;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 25px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div class="gate-container">
+            <div class="gate-header">
+                <h1>🔐 Site Access</h1>
+                <p>Enter the community passphrase to continue</p>
+            </div>
+
+            <div id="error-message" class="error-message"></div>
+
+            <form id="gate-form" onsubmit="verifyPassphrase(event)">
+                <div class="form-group">
+                    <label for="passphrase">Passphrase</label>
+                    <input
+                        type="password"
+                        id="passphrase"
+                        name="passphrase"
+                        placeholder="Enter passphrase"
+                        autocomplete="off"
+                        required
+                        autofocus
+                    >
+                </div>
+
+                <button type="submit" class="submit-btn">Enter Site</button>
+            </form>
+
+            <div class="info-message">
+                <strong>Community Access:</strong> This site requires a shared passphrase. If you don't have it, please contact your administrator.
+            </div>
+        </div>
+
+        <div class="footer">
+            TrainingBench<br>
+            <span style="font-size: 9px;">© 2025-2026 Jesse Eversole Consulting</span>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Load version dynamically from backend
+        fetch(`${API_BASE}/version`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('app-version').textContent = `Version ${data.version}`;
+            })
+            .catch(err => {
+                console.error('Failed to load version:', err);
+                document.getElementById('app-version').textContent = 'Version Unknown';
+            });
+
+        async function verifyPassphrase(event) {
+            event.preventDefault();
+
+            const passphrase = document.getElementById('passphrase').value.trim();
+            const errorDiv = document.getElementById('error-message');
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+
+            // Clear previous errors
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+
+            // Disable button during verification
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Verifying...';
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/verify-gate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ passphrase: passphrase })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Store gate token in localStorage (for client-side checks)
+                    localStorage.setItem('gate_token', data.gate_token);
+
+                    // Redirect to login page (cookie is set by server)
+                    window.location.href = '/static/login.html';
+                } else {
+                    // Show error
+                    errorDiv.textContent = data.detail || 'Invalid passphrase. Please try again.';
+                    errorDiv.style.display = 'block';
+
+                    // Clear the input
+                    document.getElementById('passphrase').value = '';
+                    document.getElementById('passphrase').focus();
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Enter Site';
+            }
+        }
+
+        // Don't auto-redirect - let user enter passphrase
+        // The server will handle protection via cookies
+    </script>
+</body>
+</html>

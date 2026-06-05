@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrainingBench — Docs</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- highlight.js for code blocks -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ─────────────────────────────────────────── */
+        .docs-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .docs-header h1 {
+            margin: 0;
+            font-size: 1.3em;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .docs-header .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .header-btn {
+            padding: 7px 16px;
+            border: 2px solid rgba(255,255,255,0.7);
+            background: transparent;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .header-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* ── Layout ──────────────────────────────────────────── */
+        .docs-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── Sidebar ─────────────────────────────────────────── */
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 14px 16px;
+            background: #f8f8f8;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            color: #444;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-search {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .sidebar-search input {
+            width: 100%;
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85em;
+            outline: none;
+        }
+
+        .sidebar-search input:focus {
+            border-color: #667eea;
+        }
+
+        .sidebar-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        /* Directory group */
+        .dir-group {
+            margin-bottom: 2px;
+        }
+
+        .dir-label {
+            padding: 6px 16px;
+            font-size: 0.78em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .dir-label:hover {
+            color: #667eea;
+        }
+
+        .dir-label .toggle-icon {
+            font-size: 0.7em;
+            transition: transform 0.2s;
+        }
+
+        .dir-label.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .dir-files {
+            overflow: hidden;
+        }
+
+        .dir-files.collapsed {
+            display: none;
+        }
+
+        .file-entry {
+            display: block;
+            padding: 7px 16px 7px 28px;
+            font-size: 0.88em;
+            color: #444;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            text-decoration: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .file-entry:hover {
+            background: #f0f4ff;
+            border-left-color: #aab8f0;
+            color: #444;
+        }
+
+        .file-entry.active {
+            background: #eef1ff;
+            border-left-color: #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        /* Root-level files (no directory) */
+        .root-file {
+            padding-left: 16px;
+        }
+
+        /* ── Main Content ─────────────────────────────────────── */
+        .docs-main {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .docs-toolbar {
+            padding: 10px 24px;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .breadcrumb {
+            font-size: 0.85em;
+            color: #888;
+            flex: 1;
+        }
+
+        .breadcrumb span {
+            color: #444;
+            font-weight: 500;
+        }
+
+        .docs-content {
+            flex: 1;
+            padding: 32px 48px;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ── Loading / Empty States ───────────────────────────── */
+        .docs-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #aaa;
+            gap: 12px;
+        }
+
+        .docs-placeholder .icon {
+            font-size: 3em;
+        }
+
+        .docs-placeholder p {
+            font-size: 1em;
+            margin: 0;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+        /* ── Markdown Styles ─────────────────────────────────── */
+        .markdown-body {
+            font-size: 0.97em;
+            line-height: 1.7;
+            color: #333;
+        }
+
+        .markdown-body h1 {
+            font-size: 1.8em;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 0.3em;
+            margin-top: 0;
+            color: #222;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.4em;
+            border-bottom: 1px solid #e8e8e8;
+            padding-bottom: 0.25em;
+            margin-top: 1.6em;
+            color: #333;
+        }
+
+        .markdown-body h3 {
+            font-size: 1.15em;
+            margin-top: 1.4em;
+            color: #444;
+        }
+
+        .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+            margin-top: 1.2em;
+            color: #555;
+        }
+
+        .markdown-body p {
+            margin: 0.9em 0;
+        }
+
+        .markdown-body a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .markdown-body a:hover {
+            text-decoration: underline;
+        }
+
+        .markdown-body code {
+            background: #f0f2f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+
+        .markdown-body pre {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 1.2em 0;
+        }
+
+        .markdown-body pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: 0.88em;
+        }
+
+        .markdown-body blockquote {
+            border-left: 4px solid #667eea;
+            margin: 1em 0;
+            padding: 8px 16px;
+            background: rgba(102, 126, 234, 0.05);
+            color: #555;
+        }
+
+        .markdown-body table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.2em 0;
+            font-size: 0.93em;
+        }
+
+        .markdown-body th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .markdown-body td {
+            padding: 9px 14px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        .markdown-body tr:nth-child(even) td {
+            background: #f9f9f9;
+        }
+
+        .markdown-body tr:hover td {
+            background: #f0f4ff;
+        }
+
+        .markdown-body ul, .markdown-body ol {
+            padding-left: 1.8em;
+            margin: 0.8em 0;
+        }
+
+        .markdown-body li {
+            margin: 0.3em 0;
+        }
+
+        .markdown-body hr {
+            border: none;
+            border-top: 2px solid #e0e0e0;
+            margin: 1.5em 0;
+        }
+
+        .markdown-body img {
+            max-width: 100%;
+            border-radius: 5px;
+        }
+
+        /* ── Error state ─────────────────────────────────────── */
+        .error-msg {
+            background: #fff3f3;
+            border: 1px solid #f44336;
+            border-radius: 5px;
+            padding: 16px;
+            color: #c62828;
+            margin: 20px 0;
+        }
+
+        /* ── Responsive ──────────────────────────────────────── */
+        @media (max-width: 700px) {
+            .sidebar { width: 220px; }
+            .docs-content { padding: 20px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="docs-header">
+        <h1>TrainingBench — Documentation</h1>
+        <div class="header-actions">
+            <button class="header-btn" onclick="window.location.href='/static/index.html'">Back to App</button>
+            <button class="header-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <!-- Body -->
+    <div class="docs-body">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>📁</span> Markdown Files
+            </div>
+            <div class="sidebar-search">
+                <input type="text" id="sidebar-search" placeholder="Filter files..." oninput="filterFiles(this.value)">
+            </div>
+            <div class="sidebar-tree" id="sidebar-tree">
+                <div style="padding: 20px; text-align: center; color: #aaa; font-size: 0.85em;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Main -->
+        <div class="docs-main">
+            <div class="docs-toolbar">
+                <div class="breadcrumb" id="breadcrumb">Select a file from the sidebar</div>
+            </div>
+
+            <div class="docs-content">
+                <div id="loading-spinner" class="loading-spinner">
+                    <div class="loader" style="display: inline-block;"></div>
+                    <p>Loading document...</p>
+                </div>
+
+                <div id="doc-placeholder" class="docs-placeholder">
+                    <div class="icon">📄</div>
+                    <p>Select a markdown file from the sidebar to view it here.</p>
+                </div>
+
+                <div id="doc-output" class="markdown-body" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let allFiles = [];
+        let currentPath = null;
+
+        // ── Auth ──────────────────────────────────────────────────
+        (async function checkAuth() {
+            const token = localStorage.getItem('session_token');
+            if (!token) {
+                window.location.href = '/static/login.html';
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/auth/verify`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    localStorage.removeItem('session_token');
+                    window.location.href = '/static/login.html';
+                    return;
+                }
+            } catch (e) {
+                window.location.href = '/static/login.html';
+                return;
+            }
+            // Auth OK — load file list
+            loadFileList();
+        })();
+
+        function logout() {
+            const token = localStorage.getItem('session_token');
+            fetch(`${API_BASE}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            }).finally(() => {
+                localStorage.removeItem('session_token');
+                window.location.href = '/static/login.html';
+            });
+        }
+
+        // ── File List ─────────────────────────────────────────────
+        async function loadFileList() {
+            try {
+                const res = await fetch(`${API_BASE}/docs/list`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                });
+                if (!res.ok) throw new Error('Failed to load file list');
+                const data = await res.json();
+                allFiles = data.files || [];
+                renderSidebar(allFiles);
+            } catch (e) {
+                document.getElementById('sidebar-tree').innerHTML =
+                    `<div style="padding: 16px; color: #f44336; font-size: 0.85em;">Error: ${e.message}</div>`;
+            }
+        }
+
+        function renderSidebar(files) {
+            const tree = document.getElementById('sidebar-tree');
+
+            if (files.length === 0) {
+                tree.innerHTML = '<div style="padding: 16px; color: #aaa; font-size: 0.85em;">No markdown files found.</div>';
+                return;
+            }
+
+            // Group by directory
+            const groups = {};
+            files.forEach(f => {
+                const dir = f.dir || '';
+                if (!groups[dir]) groups[dir] = [];
+                groups[dir].push(f);
+            });
+
+            const sortedDirs = Object.keys(groups).sort((a, b) => {
+                if (a === '') return -1;
+                if (b === '') return 1;
+                return a.localeCompare(b);
+            });
+
+            let html = '';
+            sortedDirs.forEach(dir => {
+                const dirFiles = groups[dir];
+                if (dir === '') {
+                    // Root-level files
+                    dirFiles.forEach(f => {
+                        const active = f.path === currentPath ? ' active' : '';
+                        html += `<div class="file-entry root-file${active}"
+                                      onclick="loadDoc('${escapeAttr(f.path)}')"
+                                      title="${escapeAttr(f.path)}">
+                                    📄 ${escapeHtml(f.name)}
+                                 </div>`;
+                    });
+                } else {
+                    const dirId = 'dir-' + dir.replace(/[^a-zA-Z0-9]/g, '_');
+                    html += `<div class="dir-group">
+                        <div class="dir-label" onclick="toggleDir('${dirId}')">
+                            <span class="toggle-icon">▼</span>
+                            📂 ${escapeHtml(dir)}
+                        </div>
+                        <div class="dir-files" id="${dirId}">`;
+                    dirFiles.forEach(f => {
+                        const active = f.path === currentPath ? ' active' : '';
+                        html += `<div class="file-entry${active}"
+                                      onclick="loadDoc('${escapeAttr(f.path)}')"
+                                      title="${escapeAttr(f.path)}">
+                                    📄 ${escapeHtml(f.name)}
+                                 </div>`;
+                    });
+                    html += `    </div></div>`;
+                }
+            });
+
+            tree.innerHTML = html;
+        }
+
+        function toggleDir(id) {
+            const filesEl = document.getElementById(id);
+            const labelEl = filesEl.previousElementSibling;
+            filesEl.classList.toggle('collapsed');
+            labelEl.classList.toggle('collapsed');
+        }
+
+        function filterFiles(query) {
+            if (!query.trim()) {
+                renderSidebar(allFiles);
+                return;
+            }
+            const q = query.toLowerCase();
+            const filtered = allFiles.filter(f =>
+                f.path.toLowerCase().includes(q) ||
+                f.name.toLowerCase().includes(q)
+            );
+            renderSidebar(filtered);
+        }
+
+        // ── Document Loading ──────────────────────────────────────
+        async function loadDoc(path) {
+            currentPath = path;
+
+            // Update active state
+            document.querySelectorAll('.file-entry').forEach(el => {
+                el.classList.remove('active');
+                if (el.getAttribute('onclick') && el.getAttribute('onclick').includes(escapeAttr(path))) {
+                    el.classList.add('active');
+                }
+            });
+
+            // Update breadcrumb
+            document.getElementById('breadcrumb').innerHTML =
+                path.split('/').map((p, i, arr) =>
+                    i === arr.length - 1
+                        ? `<span>${escapeHtml(p)}</span>`
+                        : `${escapeHtml(p)} /`
+                ).join(' ');
+
+            // Show loading
+            document.getElementById('doc-placeholder').style.display = 'none';
+            document.getElementById('doc-output').style.display = 'none';
+            const spinner = document.getElementById('loading-spinner');
+            spinner.style.display = 'block';
+
+            try {
+                const res = await fetch(`${API_BASE}/docs/content?path=${encodeURIComponent(path)}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Failed to load document');
+                }
+
+                const data = await res.json();
+                renderMarkdown(data.content);
+            } catch (e) {
+                spinner.style.display = 'none';
+                const out = document.getElementById('doc-output');
+                out.style.display = 'block';
+                out.innerHTML = `<div class="error-msg">Error loading document: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function renderMarkdown(content) {
+            const spinner = document.getElementById('loading-spinner');
+            const out = document.getElementById('doc-output');
+
+            // Configure marked
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+
+            out.innerHTML = marked.parse(content);
+
+            // Syntax highlight code blocks
+            out.querySelectorAll('pre code').forEach(block => {
+                hljs.highlightElement(block);
+            });
+
+            spinner.style.display = 'none';
+            out.style.display = 'block';
+
+            // Scroll to top
+            document.querySelector('.docs-main').scrollTop = 0;
+        }
+
+        // ── Helpers ───────────────────────────────────────────────
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function escapeAttr(str) {
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>

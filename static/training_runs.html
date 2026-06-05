@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Runs - TrainingBench</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 28px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .user-info {
+            padding: 8px 15px;
+            background: #f0f4f8;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-small {
+            padding: 5px 12px;
+            font-size: 12px;
+        }
+
+        .content-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .runs-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .run-card {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .run-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .run-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .run-title {
+            flex: 1;
+        }
+
+        .run-title h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .run-title .description {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-running {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-stopped {
+            background: #d6d8db;
+            color: #383d41;
+        }
+
+        .run-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .detail-item {
+            font-size: 13px;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .detail-value {
+            color: #333;
+        }
+
+        .run-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .progress-container {
+            margin: 15px 0;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .progress-bar-wrapper {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-bar.running {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .metric-box {
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .metric-value.good {
+            color: #28a745;
+        }
+
+        .run-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-header h2 {
+            color: #667eea;
+            font-size: 24px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .log-entries {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-left: 3px solid transparent;
+        }
+
+        .log-entry.info {
+            border-left-color: #4CAF50;
+        }
+
+        .log-entry.warning {
+            border-left-color: #ff9800;
+        }
+
+        .log-entry.error {
+            border-left-color: #f44336;
+        }
+
+        .checkpoint-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .checkpoint-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .compare-selector {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .compare-selector.active {
+            display: block;
+        }
+
+        .selected-runs {
+            margin-bottom: 15px;
+        }
+
+        .selected-run-tag {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 5px;
+            margin: 5px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .run-details {
+                grid-template-columns: 1fr;
+            }
+
+            .run-metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏃 Training Runs</h1>
+            <div class="header-actions">
+                <div class="user-info" id="userInfo">Loading...</div>
+                <a href="/static/training_sets.html" class="btn btn-secondary">Training Sets</a>
+                <a href="/static/index.html" class="btn btn-secondary">Main App</a>
+                <button class="btn btn-primary" id="newRunBtn">+ New Training Run</button>
+                <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+            </div>
+        </header>
+
+        <div class="content-card">
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Search</label>
+                    <input type="text" id="searchInput" placeholder="Search by name or description...">
+                </div>
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select id="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="running">Running</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="stopped">Stopped</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Training Set</label>
+                    <select id="trainingSetFilter">
+                        <option value="">All Training Sets</option>
+                    </select>
+                </div>
+                <div class="filter-group" style="display: flex; align-items: flex-end;">
+                    <button class="btn btn-secondary" id="compareBtn" style="width: 100%;">Compare Selected</button>
+                </div>
+            </div>
+
+            <div id="runsContainer" class="runs-grid">
+                <div class="empty-state">
+                    <div class="empty-state-icon">⏳</div>
+                    <h3>Loading training runs...</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Run Modal -->
+    <div id="newRunModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Training Run</h2>
+                <button class="close-btn" onclick="closeModal('newRunModal')">&times;</button>
+            </div>
+            <form id="newRunForm">
+                <div class="form-group">
+                    <label>Run Name *</label>
+                    <input type="text" id="runName" required placeholder="e.g., my-adapter-v1">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="runDescription" placeholder="Describe what this training run is testing..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Training Set *</label>
+                        <select id="runTrainingSet" required>
+                            <option value="">Select training set...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Test Set (Optional)</label>
+                        <select id="runTestSet">
+                            <option value="">No test set</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Base Model *</label>
+                        <input type="text" id="runBaseModel" required placeholder="e.g., meta-llama/Llama-3.1-8B">
+                    </div>
+                    <div class="form-group">
+                        <label>Adapter Output Path *</label>
+                        <input type="text" id="runAdapterPath" required placeholder="e.g., training/adapters/my-adapter-v1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Training Configuration (JSON) *</label>
+                    <textarea id="runConfig" placeholder='{
+  "learning_rate": 2e-4,
+  "num_epochs": 3,
+  "batch_size": 4,
+  "max_seq_length": 2048
+}'></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>GPU Info</label>
+                        <input type="text" id="runGPU" placeholder="e.g., NVIDIA A100 40GB">
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <input type="text" id="runNotes" placeholder="Additional notes...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Create Training Run</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('newRunModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Run Details Modal -->
+    <div id="runDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 1200px;">
+            <div class="modal-header">
+                <h2 id="detailsRunName">Training Run Details</h2>
+                <button class="close-btn" onclick="closeModal('runDetailsModal')">&times;</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('overview')">Overview</button>
+                <button class="tab" onclick="switchTab('metrics')">Metrics</button>
+                <button class="tab" onclick="switchTab('logs')">Logs</button>
+                <button class="tab" onclick="switchTab('checkpoints')">Checkpoints</button>
+            </div>
+
+            <div id="overviewTab" class="tab-content active">
+                <div id="detailsContent"></div>
+            </div>
+
+            <div id="metricsTab" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="lossChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="accuracyChart"></canvas>
+                </div>
+            </div>
+
+            <div id="logsTab" class="tab-content">
+                <div class="log-entries" id="logEntries">
+                    <div class="empty-state">No logs available</div>
+                </div>
+            </div>
+
+            <div id="checkpointsTab" class="tab-content">
+                <div class="checkpoint-list" id="checkpointList">
+                    <div class="empty-state">No checkpoints saved</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compare Runs Selector -->
+    <div id="compareSelector" class="compare-selector">
+        <h3 style="margin-bottom: 15px;">Compare Runs</h3>
+        <div class="selected-runs" id="selectedRuns"></div>
+        <button class="btn btn-primary btn-small" onclick="viewComparison()">View Comparison</button>
+        <button class="btn btn-secondary btn-small" onclick="clearSelection()">Clear</button>
+    </div>
+
+    <script>
+        // Global state
+        let authToken = '';
+        let currentUser = null;
+        let allRuns = [];
+        let trainingSets = [];
+        let selectedRunsForCompare = new Set();
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('newRunBtn').addEventListener('click', () => openModal('newRunModal'));
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('newRunForm').addEventListener('submit', handleCreateRun);
+            document.getElementById('searchInput').addEventListener('input', filterRuns);
+            document.getElementById('statusFilter').addEventListener('change', filterRuns);
+            document.getElementById('trainingSetFilter').addEventListener('change', filterRuns);
+            document.getElementById('compareBtn').addEventListener('click', () => {
+                if (selectedRunsForCompare.size > 0) {
+                    document.getElementById('compareSelector').classList.add('active');
+                }
+            });
+        }
+
+        async function checkAuth() {
+            authToken = sessionStorage.getItem('session_token');
+            if (!authToken) {
+                window.location.href = '/static/login.html';
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/verify', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Auth failed');
+
+                const data = await response.json();
+                currentUser = data;
+                document.getElementById('userInfo').textContent = `${data.username} (${data.user_type})`;
+
+                // Check if user has super privileges
+                if (data.user_type !== 'super') {
+                    alert('Access denied. Training runs require super user privileges.');
+                    window.location.href = '/static/index.html';
+                    return;
+                }
+
+                await Promise.all([loadTrainingSets(), loadTrainingRuns()]);
+            } catch (error) {
+                console.error('Auth error:', error);
+                sessionStorage.removeItem('session_token');
+                window.location.href = '/static/login.html';
+            }
+        }
+
+        async function loadTrainingSets() {
+            try {
+                const response = await fetch('/training/sets', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load training sets');
+
+                const data = await response.json();
+                trainingSets = data.training_sets || [];
+
+                // Populate dropdowns
+                const selectors = ['runTrainingSet', 'runTestSet', 'trainingSetFilter'];
+                selectors.forEach(id => {
+                    const select = document.getElementById(id);
+                    const currentValue = select.value;
+
+                    // Clear existing options (except first)
+                    while (select.options.length > 1) {
+                        select.remove(1);
+                    }
+
+                    trainingSets.forEach(ts => {
+                        const option = document.createElement('option');
+                        option.value = ts.id;
+                        option.textContent = `${ts.name} (${ts.example_count} examples)`;
+                        select.appendChild(option);
+                    });
+
+                    if (currentValue) select.value = currentValue;
+                });
+            } catch (error) {
+                console.error('Error loading training sets:', error);
+                showError('Failed to load training sets');
+            }
+        }
+
+        async function loadTrainingRuns() {
+            try {
+                const response = await fetch('/training/runs', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load training runs');
+
+                const data = await response.json();
+                allRuns = data.training_runs || [];
+                await renderRuns(allRuns);
+            } catch (error) {
+                console.error('Error loading training runs:', error);
+                showError('Failed to load training runs');
+            }
+        }
+
+        async function calculateProgress(run) {
+            // Calculate progress based on available data
+            if (run.status !== 'running') {
+                return run.status === 'completed' ? 100 : 0;
+            }
+
+            try {
+                // Fetch metrics to calculate real progress
+                const response = await fetch(`/training/runs/${run.id}/metrics`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const metrics = data.metrics || [];
+
+                    if (metrics.length > 0) {
+                        // Get config to know total epochs
+                        const detailResponse = await fetch(`/training/runs/${run.id}`, {
+                            headers: { 'Authorization': `Bearer ${authToken}` }
+                        });
+
+                        if (detailResponse.ok) {
+                            const runDetail = await detailResponse.json();
+                            const totalEpochs = runDetail.config?.num_epochs || 3;
+
+                            // Get latest epoch from metrics
+                            const latestMetric = metrics[metrics.length - 1];
+                            const currentEpoch = latestMetric.epoch || 0;
+
+                            // Calculate percentage
+                            const progress = Math.min(100, Math.round((currentEpoch / totalEpochs) * 100));
+                            return progress;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error calculating progress:', error);
+            }
+
+            // Default to 50% if we can't calculate
+            return 50;
+        }
+
+        async function renderRuns(runs) {
+            const container = document.getElementById('runsContainer');
+
+            if (runs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <h3>No training runs yet</h3>
+                        <p>Create your first training run to start tracking experiments</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Calculate progress for all runs
+            const progressPromises = runs.map(run => calculateProgress(run));
+            const progressValues = await Promise.all(progressPromises);
+
+            container.innerHTML = runs.map((run, index) => {
+                const statusClass = `status-${run.status}`;
+                const trainingSet = trainingSets.find(ts => ts.id === run.training_set_id);
+                const duration = run.duration_seconds ? formatDuration(run.duration_seconds) : 'In progress...';
+                const progress = progressValues[index];
+
+                // Build progress bar HTML for running jobs
+                let progressBarHtml = '';
+                if (run.status === 'running') {
+                    progressBarHtml = `
+                        <div class="progress-container">
+                            <div class="progress-label">
+                                <span>Training Progress</span>
+                                <span>${progress}%</span>
+                            </div>
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar running" style="width: ${progress}%"></div>
+                            </div>
+                        </div>
+                    `;
+                } else if (run.status === 'completed') {
+                    progressBarHtml = `
+                        <div class="progress-container">
+                            <div class="progress-label">
+                                <span>Training Progress</span>
+                                <span>100%</span>
+                            </div>
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar" style="width: 100%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="run-card" onclick="viewRunDetails(${run.id})">
+                        <div class="run-header">
+                            <div class="run-title">
+                                <h3>${escapeHtml(run.run_name)}</h3>
+                                ${run.description ? `<div class="description">${escapeHtml(run.description)}</div>` : ''}
+                            </div>
+                            <span class="status-badge ${statusClass}">${run.status}</span>
+                        </div>
+
+                        <div class="run-details">
+                            <div class="detail-item">
+                                <div class="detail-label">Training Set</div>
+                                <div class="detail-value">${trainingSet ? escapeHtml(trainingSet.name) : 'Unknown'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Started</div>
+                                <div class="detail-value">${formatDate(run.started_at)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Duration</div>
+                                <div class="detail-value">${duration}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Created By</div>
+                                <div class="detail-value">${escapeHtml(run.created_by)}</div>
+                            </div>
+                        </div>
+
+                        ${progressBarHtml}
+
+                        ${run.status === 'completed' && run.final_eval_loss ? `
+                            <div class="run-metrics">
+                                <div class="metric-box">
+                                    <div class="metric-label">Train Loss</div>
+                                    <div class="metric-value">${run.final_train_loss ? run.final_train_loss.toFixed(4) : 'N/A'}</div>
+                                </div>
+                                <div class="metric-box">
+                                    <div class="metric-label">Eval Loss</div>
+                                    <div class="metric-value">${run.final_eval_loss.toFixed(4)}</div>
+                                </div>
+                                <div class="metric-box">
+                                    <div class="metric-label">Train Acc</div>
+                                    <div class="metric-value ${run.final_train_accuracy > 0.8 ? 'good' : ''}">${run.final_train_accuracy ? (run.final_train_accuracy * 100).toFixed(1) + '%' : 'N/A'}</div>
+                                </div>
+                                <div class="metric-box">
+                                    <div class="metric-label">Eval Acc</div>
+                                    <div class="metric-value ${run.final_eval_accuracy > 0.8 ? 'good' : ''}">${run.final_eval_accuracy ? (run.final_eval_accuracy * 100).toFixed(1) + '%' : 'N/A'}</div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="run-actions" onclick="event.stopPropagation();">
+                            <button class="btn btn-primary btn-small" onclick="viewRunDetails(${run.id})">View Details</button>
+                            <button class="btn btn-secondary btn-small" onclick="toggleCompareSelection(${run.id}, '${escapeHtml(run.run_name)}')">
+                                ${selectedRunsForCompare.has(run.id) ? '✓ Selected' : 'Select for Compare'}
+                            </button>
+                            <button class="btn btn-danger btn-small" onclick="deleteRun(${run.id}, '${escapeHtml(run.run_name)}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function filterRuns() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const trainingSetFilter = document.getElementById('trainingSetFilter').value;
+
+            const filtered = allRuns.filter(run => {
+                const matchesSearch = !searchTerm ||
+                    run.run_name.toLowerCase().includes(searchTerm) ||
+                    (run.description && run.description.toLowerCase().includes(searchTerm));
+
+                const matchesStatus = !statusFilter || run.status === statusFilter;
+                const matchesTrainingSet = !trainingSetFilter || run.training_set_id == trainingSetFilter;
+
+                return matchesSearch && matchesStatus && matchesTrainingSet;
+            });
+
+            await renderRuns(filtered);
+        }
+
+        async function handleCreateRun(e) {
+            e.preventDefault();
+
+            const config = document.getElementById('runConfig').value;
+            let configObj;
+            try {
+                configObj = JSON.parse(config);
+            } catch (error) {
+                alert('Invalid JSON in Training Configuration');
+                return;
+            }
+
+            const runData = {
+                run_name: document.getElementById('runName').value,
+                description: document.getElementById('runDescription').value,
+                training_set_id: parseInt(document.getElementById('runTrainingSet').value),
+                test_set_id: document.getElementById('runTestSet').value ? parseInt(document.getElementById('runTestSet').value) : null,
+                base_model: document.getElementById('runBaseModel').value,
+                adapter_output_path: document.getElementById('runAdapterPath').value,
+                config: configObj,
+                gpu_info: document.getElementById('runGPU').value || null,
+                notes: document.getElementById('runNotes').value || null
+            };
+
+            try {
+                const response = await fetch('/training/runs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(runData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create run');
+                }
+
+                const result = await response.json();
+                closeModal('newRunModal');
+                document.getElementById('newRunForm').reset();
+                await loadTrainingRuns();
+                showSuccess('Training run created successfully!');
+            } catch (error) {
+                console.error('Error creating run:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function viewRunDetails(runId) {
+            try {
+                const response = await fetch(`/training/runs/${runId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load run details');
+
+                const run = await response.json();
+                displayRunDetails(run);
+                openModal('runDetailsModal');
+            } catch (error) {
+                console.error('Error loading run details:', error);
+                alert('Failed to load run details');
+            }
+        }
+
+        function displayRunDetails(run) {
+            document.getElementById('detailsRunName').textContent = run.run_name;
+
+            const trainingSet = trainingSets.find(ts => ts.id === run.training_set_id);
+            const testSet = run.test_set_id ? trainingSets.find(ts => ts.id === run.test_set_id) : null;
+
+            const overviewHTML = `
+                <div class="run-details" style="grid-template-columns: 1fr 1fr;">
+                    <div class="detail-item">
+                        <div class="detail-label">Status</div>
+                        <div class="detail-value">
+                            <span class="status-badge status-${run.status}">${run.status}</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Created By</div>
+                        <div class="detail-value">${escapeHtml(run.created_by)}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Training Set</div>
+                        <div class="detail-value">${trainingSet ? escapeHtml(trainingSet.name) : 'Unknown'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Test Set</div>
+                        <div class="detail-value">${testSet ? escapeHtml(testSet.name) : 'None'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Base Model</div>
+                        <div class="detail-value">${escapeHtml(run.base_model)}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Adapter Path</div>
+                        <div class="detail-value">${escapeHtml(run.adapter_output_path)}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Started</div>
+                        <div class="detail-value">${formatDate(run.started_at)}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Completed</div>
+                        <div class="detail-value">${run.completed_at ? formatDate(run.completed_at) : 'In progress...'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Duration</div>
+                        <div class="detail-value">${run.duration_seconds ? formatDuration(run.duration_seconds) : 'In progress...'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">GPU Info</div>
+                        <div class="detail-value">${run.gpu_info || 'N/A'}</div>
+                    </div>
+                </div>
+
+                ${run.description ? `
+                    <div style="margin-top: 20px;">
+                        <div class="detail-label">Description</div>
+                        <div class="detail-value">${escapeHtml(run.description)}</div>
+                    </div>
+                ` : ''}
+
+                ${run.notes ? `
+                    <div style="margin-top: 20px;">
+                        <div class="detail-label">Notes</div>
+                        <div class="detail-value">${escapeHtml(run.notes)}</div>
+                    </div>
+                ` : ''}
+
+                <div style="margin-top: 20px;">
+                    <div class="detail-label">Training Configuration</div>
+                    <pre style="background: #f8f9fa; padding: 15px; border-radius: 8px; overflow-x: auto;">${JSON.stringify(run.config, null, 2)}</pre>
+                </div>
+
+                ${run.status === 'completed' ? `
+                    <div class="run-metrics" style="margin-top: 20px;">
+                        <div class="metric-box">
+                            <div class="metric-label">Final Train Loss</div>
+                            <div class="metric-value">${run.final_train_loss ? run.final_train_loss.toFixed(4) : 'N/A'}</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Final Eval Loss</div>
+                            <div class="metric-value">${run.final_eval_loss ? run.final_eval_loss.toFixed(4) : 'N/A'}</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Final Train Accuracy</div>
+                            <div class="metric-value ${run.final_train_accuracy > 0.8 ? 'good' : ''}">${run.final_train_accuracy ? (run.final_train_accuracy * 100).toFixed(1) + '%' : 'N/A'}</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Final Eval Accuracy</div>
+                            <div class="metric-value ${run.final_eval_accuracy > 0.8 ? 'good' : ''}">${run.final_eval_accuracy ? (run.final_eval_accuracy * 100).toFixed(1) + '%' : 'N/A'}</div>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('detailsContent').innerHTML = overviewHTML;
+
+            // Load metrics, logs, and checkpoints
+            loadMetrics(run.id);
+            loadLogs(run.id);
+            loadCheckpoints(run.id);
+        }
+
+        async function loadMetrics(runId) {
+            try {
+                const response = await fetch(`/training/runs/${runId}/metrics`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load metrics');
+
+                const data = await response.json();
+                const metrics = data.metrics || [];
+
+                if (metrics.length === 0) {
+                    document.getElementById('metricsTab').innerHTML = '<div class="empty-state">No metrics available yet</div>';
+                    return;
+                }
+
+                // TODO: Implement Chart.js for metrics visualization
+                // For now, just show a message
+                document.getElementById('metricsTab').innerHTML = `
+                    <div style="padding: 20px; text-align: center;">
+                        <p>${metrics.length} metric points recorded</p>
+                        <p><em>Chart visualization coming soon...</em></p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+            }
+        }
+
+        async function loadLogs(runId) {
+            try {
+                const response = await fetch(`/training/runs/${runId}/logs`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load logs');
+
+                const data = await response.json();
+                const logs = data.logs || [];
+
+                const logContainer = document.getElementById('logEntries');
+
+                if (logs.length === 0) {
+                    logContainer.innerHTML = '<div class="empty-state">No logs available</div>';
+                    return;
+                }
+
+                logContainer.innerHTML = logs.map(log => `
+                    <div class="log-entry ${log.log_level.toLowerCase()}">
+                        <span style="color: #888;">[${formatDate(log.timestamp)}]</span>
+                        <span style="color: #4CAF50;">[${log.log_level}]</span>
+                        ${escapeHtml(log.message)}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        async function loadCheckpoints(runId) {
+            try {
+                const response = await fetch(`/training/runs/${runId}/checkpoints`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load checkpoints');
+
+                const data = await response.json();
+                const checkpoints = data.checkpoints || [];
+
+                const checkpointContainer = document.getElementById('checkpointList');
+
+                if (checkpoints.length === 0) {
+                    checkpointContainer.innerHTML = '<div class="empty-state">No checkpoints saved</div>';
+                    return;
+                }
+
+                checkpointContainer.innerHTML = checkpoints.map(cp => `
+                    <div class="checkpoint-item">
+                        <div>
+                            <strong>Step ${cp.checkpoint_step}</strong>
+                            ${cp.epoch ? ` (Epoch ${cp.epoch.toFixed(2)})` : ''}
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">${escapeHtml(cp.checkpoint_path)}</div>
+                        </div>
+                        <div style="text-align: right; font-size: 13px;">
+                            ${cp.eval_loss ? `Loss: ${cp.eval_loss.toFixed(4)}` : ''}
+                            ${cp.eval_accuracy ? ` | Acc: ${(cp.eval_accuracy * 100).toFixed(1)}%` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading checkpoints:', error);
+            }
+        }
+
+        async function toggleCompareSelection(runId, runName) {
+            if (selectedRunsForCompare.has(runId)) {
+                selectedRunsForCompare.delete(runId);
+            } else {
+                if (selectedRunsForCompare.size >= 5) {
+                    alert('Maximum 5 runs can be compared at once');
+                    return;
+                }
+                selectedRunsForCompare.add(runId);
+            }
+
+            updateCompareSelector();
+            await filterRuns(); // Re-render to update button states
+        }
+
+        function updateCompareSelector() {
+            const selectedRunsDiv = document.getElementById('selectedRuns');
+
+            if (selectedRunsForCompare.size === 0) {
+                document.getElementById('compareSelector').classList.remove('active');
+                return;
+            }
+
+            const tags = Array.from(selectedRunsForCompare).map(id => {
+                const run = allRuns.find(r => r.id === id);
+                return `<span class="selected-run-tag">${run ? escapeHtml(run.run_name) : `Run ${id}`}</span>`;
+            }).join('');
+
+            selectedRunsDiv.innerHTML = tags;
+        }
+
+        function clearSelection() {
+            selectedRunsForCompare.clear();
+            updateCompareSelector();
+            filterRuns();
+        }
+
+        async function viewComparison() {
+            if (selectedRunsForCompare.size < 2) {
+                alert('Please select at least 2 runs to compare');
+                return;
+            }
+
+            const ids = Array.from(selectedRunsForCompare).join(',');
+
+            try {
+                const response = await fetch(`/training/runs/compare?ids=${ids}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to compare runs');
+
+                const data = await response.json();
+
+                // TODO: Create a dedicated comparison modal
+                // For now, just show a simple comparison
+                alert(`Comparison loaded for ${data.count} runs. \n\nDetailed comparison UI coming soon...`);
+            } catch (error) {
+                console.error('Error comparing runs:', error);
+                alert('Failed to load comparison');
+            }
+        }
+
+        async function deleteRun(runId, runName) {
+            if (!confirm(`Are you sure you want to delete the training run "${runName}"?\n\nThis will delete all associated metrics, logs, and checkpoints.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/training/runs/${runId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to delete run');
+                }
+
+                await loadTrainingRuns();
+                showSuccess('Training run deleted successfully');
+            } catch (error) {
+                console.error('Error deleting run:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function logout() {
+            sessionStorage.removeItem('session_token');
+            window.location.href = '/static/login.html';
+        }
+
+        // Utility functions
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${secs}s`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        function showSuccess(message) {
+            // Simple success notification (can be enhanced with a toast library)
+            const notification = document.createElement('div');
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 9999;';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+
+        function showError(message) {
+            // Simple error notification
+            const notification = document.createElement('div');
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 9999;';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
