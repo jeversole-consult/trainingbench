@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- CACHE BUSTING: Update ?v= version on script tag at bottom when making JS changes -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrainingBench</title>
@@ -243,9 +244,10 @@
                     <h1>TrainingBench</h1>
                     <p>Upload documents, scrape websites, and search through your knowledge base</p>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; justify-content: flex-end;">
+                    <span id="mode-pill" style="display: none; font-size: 0.85em; font-weight: bold; padding: 5px 12px; border-radius: 20px; white-space: nowrap; letter-spacing: 0.5px;" title=""></span>
+                    <span id="current-user-display" style="font-size: 0.85em; color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 20px; white-space: nowrap;"></span>
                     <button onclick="window.location.href='training_sets.html'" style="padding: 10px 20px; background: linear-gradient(135deg, #764ba2 0%, #667eea 100%); color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;">🎓 Training Sets</button>
-                    <button onclick="window.location.href='docs.html'" style="padding: 10px 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;">📄 Docs</button>
                     <button id="logout-btn" onclick="logout()" class="logout-btn">Logout</button>
                 </div>
             </div>
@@ -280,19 +282,19 @@
             <button class="tab" onclick="switchTab('compare')">Compare</button>
             <button class="tab" onclick="switchTab('search')">Search Documents</button>
             <button class="tab" onclick="switchTab('manage')">Manage Documents</button>
-            <button class="tab" onclick="switchTab('history')">Query History</button>
+            <button class="tab" id="history-tab-btn" onclick="switchTab('history')">Query History</button>
             <button class="tab" onclick="switchTab('databases')">Manage Databases</button>
         </div>
 
         <!-- Upload Tab -->
         <div id="upload-tab" class="tab-content active section">
             <h2>Upload Documents</h2>
-            <p style="color: #666; margin: 10px 0;">Supported formats: PDF, DOCX, PPTX, TXT, CSV, XLSX, XLS</p>
+            <p style="color: #666; margin: 10px 0;">Supported formats: PDF, DOCX, PPTX, TXT, MD, CSV, XLSX, XLS</p>
 
             <div class="status-message" id="upload-status"></div>
 
             <div class="file-input-wrapper">
-                <input type="file" id="file-input" accept=".pdf,.docx,.pptx,.txt,.csv,.xlsx,.xls" multiple onchange="handleFileSelect()">
+                <input type="file" id="file-input" accept=".pdf,.docx,.pptx,.txt,.md,.markdown,.csv,.xlsx,.xls" multiple onchange="handleFileSelect()">
             </div>
 
             <div class="selected-files" id="selected-files"></div>
@@ -347,30 +349,87 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div>
                     <h2 style="margin: 0;">Ask Questions</h2>
-                    <p style="color: #666; margin: 10px 0;">Ask questions and get AI-generated answers based on your knowledge base</p>
+                    <p style="color: #666; margin: 10px 0;">Ask questions and get Agent-generated answers based on your knowledge base</p>
                 </div>
-                <button onclick="clearChat()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Clear chat history">🗑️ Clear Chat</button>
+                <button id="clear-screen-btn" onclick="clearChat()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Remove messages from display (your saved training data is preserved)">🗑️ Clear Screen</button>
+            </div>
+
+            <!-- Training User Help Panel (hidden by default, shown only for training users) -->
+            <div id="training-help-panel" style="display: none; margin-bottom: 20px; padding: 15px 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #667eea; border-radius: 5px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0 0 10px 0; color: #667eea; font-size: 1.1em;">📋 How to Train Your AI Agent</h3>
+                        <p style="margin: 5px 0; color: #555; line-height: 1.6;">
+                            • Use a training session to ask questions and provide your response<br>
+                            • ✓ <strong>Acceptable</strong> — Answer is correct and helpful<br>
+                            • ✗ <strong>Needs Improvement</strong> — Answer is wrong or incomplete (provide the correct answer to help the Agent)<br>
+                            • Your feedback provides the training data necessary for continuous improvement of the Agent into the future
+                        </p>
+                    </div>
+                    <button onclick="openTrainingHelpModal()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">❓ Full Instructions</button>
+                </div>
+            </div>
+
+            <!-- Training Session Status (hidden by default, shown only for training users) -->
+            <div id="training-session-status" style="display: none; margin-bottom: 20px; padding: 15px 20px; background: linear-gradient(135deg, rgba(17, 153, 142, 0.1) 0%, rgba(56, 239, 125, 0.1) 100%); border-left: 4px solid #11998e; border-radius: 5px;">
+
+                <!-- Not Started State -->
+                <div id="session-not-started" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 1.1em; font-weight: 500; color: #11998e; margin-bottom: 5px;">📝 No Active Training Session</div>
+                            <div style="font-size: 0.9em; color: #666;">Start a new training session to begin creating training data</div>
+                        </div>
+                        <button onclick="startNewTrainingSession()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 1em; font-weight: 500;">▶ Start Training Session</button>
+                    </div>
+                </div>
+
+                <!-- Active State -->
+                <div id="session-active" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 0.85em; color: #666; margin-bottom: 3px;">Active Training Set:</div>
+                            <div style="font-size: 1.2em; font-weight: bold; color: #11998e; margin-bottom: 8px;">
+                                <span id="session-name">Untitled Session</span>
+                            </div>
+                            <div style="font-size: 1.1em; color: #555;">
+                                Progress: <span id="session-record-count" style="font-weight: bold; color: #11998e;">0</span> Training Records
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-direction: column;">
+                            <button onclick="completeTrainingSession()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">💾 Save & Complete</button>
+                            <button onclick="cancelTrainingSession()" style="padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">🗑️ Cancel Session</button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <div class="status-message" id="chat-status"></div>
 
-            <div style="margin: 15px 0; padding: 15px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #667eea;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #667eea;">Select LLM Model:</label>
-                <select id="llm-model-selector" style="width: 100%; padding: 10px; border: 2px solid #667eea; border-radius: 5px; font-size: 1em; background: white; cursor: pointer;">
-                    <option value="">Loading models...</option>
-                </select>
+            <div style="margin: 15px 0; padding: 12px 15px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #667eea; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="font-weight: 500; color: #667eea; white-space: nowrap;">Database:</span>
+                <span id="current-database-label" style="font-weight: bold; color: #333;">Default Database</span>
+                <span style="color: #ccc; margin: 0 5px;">|</span>
+                <span style="font-weight: 500; color: #667eea; white-space: nowrap;">Model:</span>
+                <span id="current-model-label" style="font-weight: bold; color: #333;">Llama 3.1 8B</span>
+                <span style="color: #ccc; margin: 0 5px;">|</span>
+                <span style="font-weight: 500; color: #667eea; white-space: nowrap;">Adapter:</span>
+                <span id="current-adapter-label" style="font-weight: bold; color: #333;">Loading...</span>
+                <button onclick="openWorkflowModal()" style="margin-left: auto; padding: 5px 12px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">📊 View Workflow</button>
+            </div>
+
+            <div class="chat-input-container">
+                <input type="text" id="question-input" placeholder="Start a training session above to begin entering prompts..."
+                       onkeypress="handleKeyPress(event)" disabled />
+                <button id="voice-input-btn" onclick="toggleVoiceInput()" title="Voice input" disabled>
+                    <span id="mic-icon">🎤</span>
+                </button>
+                <button id="ask-btn" onclick="askQuestion()" disabled>Ask</button>
             </div>
 
             <div id="chat-container">
                 <div id="chat-messages"></div>
-            </div>
-            <div class="chat-input-container">
-                <input type="text" id="question-input" placeholder="Ask a question about the scraped content..."
-                       onkeypress="handleKeyPress(event)" />
-                <button id="voice-input-btn" onclick="toggleVoiceInput()" title="Voice input">
-                    <span id="mic-icon">🎤</span>
-                </button>
-                <button id="ask-btn" onclick="askQuestion()">Ask</button>
             </div>
         </div>
 
@@ -529,7 +588,7 @@
 
         <!-- History Tab -->
         <div id="history-tab" class="tab-content section">
-            <h2>Query History</h2>
+            <h2 id="history-tab-heading">Query History</h2>
             <div class="history-controls">
                 <button onclick="loadQueryHistory()">Refresh History</button>
                 <button onclick="exportHistory()" class="export-btn">Export CSV</button>
@@ -574,7 +633,7 @@
     <div id="feedback-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center;">
         <div style="background: white; border-radius: 10px; padding: 30px; max-width: 600px; width: 90%; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
             <h3 style="margin-top: 0; color: #f44336;">Why does this response need improvement?</h3>
-            <p style="color: #666; margin-bottom: 15px;">Please provide detailed feedback to help improve the AI's responses:</p>
+            <p style="color: #666; margin-bottom: 15px;">Please provide detailed feedback to help improve the Agent's responses:</p>
             <textarea id="feedback-text" rows="8" placeholder="Explain what was wrong with the response, what was missing, or how it could be better..." style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 1em; font-family: inherit; resize: vertical;"></textarea>
             <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
                 <button onclick="cancelFeedback()" style="padding: 12px 24px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Cancel</button>
@@ -583,14 +642,178 @@
         </div>
     </div>
 
+    <!-- Training Help Modal -->
+    <div id="training-help-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 10px; padding: 30px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;">
+                <h2 style="margin: 0; color: #667eea;">📚 Training User Guide</h2>
+                <button onclick="closeTrainingHelpModal()" style="padding: 8px 16px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Close</button>
+            </div>
+
+            <div style="line-height: 1.7; color: #333;">
+                <h3 style="color: #667eea; margin-top: 0;">Objective</h3>
+                <p>Training helps improve the Agent. Feedback on the Agent's answers creates high-quality training data that will make the Agent smarter and more accurate over time.</p>
+
+                <h3 style="color: #667eea; margin-top: 25px;">How It Works</h3>
+                <ol style="padding-left: 20px;">
+                    <li style="margin-bottom: 12px;"><strong>Ask Questions</strong> — Type questions relevant to your loaded knowledge base.</li>
+                    <li style="margin-bottom: 12px;"><strong>Review the Answer</strong> — Read the Agent's response carefully.</li>
+                    <li style="margin-bottom: 12px;"><strong>Rate the Response</strong> — Choose one:
+                        <ul style="margin-top: 8px; padding-left: 20px;">
+                            <li style="margin-bottom: 8px;"><span style="color: #11998e; font-weight: bold;">✓ Acceptable</span> — The answer is correct, complete, and helpful.</li>
+                            <li><span style="color: #e91e63; font-weight: bold;">✗ Needs Improvement</span> — The answer is wrong, incomplete, or unclear.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-bottom: 12px;"><strong>Provide Corrections</strong> (for "Needs Improvement") — When you mark an answer as needing improvement, you'll be asked to provide the correct answer or explain what's wrong.</li>
+                </ol>
+
+                <h3 style="color: #667eea; margin-top: 25px;">Tips for Effective Training</h3>
+                <ul style="padding-left: 20px;">
+                    <li style="margin-bottom: 10px;">Ask a <strong>variety of questions</strong> — easy, medium, and difficult</li>
+                    <li style="margin-bottom: 10px;">Be <strong>honest and accurate</strong> in your ratings</li>
+                    <li style="margin-bottom: 10px;">When providing corrections, be <strong>specific and complete</strong></li>
+                    <li style="margin-bottom: 10px;">Don't skip the feedback — it's what makes the training data valuable!</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px;">What Happens Next?</h3>
+                <p>Your rated Q&A pairs are stored in a training database. Administrators will use this data to:</p>
+                <ul style="padding-left: 20px;">
+                    <li style="margin-bottom: 8px;">Create training sets from your feedback</li>
+                    <li style="margin-bottom: 8px;">Fine-tune the Agent with correct answers</li>
+                    <li>Improve the system's accuracy for everyone</li>
+                </ul>
+
+                <div style="margin-top: 25px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; border-radius: 5px;">
+                    <strong style="color: #667eea;">Questions?</strong> Contact your system administrator if you need help or have questions about the training process.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow Diagram Modal -->
+    <div id="workflow-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 10px; padding: 30px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;">
+                <h2 style="margin: 0; color: #667eea;">📊 Query Processing Workflow</h2>
+                <button onclick="closeWorkflowModal()" style="padding: 8px 16px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Close</button>
+            </div>
+
+            <div style="line-height: 1.7; color: #333;">
+                <h3 style="color: #667eea; margin-top: 0;">System Architecture</h3>
+                <p>When you ask a question, your query flows through a multi-stage processing pipeline that combines multiple AI components to deliver accurate, contextual answers.</p>
+
+                <!-- Workflow Diagram -->
+                <div style="margin: 30px 0; padding: 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); border-radius: 10px; border: 2px solid #667eea;">
+                    <!-- Step 1 -->
+                    <div style="display: flex; align-items: center; margin-bottom: 25px;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">1</div>
+                        <div style="flex: 1; margin-left: 20px;">
+                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">User Question Input</div>
+                            <div style="color: #666;">You enter a natural language question through the chat interface.</div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+
+                    <!-- Step 2 -->
+                    <div style="display: flex; align-items: center; margin-bottom: 25px;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">2</div>
+                        <div style="flex: 1; margin-left: 20px;">
+                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">RAG Database Retrieval</div>
+                            <div style="color: #666; margin-bottom: 5px;">The system searches through your knowledge base using vector similarity to find the most relevant document chunks.</div>
+                            <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #11998e; margin-top: 8px;">
+                                <div style="font-size: 0.9em; color: #555;"><strong>🗄️ Active Database:</strong> <span id="workflow-db-name" style="color: #11998e; font-weight: 500;">Loading...</span></div>
+                                <div style="font-size: 0.85em; color: #777; margin-top: 3px;">Vector embeddings powered by ChromaDB</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+
+                    <!-- Step 3 -->
+                    <div style="display: flex; align-items: center; margin-bottom: 25px;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">3</div>
+                        <div style="flex: 1; margin-left: 20px;">
+                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">Spreadsheet Calculator</div>
+                            <div style="color: #666; margin-bottom: 5px;">If your question involves numerical data or calculations, the system automatically extracts values and performs computations.</div>
+                            <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #FFA726; margin-top: 8px;">
+                                <div style="font-size: 0.85em; color: #777;">🧮 Handles arithmetic, financial calculations, and data analysis</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+
+                    <!-- Step 4 -->
+                    <div style="display: flex; align-items: center; margin-bottom: 25px;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">4</div>
+                        <div style="flex: 1; margin-left: 20px;">
+                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">LLM Answer Generation</div>
+                            <div style="color: #666; margin-bottom: 5px;">A language model synthesizes the retrieved context and calculations into a natural, coherent answer.</div>
+                            <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #764ba2; margin-top: 8px;">
+                                <div style="font-size: 0.9em; color: #555;"><strong>🤖 Active Model:</strong> <span id="workflow-llm-name" style="color: #764ba2; font-weight: 500;">Loading...</span></div>
+                                <div style="font-size: 0.85em; color: #777; margin-top: 3px;">PEFT adapters provide domain-specific fine-tuning</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+
+                    <!-- Step 5 -->
+                    <div style="display: flex; align-items: center;">
+                        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">5</div>
+                        <div style="flex: 1; margin-left: 20px;">
+                            <div style="font-weight: bold; font-size: 1.1em; color: #11998e; margin-bottom: 5px;">Answer Delivery</div>
+                            <div style="color: #666;">The complete answer is displayed with source citations, allowing you to verify accuracy and explore the original documents.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="color: #667eea; margin-top: 30px;">Component Details</h3>
+
+                <div style="margin-top: 15px; padding: 15px; background: rgba(102, 126, 234, 0.05); border-left: 4px solid #667eea; border-radius: 5px;">
+                    <h4 style="margin-top: 0; color: #667eea;">RAG (Retrieval-Augmented Generation)</h4>
+                    <p style="margin-bottom: 0;">Your documents are chunked and embedded as vectors in a ChromaDB database. When you ask a question, the system performs semantic search to find the most relevant chunks, which provide context to the language model.</p>
+                </div>
+
+                <div style="margin-top: 15px; padding: 15px; background: rgba(255, 167, 38, 0.05); border-left: 4px solid #FFA726; border-radius: 5px;">
+                    <h4 style="margin-top: 0; color: #FFA726;">Spreadsheet Calculator</h4>
+                    <p style="margin-bottom: 0;">When questions involve numerical data, the calculator component automatically extracts values, performs computations, and integrates results into the final answer. This enables financial analysis, data comparisons, and mathematical operations.</p>
+                </div>
+
+                <div style="margin-top: 15px; padding: 15px; background: rgba(118, 75, 162, 0.05); border-left: 4px solid #764ba2; border-radius: 5px;">
+                    <h4 style="margin-top: 0; color: #764ba2;">Language Model</h4>
+                    <p style="margin-bottom: 0;">The system uses either standard Ollama models (like Llama 3.1 8B) or fine-tuned PEFT adapters trained on domain-specific data. PEFT adapters provide specialized knowledge while maintaining the base model's general capabilities.</p>
+                </div>
+
+                <div style="margin-top: 25px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; border-radius: 5px;">
+                    <strong style="color: #667eea;">💡 Pro Tip:</strong> The quality of answers depends on the knowledge base content. Upload relevant documents and scrape authoritative websites to improve response accuracy.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Training Set Viewer Modal -->
+    <div id="trainingset-viewer-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 10px; padding: 25px; max-width: 1000px; width: 92%; max-height: 88vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 12px; border-bottom: 2px solid #e0e0e0;">
+                <div>
+                    <h2 id="trainingset-viewer-title" style="margin: 0; color: #667eea;">Training Set</h2>
+                    <div id="trainingset-viewer-meta" style="font-size: 0.85em; color: #777; margin-top: 4px;"></div>
+                </div>
+                <button onclick="closeTrainingSetViewer()" style="padding: 8px 16px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Close</button>
+            </div>
+            <div id="trainingset-viewer-body" style="line-height: 1.6; color: #333;">
+                <p style="color: #999;">Loading...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer with version -->
-    <footer style="text-align: center; padding: 20px; margin-top: 30px; border-top: 1px solid #e0e0e0; color: #999; font-size: 0.9em;">
-        TrainingBench <span id="app-version">v...</span>
+    <footer style="text-align: center; padding: 20px; margin-top: 30px; border-top: 1px solid #e0e0e0; color: #999; font-size: 12px;">
+        TrainingBench <span id="app-version">v...</span><br>
+        <span style="font-size: 9px;">© 2025-2026 Jesse Eversole Consulting</span>
     </footer>
 
     <script>
         // Load version dynamically from backend.
-        // Uses a relative URL so it works regardless of script.js load order
+        // Use a relative URL so this works regardless of script.js load order
         // (this inline script runs before script.js, where API_BASE is defined).
         fetch('/version')
             .then(response => response.json())
@@ -603,7 +826,19 @@
             });
     </script>
 
-    <script src="script.js?v=20260128g"></script>
+    <!-- Demo / Live mode toggle confirmation (super-user only) -->
+    <div id="mode-toggle-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1100; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 10px; padding: 30px; max-width: 480px; width: 90%; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+            <h3 id="mode-toggle-title" style="margin-top: 0;">Switch mode?</h3>
+            <p id="mode-toggle-body" style="color: #555; line-height: 1.5;"></p>
+            <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
+                <button onclick="closeModeToggleModal()" style="padding: 10px 20px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer;">Cancel</button>
+                <button id="mode-toggle-confirm" onclick="confirmModeToggle()" style="padding: 10px 20px; color: white; border: none; border-radius: 5px; cursor: pointer;">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=20260530a"></script>
     <script>
         // Tab switching
         function switchTab(tabName) {
@@ -690,6 +925,7 @@
 
             let successCount = 0;
             let errorCount = 0;
+            let firstErrorDetail = null;
 
             for (const file of selectedFiles) {
                 const formData = new FormData();
@@ -699,7 +935,7 @@
                     const response = await fetch(`${API_BASE}/upload`, {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('session_token')}`
+                            'Authorization': `Bearer ${sessionStorage.getItem('session_token')}`
                         },
                         body: formData
                     });
@@ -708,9 +944,22 @@
                         successCount++;
                     } else {
                         errorCount++;
+                        if (!firstErrorDetail) {
+                            let detail = null;
+                            try {
+                                const body = await response.json();
+                                detail = body && body.detail ? body.detail : null;
+                            } catch (_) {
+                                // body wasn't JSON; fall through to status-code fallback
+                            }
+                            firstErrorDetail = `${file.name}: ${detail || `HTTP ${response.status}`}`;
+                        }
                     }
                 } catch (error) {
                     errorCount++;
+                    if (!firstErrorDetail) {
+                        firstErrorDetail = `${file.name}: ${error.message}`;
+                    }
                 }
             }
 
@@ -726,7 +975,10 @@
             }
 
             if (errorCount > 0) {
-                showStatus(statusDiv, `Failed to upload ${errorCount} file(s)`, 'error');
+                const msg = firstErrorDetail
+                    ? `Failed to upload ${errorCount} file(s) — ${firstErrorDetail}`
+                    : `Failed to upload ${errorCount} file(s)`;
+                showStatus(statusDiv, msg, 'error');
             }
         }
 
@@ -737,7 +989,8 @@
         }
 
         function updateSlider(type) {
-            const value = document.getElementById(`max-${type === 'depth' ? 'depth' : type === 'pages' ? 'pages' : 'delay-between'}`).value;
+            const idMap = { depth: 'max-depth', pages: 'max-pages', delay: 'delay-between' };
+            const value = document.getElementById(idMap[type]).value;
             document.getElementById(`${type}-value`).textContent = value;
         }
 
@@ -773,7 +1026,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('session_token')}`,
+                            'Authorization': `Bearer ${sessionStorage.getItem('session_token')}`,
                             'X-API-Key': ''
                         },
                         body: JSON.stringify({
@@ -784,7 +1037,7 @@
                         })
                     });
 
-                    const data = await response.json();
+                    const data = await parseScrapeResponse(response);
 
                     if (response.ok) {
                         showStatus(statusDiv, `Successfully crawled ${data.pages_crawled} pages`, 'success');
@@ -798,13 +1051,13 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('session_token')}`,
+                            'Authorization': `Bearer ${sessionStorage.getItem('session_token')}`,
                             'X-API-Key': ''
                         },
                         body: JSON.stringify({ urls: urls })
                     });
 
-                    const data = await response.json();
+                    const data = await parseScrapeResponse(response);
 
                     if (response.ok) {
                         showStatus(statusDiv, data.message, 'success');
@@ -818,6 +1071,31 @@
                 showStatus(statusDiv, `Error: ${error.message}`, 'error');
             } finally {
                 loader.style.display = 'none';
+            }
+        }
+
+        // Parse a scrape-endpoint response, but translate the common "long
+        // request → proxy timeout → HTML 502/504 page" case into a useful
+        // message instead of the raw JSON-parse error the browser would emit.
+        async function parseScrapeResponse(response) {
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (parseErr) {
+                const looksLikeHtml = text.trim().toLowerCase().startsWith('<!doctype') ||
+                                      text.trim().startsWith('<');
+                if (looksLikeHtml) {
+                    const status = response.status;
+                    const hint = (status === 502 || status === 504)
+                        ? `The network gateway returned an HTTP ${status} (proxy/gateway timeout).`
+                        : `The server returned an HTML page (HTTP ${status}) instead of JSON.`;
+                    throw new Error(
+                        `${hint} The scrape may still be running in the background — ` +
+                        `wait a minute or two and click "Refresh Stats" to see if pages were ingested. ` +
+                        `Check the backend log (logs/backend.log) for the actual completion status.`
+                    );
+                }
+                throw new Error(`Could not parse response from server: ${parseErr.message}`);
             }
         }
 
@@ -837,7 +1115,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('session_token')}`
+                        'Authorization': `Bearer ${sessionStorage.getItem('session_token')}`
                     },
                     body: JSON.stringify({ query: query, k: 5 })
                 });
@@ -876,10 +1154,10 @@
             try {
                 const [docsResponse, foldersResponse] = await Promise.all([
                     fetch(`${API_BASE}/documents`, {
-                        headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('session_token')}` }
                     }),
                     fetch(`${API_BASE}/folders`, {
-                        headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('session_token')}` }
                     })
                 ]);
 
@@ -956,7 +1234,7 @@
             try {
                 const response = await fetch(`${API_BASE}/documents/${encodeURIComponent(docId)}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('session_token')}` }
                 });
 
                 if (response.ok) {
@@ -986,7 +1264,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('session_token')}`
+                        'Authorization': `Bearer ${sessionStorage.getItem('session_token')}`
                     },
                     body: JSON.stringify({ folder_name: folderName.trim() })
                 });
@@ -1023,7 +1301,7 @@
         // Power Search Functions
         async function loadPowerSearchServices() {
             try {
-                const token = localStorage.getItem('session_token');
+                const token = sessionStorage.getItem('session_token');
                 const response = await fetch(`${API_BASE}/power-search/services`, {
                     headers: {'Authorization': `Bearer ${token}`}
                 });
@@ -1114,7 +1392,7 @@
             }, 100);
 
             try {
-                const token = localStorage.getItem('session_token');
+                const token = sessionStorage.getItem('session_token');
                 const response = await fetch(`${API_BASE}/power-search`, {
                     method: 'POST',
                     headers: {
