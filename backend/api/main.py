@@ -46,9 +46,14 @@ WEB_USERNAME = os.getenv("WEB_USERNAME", "demo")
 WEB_PASSWORD = os.getenv("WEB_PASSWORD", "changeme")
 SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key-change-this")
 
-# PEFT adapter to use for the RAG generation backend. Configure via env var
-# to point to your trained adapter; the default below is a placeholder.
-PEFT_ADAPTER_PATH = os.getenv("PEFT_ADAPTER_PATH", "training/adapters/example")
+# RAG generation backend selection. The RAG system supports several
+# providers (peft, ollama, openai, huggingface). Choose at runtime via
+# env var; default is peft.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "peft").lower()
+# Model identifier passed to the chosen provider. If unset, the provider
+# falls back to its own default (e.g. PEFT_ADAPTER_PATH env for peft,
+# OLLAMA_MODEL env for ollama). Set this to override per-deployment.
+LLM_MODEL = os.getenv("LLM_MODEL") or None
 
 # Site Access Gate configuration
 SITE_PASSPHRASE = os.getenv("SITE_PASSPHRASE", "")  # Shared passphrase for community access
@@ -96,8 +101,8 @@ db_manager = DatabaseManager(config_file="database_config.json")
 # Use the active database path from database manager
 active_db_path = db_manager.get_database_path()
 rag_system = RAGSystem(
-    llm_provider="peft",
-    model_name=PEFT_ADAPTER_PATH,
+    llm_provider=LLM_PROVIDER,
+    model_name=LLM_MODEL,
     vector_store=VectorStore(persist_directory=active_db_path)
 )
 
@@ -1316,8 +1321,8 @@ async def switch_database(
         # Reinitialize RAG system with new database
         new_db_path = db_manager.get_database_path(switch_request.db_id)
         rag_system = RAGSystem(
-            llm_provider="peft",
-            model_name=PEFT_ADAPTER_PATH,
+            llm_provider=LLM_PROVIDER,
+            model_name=LLM_MODEL,
             vector_store=VectorStore(persist_directory=new_db_path)
         )
 
