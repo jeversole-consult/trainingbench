@@ -1,9 +1,9 @@
 # TB-US-001: Add CLI arguments, evaluation, and run tracking to the GSM8K training pipeline
 
-**Status**: Proposed
+**Status**: In Progress
 **Created**: 2026-06-06
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: a908237 (implementation)
 
 ## Story
 
@@ -39,48 +39,57 @@ methodology for TrainingBench (see `docs/user-stories/template.md`).
 
 ## Requirements
 
-- [ ] R1: `training/math/train.py` accepts CLI arguments for every
+- [x] R1: `training/math/train.py` accepts CLI arguments for every
       currently-hard-coded knob: base model, dataset path, output dir,
       LoRA rank / alpha / dropout / target modules, batch size,
       gradient accumulation, learning rate, number of epochs, max
       sequence length, warmup steps, save steps, logging steps, and
       a way to use a subset of the training data for smoke tests.
-- [ ] R2: Each CLI argument has a default that matches the value the
+- [x] R2: Each CLI argument has a default that matches the value the
       original committed script used, so the existing behaviour is
       reproducible by running the script with no arguments.
-- [ ] R3: When the dataset directory contains a `test` split, the
+- [x] R3: When the dataset directory contains a `test` split, the
       training loop evaluates against it on a configurable cadence.
       When there is no `test` split, training continues without
       evaluation rather than failing.
-- [ ] R4: CLI flags also cap eval samples (e.g. `--max-eval-samples`)
+- [x] R4: CLI flags also cap eval samples (e.g. `--max-eval-samples`)
       so a quick smoke test doesn't pay for full-eval at every step.
-- [ ] R5: When `scripts/training_tracker_callback.py` is importable,
+- [x] R5: When `scripts/training_tracker_callback.py` is importable,
       training runs are recorded via the `TrainingTrackerCallback`
       under `--run-name`. When it is not importable, training proceeds
       without tracking and prints a single visible warning at startup
       — the pipeline does not hard-fail on a missing optional
       dependency.
-- [ ] R6: `scripts/training_tracker_callback.py` (the standalone-mode
+- [x] R6: `scripts/training_tracker_callback.py` (the standalone-mode
       tracker callback) is tracked in git, since R5 depends on it.
 
 ## Acceptance Criteria
 
-- [ ] AC1: `python training/math/train.py --help` lists every CLI
+- [x] AC1: `python training/math/train.py --help` lists every CLI
       flag with a brief description and the same default the
-      pre-refactor module constants had.
-- [ ] AC2: Running with no arguments produces the same training
+      pre-refactor module constants had. *(Verified by inspection of
+      the argparse definitions in main() against the constants in
+      d540c63. Not yet exercised against an installed environment.)*
+- [x] AC2: Running with no arguments produces the same training
       configuration as the pre-refactor script did (regression check
-      against `d540c63`).
+      against `d540c63`). *(Verified by inspection: every argparse
+      default matches the original module constant.)*
 - [ ] AC3: Running with `--max-train-samples 50 --max-eval-samples 25
       --num-epochs 1` completes a smoke train+eval loop quickly on the
       target hardware, with eval metrics printed at least once.
+      *(Requires runtime verification with the training stack
+      installed; not yet performed.)*
 - [ ] AC4: Running with `--run-name <some-name>` produces a structured
       log file under the tracker's log directory containing at minimum
       run name, start time, end time, final metrics, and the resolved
-      configuration.
-- [ ] AC5: Renaming or removing `scripts/training_tracker_callback.py`
+      configuration. *(Requires runtime verification; not yet
+      performed.)*
+- [x] AC5: Renaming or removing `scripts/training_tracker_callback.py`
       temporarily reproduces the "tracker not available" warning and
-      training still runs to completion.
+      training still runs to completion. *(Structurally guaranteed by
+      the try/except ImportError block at train.py lines 38-43 and the
+      TRACKER_AVAILABLE gate at line 349. Not yet exercised end-to-end
+      at runtime.)*
 
 ## Design Notes
 
@@ -113,12 +122,21 @@ methodology for TrainingBench (see `docs/user-stories/template.md`).
 - Multi-GPU / DeepSpeed / FSDP. Single-GPU QLoRA stays the assumed
   deployment target for this script.
 
+## Completion Notes
+
+Implementation landed in commit `a908237`. R1-R6 all satisfied by code
+review. AC1, AC2, and AC5 verified by inspection. AC3 and AC4 require
+an environment with `torch`, `transformers`, `peft`, `bitsandbytes`,
+and the GSM8K dataset installed; mark them when those runtime
+verifications are done and promote Status to Completed.
+
 ## Related
 
-- `training/math/train.py` — file being refactored
-- `scripts/training_tracker_callback.py` — soft dependency this story
-  promotes from untracked-on-disk to tracked
+- `training/math/train.py` — file refactored in `a908237`
+- `scripts/training_tracker_callback.py` — soft dependency, first
+  tracked in `a908237`
 - Commit `d540c63` ("feat: Add complete GSM8K training pipeline with
   QLoRA") — the baseline this refactors
+- Commit `a908237` — the implementation
 - `docs/user-stories/template.md` — the story format
 - `docs/user-stories/example.md` — the worked example
