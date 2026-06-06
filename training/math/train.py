@@ -4,6 +4,8 @@ QLoRA fine-tuning for GSM8K using Llama 3.1 8B.
 
 This script fine-tunes the base Llama model on GSM8K using QLoRA (Quantized Low-Rank Adaptation)
 for parameter-efficient training on consumer hardware.
+
+Enhanced with CLI arguments, evaluation support, and training tracking.
 """
 
 import os
@@ -29,31 +31,16 @@ from peft import (
 from datasets import load_from_disk
 from tqdm import tqdm
 
+# Add scripts directory to path for training tracker
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
-# Configuration
-BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-DATASET_PATH = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
-OUTPUT_DIR = Path(__file__).parent.parent.parent / "models" / "fine-tuned" / "gsm8k_qlora"
-LOGS_DIR = Path(__file__).parent.parent.parent / "experiments" / "logs"
-
-# QLoRA hyperparameters (from README)
-LORA_R = 16
-LORA_ALPHA = 32
-LORA_DROPOUT = 0.05
-TARGET_MODULES = ["q_proj", "v_proj", "k_proj", "o_proj"]
-
-# Training hyperparameters
-BATCH_SIZE = 4
-GRADIENT_ACCUMULATION_STEPS = 4
-LEARNING_RATE = 2e-4
-NUM_EPOCHS = 3
-MAX_LENGTH = 512
-WARMUP_STEPS = 100
-SAVE_STEPS = 500
-LOGGING_STEPS = 50
-
-# Use full training set (7,473 examples) or subset for testing
-USE_FULL_DATASET = True  # Set to False for quick testing with 1000 examples
+# Try to import training tracker callback
+try:
+    from training_tracker_callback import TrainingTrackerCallback
+    TRACKER_AVAILABLE = True
+except ImportError:
+    TRACKER_AVAILABLE = False
+    print("⚠️  Training tracker not available, training will proceed without tracking")
 
 
 def format_training_example(example):
@@ -91,25 +78,37 @@ Final Answer: {final_answer}<|eot_id|>"""
     return {"text": prompt}
 
 
-def prepare_dataset(tokenizer):
-    """Load and prepare GSM8K dataset for training."""
+def prepare_dataset(tokenizer, dataset_path, max_length=512, use_full_dataset=True, max_train_samples=None, max_eval_samples=None):
+    """Load and prepare GSM8K dataset for training and evaluation."""
     print("Loading dataset...")
 
-    if not DATASET_PATH.exists():
-        print(f"Error: Dataset not found at {DATASET_PATH}")
+    if not dataset_path.exists():
+        print(f"Error: Dataset not found at {dataset_path}")
         print("Please run: python scripts/download_gsm8k.py")
         sys.exit(1)
 
-    dataset = load_from_disk(str(DATASET_PATH))
+    dataset = load_from_disk(str(dataset_path))
 
     # Use training split
     train_data = dataset['train']
 
-    if not USE_FULL_DATASET:
-        print("Using subset of 1000 examples for testing...")
-        train_data = train_data.select(range(1000))
+    # Use test split for evaluation if available
+    eval_data = dataset.get('test', None)
+
+    # Limit training samples
+    if not use_full_dataset or max_train_samples:
+        num_samples = max_train_samples if max_train_samples else 1000
+        print(f"Using subset of {num_samples} training examples...")
+        train_data = train_data.select(range(min(num_samples, len(train_data))))
+
+    # Limit eval samples
+    if eval_data and max_eval_samples:
+        print(f"Using subset of {max_eval_samples} eval examples...")
+        eval_data = eval_data.select(range(min(max_eval_samples, len(eval_data))))
 
     print(f"Training examples: {len(train_data)}")
+    if eval_data:
+        print(f"Evaluation examples: {len(eval_data)}")
 
     # Format examples
     print("Formatting examples...")
@@ -119,6 +118,13 @@ def prepare_dataset(tokenizer):
         desc="Formatting training examples",
     )
 
+    if eval_data:
+        eval_data = eval_data.map(
+            format_training_example,
+            remove_columns=eval_data.column_names,
+            desc="Formatting eval examples",
+        )
+
     # Tokenize
     print("Tokenizing examples...")
 
@@ -126,7 +132,7 @@ def prepare_dataset(tokenizer):
         return tokenizer(
             examples["text"],
             truncation=True,
-            max_length=MAX_LENGTH,
+            max_length=max_length,
             padding=False,
         )
 
@@ -134,23 +140,34 @@ def prepare_dataset(tokenizer):
         tokenize_function,
         batched=True,
         remove_columns=["text"],
-        desc="Tokenizing",
+        desc="Tokenizing training data",
     )
 
-    return train_data
+    if eval_data:
+        eval_data = eval_data.map(
+            tokenize_function,
+            batched=True,
+            remove_columns=["text"],
+            desc="Tokenizing eval data",
+        )
+
+    return train_data, eval_data
 
 
-def create_qlora_model(model_name):
+def create_qlora_model(model_name, lora_r=16, lora_alpha=32, lora_dropout=0.05, target_modules=None):
     """Create QLoRA-configured model."""
+    if target_modules is None:
+        target_modules = ["q_proj", "v_proj", "k_proj", "o_proj"]
+
     print("=" * 80)
     print("Setting up QLoRA Configuration")
     print("=" * 80)
     print()
     print(f"Base model: {model_name}")
-    print(f"LoRA rank (r): {LORA_R}")
-    print(f"LoRA alpha: {LORA_ALPHA}")
-    print(f"LoRA dropout: {LORA_DROPOUT}")
-    print(f"Target modules: {TARGET_MODULES}")
+    print(f"LoRA rank (r): {lora_r}")
+    print(f"LoRA alpha: {lora_alpha}")
+    print(f"LoRA dropout: {lora_dropout}")
+    print(f"Target modules: {target_modules}")
     print()
 
     # BitsAndBytes configuration for 4-bit quantization
@@ -175,10 +192,10 @@ def create_qlora_model(model_name):
 
     # Configure LoRA
     lora_config = LoraConfig(
-        r=LORA_R,
-        lora_alpha=LORA_ALPHA,
-        lora_dropout=LORA_DROPOUT,
-        target_modules=TARGET_MODULES,
+        r=lora_r,
+        lora_alpha=lora_alpha,
+        lora_dropout=lora_dropout,
+        target_modules=target_modules,
         bias="none",
         task_type="CAUSAL_LM",
     )
@@ -201,50 +218,128 @@ def create_qlora_model(model_name):
     return model
 
 
-def train():
-    """Run QLoRA training on GSM8K."""
+def train(
+    model_name="meta-llama/Meta-Llama-3.1-8B-Instruct",
+    dataset_path=None,
+    output_dir=None,
+    num_epochs=3,
+    batch_size=4,
+    gradient_accumulation_steps=4,
+    learning_rate=2e-4,
+    lora_r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    lora_target_modules=None,
+    max_length=512,
+    warmup_steps=100,
+    save_steps=500,
+    logging_steps=50,
+    eval_steps=None,
+    use_full_dataset=True,
+    max_train_samples=None,
+    max_eval_samples=None,
+    use_tracking=True,
+    run_name=None
+):
+    """
+    Run QLoRA training on GSM8K.
+
+    Args:
+        model_name: Base model to fine-tune
+        dataset_path: Path to dataset directory
+        output_dir: Output directory for model and checkpoints
+        num_epochs: Number of training epochs
+        batch_size: Training batch size
+        gradient_accumulation_steps: Gradient accumulation steps
+        learning_rate: Learning rate
+        lora_r: LoRA rank
+        lora_alpha: LoRA alpha scaling factor
+        lora_dropout: LoRA dropout rate
+        max_length: Maximum sequence length
+        warmup_steps: Warmup steps
+        save_steps: Save checkpoint every N steps
+        logging_steps: Log every N steps
+        eval_steps: Evaluate every N steps (None = no evaluation)
+        use_full_dataset: Use full dataset or subset
+        max_train_samples: Maximum training samples (None = all)
+        max_eval_samples: Maximum eval samples (None = all)
+        use_tracking: Enable training tracking
+        run_name: Name for training run (for tracking)
+    """
+    # Set default paths if not provided
+    if dataset_path is None:
+        dataset_path = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
+    if output_dir is None:
+        output_dir = Path(__file__).parent.parent.parent / "models" / "fine-tuned" / "gsm8k_qlora"
+
+    dataset_path = Path(dataset_path)
+    output_dir = Path(output_dir)
+    logs_dir = Path(__file__).parent.parent.parent / "experiments" / "logs"
+
     print("=" * 80)
     print("GSM8K QLoRA Fine-Tuning")
     print("=" * 80)
     print()
     print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Model: {model_name}")
+    print(f"Output: {output_dir}")
     print()
 
+    # Check GPU
+    if not torch.cuda.is_available():
+        print("\n⚠️  WARNING: No GPU detected! Training will be very slow.")
+        response = input("Continue anyway? (yes/no): ")
+        if response.lower() != 'yes':
+            print("Training cancelled.")
+            return False
+    else:
+        print(f"✓ GPU detected: {torch.cuda.get_device_name(0)}")
+        print(f"  VRAM available: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB\n")
+
     # Create output directories
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Load tokenizer
     print("Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
     # Prepare dataset
-    train_dataset = prepare_dataset(tokenizer)
+    train_dataset, eval_dataset = prepare_dataset(
+        tokenizer, dataset_path, max_length,
+        use_full_dataset, max_train_samples, max_eval_samples
+    )
 
     # Create model
-    model = create_qlora_model(BASE_MODEL)
+    model = create_qlora_model(
+        model_name, lora_r, lora_alpha, lora_dropout,
+        target_modules=lora_target_modules,
+    )
 
     # Training arguments
     training_args = TrainingArguments(
-        output_dir=str(OUTPUT_DIR),
-        num_train_epochs=NUM_EPOCHS,
-        per_device_train_batch_size=BATCH_SIZE,
-        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
-        learning_rate=LEARNING_RATE,
-        warmup_steps=WARMUP_STEPS,
-        logging_steps=LOGGING_STEPS,
-        save_steps=SAVE_STEPS,
+        output_dir=str(output_dir),
+        num_train_epochs=num_epochs,
+        per_device_train_batch_size=batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        learning_rate=learning_rate,
+        warmup_steps=warmup_steps,
+        logging_steps=logging_steps,
+        save_steps=save_steps,
+        eval_strategy="steps" if (eval_dataset and eval_steps) else "no",
+        eval_steps=eval_steps if (eval_dataset and eval_steps) else None,
         save_total_limit=3,
         fp16=True,
         optim="paged_adamw_8bit",
-        logging_dir=str(LOGS_DIR / "gsm8k"),
+        logging_dir=str(logs_dir / "gsm8k"),
         report_to=["tensorboard"],
         gradient_checkpointing=True,
         max_grad_norm=0.3,
         weight_decay=0.001,
         lr_scheduler_type="cosine",
+        load_best_model_at_end=True if (eval_dataset and eval_steps) else False,
     )
 
     # Data collator
@@ -253,12 +348,24 @@ def train():
         mlm=False,
     )
 
+    # Set up training tracker callback
+    callbacks = []
+    if use_tracking and TRACKER_AVAILABLE:
+        if run_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            run_name = f"gsm8k_qlora_{timestamp}"
+
+        tracker_callback = TrainingTrackerCallback(run_name=run_name)
+        callbacks.append(tracker_callback)
+
     # Create trainer
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         data_collator=data_collator,
+        callbacks=callbacks if callbacks else None,
     )
 
     # Start training
@@ -267,12 +374,16 @@ def train():
     print("=" * 80)
     print()
     print(f"Training samples: {len(train_dataset)}")
-    print(f"Epochs: {NUM_EPOCHS}")
-    print(f"Batch size: {BATCH_SIZE}")
-    print(f"Gradient accumulation: {GRADIENT_ACCUMULATION_STEPS}")
-    print(f"Effective batch size: {BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS}")
-    print(f"Learning rate: {LEARNING_RATE}")
-    print(f"Output directory: {OUTPUT_DIR}")
+    if eval_dataset:
+        print(f"Eval samples: {len(eval_dataset)}")
+    print(f"Epochs: {num_epochs}")
+    print(f"Batch size: {batch_size}")
+    print(f"Gradient accumulation: {gradient_accumulation_steps}")
+    print(f"Effective batch size: {batch_size * gradient_accumulation_steps}")
+    print(f"Learning rate: {learning_rate}")
+    if eval_steps:
+        print(f"Evaluation every: {eval_steps} steps")
+    print(f"Output directory: {output_dir}")
     print()
 
     # Train
@@ -287,48 +398,134 @@ def train():
     print("=" * 80)
     print()
     print(f"Duration: {duration}")
-    print(f"Output directory: {OUTPUT_DIR}")
+    print(f"Output directory: {output_dir}")
     print()
 
     # Save final model
     print("Saving final model...")
-    trainer.save_model(str(OUTPUT_DIR / "final"))
-    tokenizer.save_pretrained(str(OUTPUT_DIR / "final"))
+    trainer.save_model(str(output_dir / "final"))
+    tokenizer.save_pretrained(str(output_dir / "final"))
 
     # Save training info
     training_info = {
-        "base_model": BASE_MODEL,
+        "base_model": model_name,
         "dataset": "GSM8K",
         "training_examples": len(train_dataset),
-        "epochs": NUM_EPOCHS,
-        "batch_size": BATCH_SIZE,
-        "learning_rate": LEARNING_RATE,
-        "lora_r": LORA_R,
-        "lora_alpha": LORA_ALPHA,
-        "lora_dropout": LORA_DROPOUT,
-        "target_modules": TARGET_MODULES,
+        "eval_examples": len(eval_dataset) if eval_dataset else 0,
+        "epochs": num_epochs,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "lora_r": lora_r,
+        "lora_alpha": lora_alpha,
+        "lora_dropout": lora_dropout,
+        "target_modules": lora_target_modules or ["q_proj", "v_proj", "k_proj", "o_proj"],
         "duration_seconds": duration.total_seconds(),
         "start_time": start_time.isoformat(),
         "end_time": end_time.isoformat(),
     }
 
-    info_file = OUTPUT_DIR / "training_info.json"
+    info_file = output_dir / "training_info.json"
     with open(info_file, 'w') as f:
         json.dump(training_info, f, indent=2)
 
     print(f"Training info saved to: {info_file}")
     print()
     print("Next steps:")
-    print("  1. Run evaluation: python training/math/evaluate.py")
-    print("  2. Compare results with baseline")
+    print("  1. Test adapter: python scripts/test_adapter.py --adapter-path", str(output_dir / "final"))
+    print("  2. Run evaluation: python training/math/evaluate.py")
+    print("  3. Compare results with baseline")
     print()
 
     return True
 
 
-if __name__ == "__main__":
+def main():
+    """Main function with argument parsing."""
+    import argparse
+
+    # Set default paths relative to script location
+    default_dataset = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
+    default_output = Path(__file__).parent.parent.parent / "models" / "fine-tuned" / "gsm8k_qlora"
+
+    parser = argparse.ArgumentParser(description="Train QLoRA adapter for GSM8K")
+
+    # Model configuration
+    parser.add_argument("--model", default="meta-llama/Meta-Llama-3.1-8B-Instruct",
+                        help="Base model name (default: Meta-Llama-3.1-8B-Instruct)")
+    parser.add_argument("--dataset-path", type=str, default=str(default_dataset),
+                        help="Path to dataset directory")
+    parser.add_argument("--output-dir", type=str, default=str(default_output),
+                        help="Output directory for model and checkpoints")
+
+    # Training hyperparameters
+    parser.add_argument("--epochs", type=int, default=3, help="Number of epochs (default: 3)")
+    parser.add_argument("--batch-size", type=int, default=4, help="Batch size (default: 4)")
+    parser.add_argument("--gradient-accum", type=int, default=4,
+                        help="Gradient accumulation steps (default: 4)")
+    parser.add_argument("--lr", type=float, default=2e-4, help="Learning rate (default: 2e-4)")
+    parser.add_argument("--max-length", type=int, default=512,
+                        help="Max sequence length (default: 512)")
+    parser.add_argument("--warmup-steps", type=int, default=100, help="Warmup steps (default: 100)")
+
+    # LoRA hyperparameters
+    parser.add_argument("--lora-r", type=int, default=16, help="LoRA rank (default: 16)")
+    parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha (default: 32)")
+    parser.add_argument("--lora-dropout", type=float, default=0.05,
+                        help="LoRA dropout (default: 0.05)")
+    parser.add_argument("--lora-target-modules", nargs='+',
+                        default=["q_proj", "v_proj", "k_proj", "o_proj"],
+                        help="LoRA target module names, space-separated "
+                             "(default: q_proj v_proj k_proj o_proj)")
+
+    # Logging and saving
+    parser.add_argument("--save-steps", type=int, default=500,
+                        help="Save checkpoint every N steps (default: 500)")
+    parser.add_argument("--logging-steps", type=int, default=50,
+                        help="Log every N steps (default: 50)")
+    parser.add_argument("--eval-steps", type=int, default=None,
+                        help="Evaluate every N steps (default: None = no evaluation)")
+
+    # Dataset options
+    parser.add_argument("--subset", action="store_true",
+                        help="Use subset of 1000 examples for quick testing")
+    parser.add_argument("--max-train-samples", type=int, default=None,
+                        help="Maximum number of training samples to use")
+    parser.add_argument("--max-eval-samples", type=int, default=None,
+                        help="Maximum number of evaluation samples to use")
+
+    # Training tracking
+    parser.add_argument("--no-tracking", action="store_true",
+                        help="Disable training tracking")
+    parser.add_argument("--run-name", type=str, default=None,
+                        help="Name for this training run (for tracking)")
+
+    args = parser.parse_args()
+
+    # Run training
     try:
-        success = train()
+        success = train(
+            model_name=args.model,
+            dataset_path=args.dataset_path,
+            output_dir=args.output_dir,
+            num_epochs=args.epochs,
+            batch_size=args.batch_size,
+            gradient_accumulation_steps=args.gradient_accum,
+            learning_rate=args.lr,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            max_length=args.max_length,
+            warmup_steps=args.warmup_steps,
+            save_steps=args.save_steps,
+            logging_steps=args.logging_steps,
+            eval_steps=args.eval_steps,
+            use_full_dataset=not args.subset,
+            max_train_samples=args.max_train_samples,
+            max_eval_samples=args.max_eval_samples,
+            use_tracking=not args.no_tracking,
+            run_name=args.run_name
+        )
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
@@ -338,3 +535,7 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
