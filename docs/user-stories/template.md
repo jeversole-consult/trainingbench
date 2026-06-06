@@ -3,9 +3,10 @@
 <!--
 How to use this template:
 
-1. Copy this file to `docs/user-stories/NNN-short-slug.md` where NNN is the
+1. Copy this file to `docs/user-stories/tb-us-NNN.md` where NNN is the
    next available number (zero-padded to three digits — 001, 002, 010,
-   100). Pick the slug to match the title (e.g. 001-admin-user-ui.md).
+   100). The filename is exactly the story ID, lowercased, with no
+   descriptive slug.
 2. Fill in every section. If a section genuinely doesn't apply, write
    "N/A" with a one-line reason — don't just delete it.
 3. Open a draft PR with the story file alone, before you write code.
