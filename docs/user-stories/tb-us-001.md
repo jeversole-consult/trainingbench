@@ -140,3 +140,5 @@ verifications are done and promote Status to Completed.
 - Commit `a908237` — the implementation
 - `docs/user-stories/template.md` — the story format
 - `docs/user-stories/example.md` — the worked example
+- TB-US-002 — the install story that will exercise this story's AC3
+  and AC4 as a side effect of verifying the install
