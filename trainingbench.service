@@ -1,0 +1,27 @@
+# Systemd service template for TrainingBench.
+#
+# Before installing this file at /etc/systemd/system/trainingbench.service,
+# replace the placeholders below with values that match your environment:
+#   <your-user>            — the OS user the service runs as
+#   /path/to/trainingbench — the absolute path to your TrainingBench checkout
+#   APP_PORT               — the port you want TrainingBench to listen on
+#
+# Then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now trainingbench
+
+[Unit]
+Description=TrainingBench ML Training Platform
+After=network.target
+
+[Service]
+Type=simple
+User=<your-user>
+WorkingDirectory=/path/to/trainingbench
+Environment="APP_PORT=8000"
+ExecStart=/path/to/trainingbench/venv/bin/python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

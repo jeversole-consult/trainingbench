@@ -54,3 +54,30 @@ wandb/
 
 # HuggingFace cache
 .cache/
+
+# Runtime artifacts (created by the running server)
+chroma_db/
+chroma_db_*/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+app_settings.json
+scraped_data/
+
+# Local virtual environments
+venv/
+.venv/
+
+# Per-run training output
+training/data/
+training/datasets/data/
+training/runs/
+
+# Editor / OS scratch
+*.bak
+*.backup
+*.backup2
+*.tmp
+.idea/
+.vscode/
