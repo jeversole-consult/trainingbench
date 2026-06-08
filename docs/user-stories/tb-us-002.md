@@ -1,4 +1,4 @@
-# TB-US-002: First-release install path for TrainingBench
+# TB-US-002: First-release install instructions for TrainingBench
 
 **Status**: Proposed
 **Created**: 2026-06-06
@@ -7,32 +7,37 @@
 
 ## Story
 
-As an operator setting up TrainingBench for the first time on a
-GPU-equipped Linux machine, I want a single documented install path
-that takes me from `git clone` to a running, smoke-verified
-TrainingBench in a known-good environment — so I can use the platform
-for training and start building a domain application on top of it
-without reverse-engineering implicit setup steps.
+
+As a new user setting up TrainingBench for a new project,
+I need install instructions that take me from `git clone`
+to a running, smoke-verified TrainingBench install
+on a bare metal or virtual hardware/OS — so that I can use
+the platform to build and train a chat based AI agent ready
+for deployment.
 
 ## Background
 
-TrainingBench currently has no documented install path. The
+TrainingBench currently has no documented install instructions. The
 `requirements.txt` lists Python dependencies, but the README does not
 walk through venv creation, system binaries (CUDA, tesseract, poppler),
 Python version selection, or how to verify the install actually works.
-A contributor or a downstream operator cloning the repo today has to
-guess at the right sequence and has no way to confirm they got it
-right short of trying the training pipeline.
+A contributor or a downstream operator cloning the repo today needs 
+detailed install instructions to navigate the installation of the many
+tools that a TrainingBench installation requires. Installation is a
+substantial undertaking. 
 
-This story is the on-ramp the platform doesn't have. It is explicitly
-the bottleneck the user identified when describing what makes
-TrainingBench powerful or not: *"a major challenge is the hardware and
-installation of the software with the networking demands."*
+Installs are **per-project**. A user managing multiple projects
+creates a separate TrainingBench install per project — a new directory
+for each, each with its own venv, runtime artifacts, and configuration.
+This story documents that per-project install workflow. It does not
+cover building the agent itself; that is the work the install enables,
+and will be addressed in one or more future stories.
 
-A successful install path satisfies two audiences:
+Successful installation satisfies the following:
 
-1. **The waiting first-release operator** — needs the install to work
-   on a real machine so they can train. Concrete, single environment.
+1. **The first install user** — needs the install to work on a well
+   defined machine/OS so they can use the application to build agents.
+   
 2. **An OSS contributor evaluating the project** — needs the install
    instructions to be honest about prerequisites, dependencies, and
    what's been tested. Generic, with clear "tested on / not tested on"
@@ -62,7 +67,7 @@ A successful install path satisfies two audiences:
       smoke-train invocation from TB-US-001. Verification should
       double as the "did it work" check for that story's AC3 and AC4.
 - [ ] R6: The document calls out the **first-boot side effects** the
-      operator will see: default admin user creation (and the env vars
+      user will see: default admin user creation (and the env vars
       that override the credentials), the `app_settings.json` getting
       seeded, and the initial empty ChromaDB directory.
 - [ ] R7: The document says clearly **what hardware was tested** and
@@ -70,27 +75,28 @@ A successful install path satisfies two audiences:
 
 ## Acceptance Criteria
 
-- [ ] AC1: A reader who has Linux, an internet connection, sudo, and
-      a supported NVIDIA GPU can follow the install document end to
-      end and end up with `uvicorn` serving the TrainingBench backend
-      on a configured port, returning the login page in a browser.
+- [ ] AC1: A new user who has Linux, an internet connection, sudo,
+      and a supported NVIDIA GPU can follow the install document end
+      to end and end up with `uvicorn` serving the TrainingBench
+      backend on a configured port, returning the login page in a
+      browser.
 - [ ] AC2: After the install path is followed, the smoke-train
       invocation from TB-US-001
       (`python training/math/train.py --max-train-samples 50
       --max-eval-samples 25 --epochs 1 --run-name smoke-test`)
       completes successfully and produces a tracker log under the
-      configured log directory.
+      install directory.
 - [ ] AC3: The install path was actually executed on at least one
-      real machine (not just dry-read), and the operator's notes on
-      what surprised them are folded back into the doc as either
-      fixes or "known issue" callouts.
+      real or virtual machine (not just dry-read), and the user's
+      notes on what surprised them are folded back into the doc as
+      either fixes or "known issue" callouts.
 - [ ] AC4: A `--help` invocation of the major entry points (the
       training script, the uvicorn startup) is included in the install
-      doc so the reader can confirm their venv is wired correctly
+      doc so the user can confirm their venv is wired correctly
       without committing to a full smoke run.
 - [ ] AC5: The install doc names a minimum disk footprint estimate
       (rough order of magnitude — the torch / transformers stack and
-      a base Llama 3.1 8B checkpoint is not small) so the operator
+      a base Llama 3.1 8B checkpoint is not small) so the user
       sizes their environment realistically.
 
 ## Design Notes
@@ -112,9 +118,22 @@ A successful install path satisfies two audiences:
 
 ## Out of Scope
 
-- **Using TrainingBench as a foundation for a new project.** The
-  template/scaffolding workflow ("clone this, rename it, build your
-  domain app on it") is a separate concern with its own story.
+This story stops at "the platform is installed and verified, the user
+is ready to build an agent." Everything past that point is downstream
+work — likely more than one future story.
+
+- **Agent construction itself.** Training adapters, loading the RAG
+  with content, configuring the chat UI for a specific use case, and
+  any other work the user does after the install is complete is
+  downstream of this story.
+- **Operational agent deployment.** Cutting a trained agent over to a
+  stable serving configuration, exposing it to end users, and running
+  it as a managed service are separate future stories.
+- **Automated scaffolding / project-init tooling.** The per-project
+  install in this story is the *manual* workflow ("make a directory,
+  clone, install, configure"). Tooling that automates project
+  creation (e.g. a `trainingbench init` command) belongs in a later
+  story.
 - **Windows or macOS install.** The test target is Linux. Other
   platforms may work but won't be claimed as supported in v0.1.
 - **Docker / container packaging.** Useful but not required for v0.1.
