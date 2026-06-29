@@ -27,6 +27,7 @@ Stories in scope for the active sprint:
 | TB-US-003 | Per-user random password salts | Security fix; replace global salt with per-user random salts and switch hash to bcrypt or argon2. |
 | TB-US-004 | Training quickstart in README | Minimum docs a researcher needs to go from clone to "I trained an adapter." Depends on TB-US-002 landing first. |
 | TB-US-005 | Cut v0.1 release | License pick, version tag, changelog entry. Last in the sequence. |
+| [TB-US-007](docs/user-stories/tb-us-007.md) | Prune unused dependencies from requirements.txt | Audit found ≥8 declared-but-not-imported packages (scrapy, selenium, matplotlib, seaborn, sklearn, rouge-score, bert-score, ipywidgets). Depends on TB-US-002 landing first so prune runs against a known-good install. |
 
 ## Shipped
 
