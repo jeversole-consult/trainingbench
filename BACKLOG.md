@@ -19,7 +19,6 @@ Stories in scope for the active sprint:
 |---|---|---|
 | [TB-US-001](docs/user-stories/tb-us-001.md) | CLI args, eval, and run tracking for GSM8K training pipeline | In Progress |
 | [TB-US-002](docs/user-stories/tb-us-002.md) | First-release install path for TrainingBench | Proposed |
-| [TB-US-006](docs/user-stories/tb-us-006.md) | Rename `chat` user type to `chat` and scrub historical traces | Proposed |
 
 ## Queued
 

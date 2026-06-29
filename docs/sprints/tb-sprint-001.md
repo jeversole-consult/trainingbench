@@ -5,8 +5,7 @@
 **Closed**: —
 **Goal**: Get TrainingBench to a documented, per-project install
 path that can be verified end-to-end on a real machine, with the
-training pipeline driveable from a CLI and project-neutral role
-names baked in before the first install freezes the schema.
+training pipeline driveable from a CLI.
 
 ## Scope
 
@@ -14,17 +13,11 @@ names baked in before the first install freezes the schema.
 |---|---|---|
 | [TB-US-001](../user-stories/tb-us-001.md) | CLI args, eval, and run tracking for GSM8K training pipeline | In Progress |
 | [TB-US-002](../user-stories/tb-us-002.md) | First-release install path for TrainingBench | Proposed |
-| [TB-US-006](../user-stories/tb-us-006.md) | Rename `chat` user type to `chat` and scrub historical traces | Proposed |
 
-TB-US-001 and TB-US-002 are tightly coupled. TB-US-002's
-verification step (running the smoke train against a freshly
-installed environment) also exercises TB-US-001's outstanding AC3
-and AC4. Both close together or neither does.
-
-TB-US-006 is sequenced before TB-US-002 closes: it includes a git
-history rewrite that changes commit hashes, and any story files
-whose commit references would otherwise be invalidated need to be
-updated as part of TB-US-006's R7.
+The two stories are tightly coupled. TB-US-002's verification step
+(running the smoke train against a freshly installed environment)
+also exercises TB-US-001's outstanding AC3 and AC4. Both close
+together or neither does.
 
 ## Out of scope
 
