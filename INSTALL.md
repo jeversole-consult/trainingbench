@@ -167,6 +167,7 @@ Open `.env` in an editor. At minimum, decide on the following:
 | `WEB_PASSWORD` | Default admin password | **choose your own** — do not leave as `changeme` |
 | `SECRET_KEY` | Cookie/token signing secret | **choose your own** — random 32+ byte string |
 | `PASSWORD_SALT` | Password hash salt | **choose your own** — random string per deployment |
+| `DEFAULT_ADMIN_EMAIL` | Email recorded on the seeded admin user | **set to your own address** — the `.env.example` placeholder does not route anywhere |
 | `LLM_PROVIDER` | RAG generation backend | `peft` if you will train your own adapter; `ollama` for quick start |
 | `OLLAMA_MODEL` | Default Ollama model (if used) | `llama3.1:8b` |
 | `OLLAMA_BASE_URL` | Where to reach Ollama | `http://localhost:11434` |

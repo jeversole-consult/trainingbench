@@ -17,6 +17,9 @@ from pathlib import Path
 DEFAULT_USERS_DB_PATH = os.getenv("USERS_DB_PATH", "users.db")
 DEFAULT_ADMIN_USERNAME = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
 DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "changeme")
+# admin@localhost is a deliberately generic placeholder so no install
+# ships with someone else's address. Set DEFAULT_ADMIN_EMAIL in your
+# .env to your own administrative address for this install.
 DEFAULT_ADMIN_EMAIL = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@localhost")
 # Password hash salt. WARNING: this is a global salt — every password
 # in the DB is hashed with the same value. A leaked salt + DB lets an
