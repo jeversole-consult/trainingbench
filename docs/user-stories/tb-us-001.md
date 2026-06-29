@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Created**: 2026-06-06
 **Author**: Jesse Eversole
-**Commit hash(es)**: a908237 (implementation)
+**Commit hash(es)**: 48fca35 (implementation)
 
 ## Story
 
@@ -124,7 +124,7 @@ methodology for TrainingBench (see `docs/user-stories/template.md`).
 
 ## Completion Notes
 
-Implementation landed in commit `a908237`. R1-R6 all satisfied by code
+Implementation landed in commit `48fca35`. R1-R6 all satisfied by code
 review. AC1, AC2, and AC5 verified by inspection. AC3 and AC4 require
 an environment with `torch`, `transformers`, `peft`, `bitsandbytes`,
 and the GSM8K dataset installed; mark them when those runtime
@@ -132,12 +132,12 @@ verifications are done and promote Status to Completed.
 
 ## Related
 
-- `training/math/train.py` — file refactored in `a908237`
+- `training/math/train.py` — file refactored in `48fca35`
 - `scripts/training_tracker_callback.py` — soft dependency, first
-  tracked in `a908237`
+  tracked in `48fca35`
 - Commit `d540c63` ("feat: Add complete GSM8K training pipeline with
   QLoRA") — the baseline this refactors
-- Commit `a908237` — the implementation
+- Commit `48fca35` — the implementation
 - `docs/user-stories/template.md` — the story format
 - `docs/user-stories/example.md` — the worked example
 - TB-US-002 — the install story that will exercise this story's AC3
