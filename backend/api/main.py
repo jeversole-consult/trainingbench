@@ -42,8 +42,6 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 # Authentication configuration
 WEB_AUTH_ENABLED = os.getenv("WEB_AUTH_ENABLED", "true").lower() == "true"
-WEB_USERNAME = os.getenv("WEB_USERNAME", "demo")
-WEB_PASSWORD = os.getenv("WEB_PASSWORD", "changeme")
 SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key-change-this")
 
 # RAG generation backend selection. The RAG system supports several

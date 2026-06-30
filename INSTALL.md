@@ -32,9 +32,9 @@ This install path is documented and intended for:
   At the time of v0.1 this means CUDA 12.x with NVIDIA driver 535 or
   newer. PyTorch ships its own CUDA libraries; you do not need a
   separate CUDA toolkit install.
-- **Python**: 3.11 or 3.12 strongly recommended. 3.10 will likely
-  work. 3.13 may have wheel-availability issues for `torch` and
-  `bitsandbytes` — use 3.11 or 3.12 if you are starting fresh.
+- **Python**: 3.11, 3.12, or 3.13 — all verified against current
+  PyPI wheels for `torch` and `bitsandbytes` as of v0.1. 3.10 will
+  likely work. Older versions may have wheel-availability gaps.
 - **Disk space**: at least **30 GB** free for the install itself
   (Python packages + one base model checkpoint). Plan for **50 GB or
   more** for active development with several adapters and ingested
@@ -125,19 +125,41 @@ Inside the project directory:
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
+```
+
+### Step 3a: Match torch to your CUDA driver — important
+
+The default `torch` wheel on PyPI is currently built against CUDA
+13.x. If your NVIDIA driver's reported max CUDA version is **12.x**
+(see the "CUDA Version" line in `nvidia-smi` output), the default
+wheel installs successfully but silently disables GPU support —
+`torch.cuda.is_available()` returns False and PEFT training cannot
+use the GPU. To avoid this, install `torch` from PyTorch's CUDA
+12.8 wheel index *before* running the full requirements install:
+
+```bash
+# Run this only if `nvidia-smi` shows CUDA 12.x
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+If `nvidia-smi` shows CUDA 13.x, skip this step — the default torch
+wheel will work.
+
+### Step 3b: Install the remaining dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-**Heads up — this step is heavy.** `pip install -r requirements.txt`
-pulls in `torch`, `transformers`, `bitsandbytes`, `peft`, `langchain`,
-`chromadb`, `sentence-transformers`, and their transitive
+**Heads up — this step is heavy.** It pulls in `transformers`,
+`bitsandbytes`, `peft`, `langchain`, `chromadb`,
+`sentence-transformers`, `tensorboard`, and their transitive
 dependencies. Expect several GB of downloads and 5-15 minutes of
 install time on a reasonable network connection.
 
-If you see wheel errors for `torch` or `bitsandbytes`, your Python
-version is likely too new (3.13) or your CUDA driver is too old.
-Recreate the venv with `python3.11 -m venv venv` or `python3.12 -m
-venv venv` and re-run pip.
+If `pip install` errors on `torch` or `bitsandbytes` wheels, your
+Python is likely older than 3.10 — upgrade to 3.11 / 3.12 / 3.13
+and recreate the venv.
 
 ### What's in `requirements.txt` vs what gets installed transitively
 
@@ -163,8 +185,8 @@ Open `.env` in an editor. At minimum, decide on the following:
 | Variable | What it controls | Sensible first value |
 |---|---|---|
 | `APP_PORT` | Port the backend listens on | `8000` |
-| `WEB_USERNAME` | Default admin username | `admin` |
-| `WEB_PASSWORD` | Default admin password | **choose your own** — do not leave as `changeme` |
+| `DEFAULT_ADMIN_USERNAME` | Username of the seeded super-admin | `admin` |
+| `DEFAULT_ADMIN_PASSWORD` | Password of the seeded super-admin | **choose your own** — do not leave as `changeme` |
 | `SECRET_KEY` | Cookie/token signing secret | **choose your own** — random 32+ byte string |
 | `PASSWORD_SALT` | Password hash salt | **choose your own** — random string per deployment |
 | `DEFAULT_ADMIN_EMAIL` | Email recorded on the seeded admin user | **set to your own address** — the `.env.example` placeholder does not route anywhere |
@@ -209,8 +231,9 @@ On the first boot, the server creates side-effect state that was not
 in the repo:
 
 - **`users.db`** is created and seeded with a default admin user
-  (`WEB_USERNAME` / `WEB_PASSWORD` from your `.env`). A startup line
-  is printed reminding you to change the password.
+  (`DEFAULT_ADMIN_USERNAME` / `DEFAULT_ADMIN_PASSWORD` /
+  `DEFAULT_ADMIN_EMAIL` from your `.env`). A startup line is printed
+  reminding you to change the password.
 - **`sessions.db`** is created for login/logout session tracking.
 - **`app_settings.json`** is created, holding runtime-modifiable
   configuration like `demo_mode` and `active_database`.
@@ -312,11 +335,13 @@ under systemd.
 
 | Symptom | Likely cause | What to try |
 |---|---|---|
-| `pip install` errors on `torch` or `bitsandbytes` wheels | Python version too new (3.13) or driver too old | Recreate venv with Python 3.11 or 3.12; verify `nvidia-smi` works |
+| `pip install` errors on `torch` or `bitsandbytes` wheels | Python older than 3.10, or no matching wheel for your platform | Use Python 3.11/3.12/3.13 and recreate the venv |
+| `torch.cuda.is_available()` is False after install | Default cu130 torch wheel pulled, but driver only supports CUDA 12.x | See Step 3a — reinstall torch from the cu128 index |
 | `nvidia-smi` does not list a GPU | NVIDIA driver not installed correctly | Reinstall the driver; reboot |
-| Backend starts but training fails with "CUDA out of memory" | GPU has less than ~16 GB VRAM | Use a smaller `--max-length`, fewer `--max-train-samples`, or pick a smaller base model via `--model` |
+| Backend starts but training fails with "CUDA out of memory" | GPU has less than ~16 GB VRAM, or other processes are holding VRAM | Use a smaller `--max-length`, fewer `--max-train-samples`, pick a smaller base model via `--model`, or stop other GPU processes (`nvidia-smi --query-compute-apps=pid,used_memory --format=csv`) |
+| Trainer fails with "TensorBoardCallback requires tensorboard to be installed" | `tensorboard` was not installed in this venv | `pip install tensorboard` (it is in `requirements.txt`; this happens if you skipped Step 3b) |
 | Login page returns 404 in browser | Wrong host/port, or backend not running | Confirm `APP_PORT` matches the port you typed; check terminal for tracebacks |
-| Admin login fails | `.env` not loaded, or password mismatch | Confirm `WEB_PASSWORD` in `.env` matches what you type |
+| Admin login fails | `.env` not loaded, or password mismatch | Confirm `DEFAULT_ADMIN_PASSWORD` in `.env` matches what you type. (`.env` must be in the project root and the backend must have been started from there.) |
 | Smoke train hangs at "Loading base model" | First-time HuggingFace download | Wait — it is downloading approximately 16 GB |
 
 ---
