@@ -31,6 +31,7 @@ from api.power_search import PowerSearchService
 from api.user_manager import UserManager
 from api.training_manager import TrainingSetManager
 from api.training_run_tracker import TrainingRunTracker
+from api.app_settings import AppSettings
 import time
 import shutil
 from pathlib import Path
@@ -182,6 +183,10 @@ class CrawlRequest(BaseModel):
     max_depth: int = 2
     max_pages: int = 50
     delay: float = 1.0
+
+
+class ModeUpdateRequest(BaseModel):
+    demo_mode: bool
 
 
 class ScrapeMultipleRequest(BaseModel):
@@ -404,6 +409,21 @@ async def get_version():
     """Get application version information."""
     from version import get_version_info
     return get_version_info()
+
+
+@app.get("/settings/mode")
+async def get_settings_mode(user_info: dict = Depends(verify_web_auth)):
+    """Return the current demo_mode flag for the UI mode pill."""
+    return {"demo_mode": AppSettings.demo_mode()}
+
+
+@app.put("/settings/mode")
+async def update_settings_mode(
+    req: ModeUpdateRequest,
+    user_info: dict = Depends(verify_super_user),
+):
+    """Toggle demo_mode. Super-user only; AppSettings appends an audit entry."""
+    return AppSettings.set_demo_mode(req.demo_mode, user_info["username"])
 
 
 @app.post("/auth/login", response_model=LoginResponse)
