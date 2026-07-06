@@ -1,0 +1,12 @@
+TrainingBench
+Copyright 2026 Jesse Eversole
+
+This product is licensed under the Apache License, Version 2.0. See the
+LICENSE file at the root of this repository for the full license text,
+or http://www.apache.org/licenses/LICENSE-2.0 for the canonical copy.
+
+TrainingBench depends on third-party open-source libraries that are
+installed via pip using requirements.txt. Each of those libraries is
+distributed under its own license, retained by its respective authors.
+Consult the metadata of each installed package (for example, via
+`pip show <package>`) for the applicable license and attribution.

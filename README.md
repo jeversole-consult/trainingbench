@@ -59,7 +59,7 @@ A research project demonstrating the effectiveness of Parameter-Efficient Fine-T
 - 13,000+ expert annotations
 - 41 label categories
 - Available: Hugging Face (theatticusproject/cuad-qa)
-- License: CC-BY 4.0
+- Dataset license: CC-BY 4.0 (upstream — not TrainingBench's license)
 
 ---
 
@@ -99,7 +99,7 @@ A research project demonstrating the effectiveness of Parameter-Efficient Fine-T
 - 8,500 high-quality math word problems
 - Multi-step reasoning required
 - Available: Hugging Face (openai/gsm8k)
-- License: MIT
+- Dataset license: MIT (upstream — not TrainingBench's license)
 - **BEST STARTING POINT** - most documented, fastest setup
 
 ---
@@ -315,7 +315,18 @@ python training/math/compare.py
 
 ## License
 
-Research project - License TBD based on dataset requirements and publication plans.
+TrainingBench is released under the **Apache License, Version 2.0**.
+See the [`LICENSE`](LICENSE) file at the repository root for the full
+text and the [`NOTICE`](NOTICE) file for the project copyright and
+third-party attribution guidance.
+
+The Apache-2.0 grant covers the TrainingBench platform code itself.
+The **datasets and pretrained model artifacts** referenced elsewhere
+in this document — including the GSM8K math dataset (MIT), the CUAD
+legal-contract dataset (CC-BY 4.0), and any Llama base models — are
+distributed under their own upstream licenses by their respective
+authors. Comply with each dataset's or model's terms independently
+when you use them.
 
 ---
 

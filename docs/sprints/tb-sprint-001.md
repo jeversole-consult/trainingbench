@@ -13,11 +13,16 @@ training pipeline driveable from a CLI.
 |---|---|---|
 | [TB-US-001](../user-stories/tb-us-001.md) | CLI args, eval, and run tracking for GSM8K training pipeline | In Progress |
 | [TB-US-002](../user-stories/tb-us-002.md) | First-release install path for TrainingBench | Proposed |
+| [TB-US-009](../user-stories/tb-us-009.md) | License TrainingBench under Apache-2.0 | In Progress |
 
-The two stories are tightly coupled. TB-US-002's verification step
-(running the smoke train against a freshly installed environment)
-also exercises TB-US-001's outstanding AC3 and AC4. Both close
-together or neither does.
+TB-US-001 and TB-US-002 are tightly coupled: TB-US-002's verification
+step (running the smoke train against a freshly installed environment)
+also exercises TB-US-001's outstanding AC3 and AC4. Both close together
+or neither does.
+
+TB-US-009 was pulled forward from TB-US-005 because the OSS license is
+a prerequisite for any public-repo push. It closes independently of
+the other two.
 
 ## Out of scope
 
@@ -28,8 +33,9 @@ Deliberately deferred to a later sprint:
   v0.1.
 - **TB-US-004** — Training quickstart in README. Depends on TB-US-002
   landing first so the install path it points at exists.
-- **TB-US-005** — Cut v0.1 release. License pick, version tag,
-  changelog. Last in the sequence; nothing to release until the
+- **TB-US-005** — Cut v0.1 release. Version tag and CHANGELOG entry
+  only, now that the license pick has been pulled forward into
+  TB-US-009. Last in the sequence; nothing to release until the
   install path is verified.
 
 Categories of work the sprint explicitly avoids:

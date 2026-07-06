@@ -10,7 +10,7 @@ GSM8K (Grade School Math 8K) is a dataset of 8,500 high-quality, linguistically 
   - Training: 7,473
   - Test: 1,027
 - **Source**: OpenAI
-- **License**: MIT
+- **License**: MIT (upstream dataset license — the TrainingBench platform itself is Apache-2.0; see the repo-root LICENSE)
 - **Format**: JSON with question/answer pairs
 - **Difficulty**: Grade school level (elementary to middle school)
 
