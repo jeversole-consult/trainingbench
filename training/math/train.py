@@ -259,7 +259,9 @@ def train(
         warmup_steps: Warmup steps
         save_steps: Save checkpoint every N steps
         logging_steps: Log every N steps
-        eval_steps: Evaluate every N steps (None = no evaluation)
+        eval_steps: Evaluate every N steps. When None: falls back to
+            per-epoch evaluation if the dataset provides an eval split,
+            or skips evaluation entirely if it does not.
         use_full_dataset: Use full dataset or subset
         max_train_samples: Maximum training samples (None = all)
         max_eval_samples: Maximum eval samples (None = all)
@@ -318,6 +320,19 @@ def train(
         target_modules=lora_target_modules,
     )
 
+    # Resolve eval cadence. --eval-steps is honored when the caller sets
+    # it. Otherwise, if the dataset provides an eval split, fall back to
+    # per-epoch evaluation so a smoke run (e.g. --epochs 1) still emits
+    # at least one eval metric without needing an extra flag.
+    if eval_dataset is None:
+        eval_strategy = "no"
+        eval_steps = None
+    elif eval_steps:
+        eval_strategy = "steps"
+    else:
+        eval_strategy = "epoch"
+        eval_steps = None
+
     # Training arguments
     training_args = TrainingArguments(
         output_dir=str(output_dir),
@@ -328,8 +343,8 @@ def train(
         warmup_steps=warmup_steps,
         logging_steps=logging_steps,
         save_steps=save_steps,
-        eval_strategy="steps" if (eval_dataset and eval_steps) else "no",
-        eval_steps=eval_steps if (eval_dataset and eval_steps) else None,
+        eval_strategy=eval_strategy,
+        eval_steps=eval_steps,
         save_total_limit=3,
         fp16=True,
         optim="paged_adamw_8bit",
@@ -339,7 +354,7 @@ def train(
         max_grad_norm=0.3,
         weight_decay=0.001,
         lr_scheduler_type="cosine",
-        load_best_model_at_end=True if (eval_dataset and eval_steps) else False,
+        load_best_model_at_end=(eval_strategy == "steps"),
     )
 
     # Data collator
@@ -381,8 +396,10 @@ def train(
     print(f"Gradient accumulation: {gradient_accumulation_steps}")
     print(f"Effective batch size: {batch_size * gradient_accumulation_steps}")
     print(f"Learning rate: {learning_rate}")
-    if eval_steps:
+    if eval_strategy == "steps":
         print(f"Evaluation every: {eval_steps} steps")
+    elif eval_strategy == "epoch":
+        print("Evaluation: at end of each epoch")
     print(f"Output directory: {output_dir}")
     print()
 
