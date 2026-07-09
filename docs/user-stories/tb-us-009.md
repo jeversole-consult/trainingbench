@@ -1,9 +1,9 @@
 # TB-US-009: License TrainingBench under Apache-2.0
 
-**Status**: In Progress
+**Status**: Completed
 **Created**: 2026-07-06
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: b22c381
 
 ## Story
 
@@ -50,21 +50,21 @@ already in flight, not a release-cut concern.
 
 ## Requirements
 
-- [ ] R1: An `Apache-2.0` `LICENSE` file exists at the repository
+- [x] R1: An `Apache-2.0` `LICENSE` file exists at the repository
       root, containing the canonical Apache-2.0 license text from
       `https://www.apache.org/licenses/LICENSE-2.0.txt`, unmodified.
-- [ ] R2: A `NOTICE` file exists at the repository root, naming the
+- [x] R2: A `NOTICE` file exists at the repository root, naming the
       project, the copyright holder, and the year, and pointing at
       `LICENSE` for the full text. The NOTICE also explains that
       third-party dependencies installed via pip carry their own
       licenses (this project does not bundle their source in-tree).
-- [ ] R3: `README.md` `## License` section is updated to name
+- [x] R3: `README.md` `## License` section is updated to name
       Apache-2.0 explicitly, link to `LICENSE`, and remove the "TBD"
       phrasing.
-- [ ] R4: `README.md` disambiguates the existing CC-BY 4.0 and MIT
+- [x] R4: `README.md` disambiguates the existing CC-BY 4.0 and MIT
       references so a reader can see they describe upstream datasets,
       not the TrainingBench code.
-- [ ] R5: `BACKLOG.md` and `docs/sprints/tb-sprint-001.md` reflect
+- [x] R5: `BACKLOG.md` and `docs/sprints/tb-sprint-001.md` reflect
       that TB-US-009 is in scope for the active sprint. TB-US-005's
       description in `BACKLOG.md` is updated to note that the license
       choice is already made, so the v0.1 cut only needs the version
@@ -72,13 +72,13 @@ already in flight, not a release-cut concern.
 
 ## Acceptance Criteria
 
-- [ ] AC1: `git ls-files LICENSE NOTICE` returns both files at HEAD.
-- [ ] AC2: `diff <(curl -sS https://www.apache.org/licenses/LICENSE-2.0.txt) LICENSE`
+- [x] AC1: `git ls-files LICENSE NOTICE` returns both files at HEAD.
+- [x] AC2: `diff <(curl -sS https://www.apache.org/licenses/LICENSE-2.0.txt) LICENSE`
       returns no differences (byte-for-byte canonical text).
-- [ ] AC3: `grep -n "License TBD" README.md` returns zero matches.
+- [x] AC3: `grep -n "License TBD" README.md` returns zero matches.
       `grep -n "Apache-2.0" README.md` returns at least one match in
       the `## License` section.
-- [ ] AC4: A reader looking only at the repository root can identify
+- [x] AC4: A reader looking only at the repository root can identify
       the project's license from `LICENSE` alone, without having to
       read `README.md`.
 

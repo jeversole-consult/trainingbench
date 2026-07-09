@@ -1,9 +1,9 @@
 # TB-US-001: Add CLI arguments, evaluation, and run tracking to the GSM8K training pipeline
 
-**Status**: In Progress
+**Status**: Completed
 **Created**: 2026-06-06
 **Author**: Jesse Eversole
-**Commit hash(es)**: 48fca35 (implementation)
+**Commit hash(es)**: 48fca35 (implementation), cadf907 (AC3 eval-default fix)
 
 ## Story
 
@@ -74,16 +74,23 @@ methodology for TrainingBench (see `docs/user-stories/template.md`).
       configuration as the pre-refactor script did (regression check
       against `d540c63`). *(Verified by inspection: every argparse
       default matches the original module constant.)*
-- [ ] AC3: Running with `--max-train-samples 50 --max-eval-samples 25
-      --num-epochs 1` completes a smoke train+eval loop quickly on the
+- [x] AC3: Running with `--max-train-samples 50 --max-eval-samples 25
+      --epochs 1` completes a smoke train+eval loop quickly on the
       target hardware, with eval metrics printed at least once.
-      *(Requires runtime verification with the training stack
-      installed; not yet performed.)*
-- [ ] AC4: Running with `--run-name <some-name>` produces a structured
+      *(Verified 2026-07-09 on a verified install: 4 optimizer steps
+      completed in ~18 s on an RTX 3090; final eval line
+      `{'eval_loss': 2.011, 'eval_runtime': 2.608, 'epoch': 1}`
+      printed. The AC3 command as written now works without an
+      extra flag, per commit cadf907.)*
+- [x] AC4: Running with `--run-name <some-name>` produces a structured
       log file under the tracker's log directory containing at minimum
       run name, start time, end time, final metrics, and the resolved
-      configuration. *(Requires runtime verification; not yet
-      performed.)*
+      configuration. *(Verified 2026-07-09: `run_info.json`,
+      `metrics.jsonl`, `logs.jsonl`, and `checkpoints.json` written
+      under `experiments/logs/training_runs/smoke-test_<timestamp>/`.
+      `run_info.json` contains `run_name`, `started_at`, `completed_at`,
+      `duration_seconds`, `final_eval_loss`, `config` snapshot, and
+      `status`.)*
 - [x] AC5: Renaming or removing `scripts/training_tracker_callback.py`
       temporarily reproduces the "tracker not available" warning and
       training still runs to completion. *(Structurally guaranteed by
@@ -124,11 +131,18 @@ methodology for TrainingBench (see `docs/user-stories/template.md`).
 
 ## Completion Notes
 
-Implementation landed in commit `48fca35`. R1-R6 all satisfied by code
-review. AC1, AC2, and AC5 verified by inspection. AC3 and AC4 require
-an environment with `torch`, `transformers`, `peft`, `bitsandbytes`,
-and the GSM8K dataset installed; mark them when those runtime
-verifications are done and promote Status to Completed.
+Implementation landed in commit `48fca35`. AC3 exposed a gap: the
+suggested smoke command did not include `--eval-steps`, and the
+original code only ran evaluation when that flag was passed, so no
+eval line was emitted. Fixed in commit `cadf907` by defaulting to
+per-epoch evaluation whenever the dataset provides an eval split.
+
+AC3 and AC4 both verified 2026-07-09 by running the AC3 command
+end-to-end against a fully installed environment on an RTX 3090.
+`final_eval_loss` recorded in the tracker's `run_info.json`; a
+final eval-metrics line printed to stdout at end of epoch.
+
+R1-R6 all satisfied; AC1-AC5 all satisfied. Story is Completed.
 
 ## Related
 

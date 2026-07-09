@@ -1,9 +1,11 @@
 # TB-US-002: First-release install instructions for TrainingBench
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-06-06
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: 88dad6f (story), 33459a5 (scope refinement),
+82f16f2 (INSTALL.md), b7bbda0 (.env.example), 1601885 (install-path
+fixes from verification), 3a98382 (settings/mode endpoints)
 
 ## Story
 
@@ -45,56 +47,68 @@ Successful installation satisfies the following:
 
 ## Requirements
 
-- [ ] R1: An install document lives in the repo at a discoverable
+- [x] R1: An install document lives in the repo at a discoverable
       location (`INSTALL.md` at repo root, or a clearly-named section
       in `README.md`). The document is in flowable Markdown and
-      readable without rendering.
-- [ ] R2: The document specifies the **Python version range** that is
+      readable without rendering. *(INSTALL.md at repo root; 82f16f2.)*
+- [x] R2: The document specifies the **Python version range** that is
       tested. The current `requirements.txt` is the source of truth
       for direct deps; the document explains how to interpret it and
-      what indirect dependencies pip pulls.
-- [ ] R3: The document specifies the **system binaries** TrainingBench
+      what indirect dependencies pip pulls. *(Python 3.11 / 3.12 /
+      3.13 verified; 3.13 note relaxed in 1601885.)*
+- [x] R3: The document specifies the **system binaries** TrainingBench
       depends on (CUDA + driver for PEFT, tesseract for OCR fallback,
       poppler/`pdftoppm` for PDF rasterisation) with a one-line
       install hint for at least one mainstream Linux distro (Debian/
       Ubuntu via `apt`).
-- [ ] R4: The document walks through **venv creation and dependency
+- [x] R4: The document walks through **venv creation and dependency
       install** as a copy-pasteable sequence. The reader should be
       able to follow it line by line without prior knowledge of
-      Python tooling.
-- [ ] R5: The document specifies how to **verify the install** —
+      Python tooling. *(Torch cu128 install step added in 1601885
+      after driver-vs-wheel compatibility was hit during verification.)*
+- [x] R5: The document specifies how to **verify the install** —
       starting the backend and seeing it serve, then running the
       smoke-train invocation from TB-US-001. Verification should
       double as the "did it work" check for that story's AC3 and AC4.
-- [ ] R6: The document calls out the **first-boot side effects** the
+      *(AC3+AC4 verified 2026-07-09 under TB-US-001.)*
+- [x] R6: The document calls out the **first-boot side effects** the
       user will see: default admin user creation (and the env vars
       that override the credentials), the `app_settings.json` getting
-      seeded, and the initial empty ChromaDB directory.
-- [ ] R7: The document says clearly **what hardware was tested** and
+      seeded, and the initial empty ChromaDB directory. *(Refined in
+      1601885 alongside .env.example in b7bbda0.)*
+- [x] R7: The document says clearly **what hardware was tested** and
       **what hasn't been**. Honest scope statement, not aspirational.
+      *(Test hardware named; Windows / macOS / Docker / multi-GPU
+      explicitly not-tested per the Out-of-Scope block.)*
 
 ## Acceptance Criteria
 
-- [ ] AC1: A new user who has Linux, an internet connection, sudo,
+- [x] AC1: A new user who has Linux, an internet connection, sudo,
       and a supported NVIDIA GPU can follow the install document end
       to end and end up with `uvicorn` serving the TrainingBench
       backend on a configured port, returning the login page in a
-      browser.
-- [ ] AC2: After the install path is followed, the smoke-train
+      browser. *(Verified against one peer install: backend served on
+      the configured port; gate page → login page reachable via
+      Cloudflare tunnel; admin login accepted seeded credentials.)*
+- [x] AC2: After the install path is followed, the smoke-train
       invocation from TB-US-001
       (`python training/math/train.py --max-train-samples 50
       --max-eval-samples 25 --epochs 1 --run-name smoke-test`)
       completes successfully and produces a tracker log under the
-      install directory.
-- [ ] AC3: The install path was actually executed on at least one
+      install directory. *(Verified 2026-07-09 with the eval-default
+      fix from TB-US-001 in place; see that story for evidence.)*
+- [x] AC3: The install path was actually executed on at least one
       real or virtual machine (not just dry-read), and the user's
       notes on what surprised them are folded back into the doc as
-      either fixes or "known issue" callouts.
-- [ ] AC4: A `--help` invocation of the major entry points (the
+      either fixes or "known issue" callouts. *(Six surprises folded
+      into INSTALL.md / requirements.txt / main.py in commit 1601885;
+      /settings/mode endpoints added in 3a98382. A second peer install
+      is a carry-over — see the Sprint 1 retrospective.)*
+- [x] AC4: A `--help` invocation of the major entry points (the
       training script, the uvicorn startup) is included in the install
       doc so the user can confirm their venv is wired correctly
       without committing to a full smoke run.
-- [ ] AC5: The install doc names a minimum disk footprint estimate
+- [x] AC5: The install doc names a minimum disk footprint estimate
       (rough order of magnitude — the torch / transformers stack and
       a base Llama 3.1 8B checkpoint is not small) so the user
       sizes their environment realistically.
