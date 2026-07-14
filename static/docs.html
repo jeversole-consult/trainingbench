@@ -453,7 +453,7 @@
 
         // ── Auth ──────────────────────────────────────────────────
         (async function checkAuth() {
-            const token = localStorage.getItem('session_token');
+            const token = sessionStorage.getItem('session_token');
             if (!token) {
                 window.location.href = '/static/login.html';
                 return;
@@ -463,7 +463,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) {
-                    localStorage.removeItem('session_token');
+                    sessionStorage.removeItem('session_token');
                     window.location.href = '/static/login.html';
                     return;
                 }
@@ -476,12 +476,12 @@
         })();
 
         function logout() {
-            const token = localStorage.getItem('session_token');
+            const token = sessionStorage.getItem('session_token');
             fetch(`${API_BASE}/auth/logout`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             }).finally(() => {
-                localStorage.removeItem('session_token');
+                sessionStorage.removeItem('session_token');
                 window.location.href = '/static/login.html';
             });
         }
@@ -490,7 +490,7 @@
         async function loadFileList() {
             try {
                 const res = await fetch(`${API_BASE}/docs/list`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('session_token')}` }
                 });
                 if (!res.ok) throw new Error('Failed to load file list');
                 const data = await res.json();
@@ -608,7 +608,7 @@
 
             try {
                 const res = await fetch(`${API_BASE}/docs/content?path=${encodeURIComponent(path)}`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('session_token')}` }
+                    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('session_token')}` }
                 });
 
                 if (!res.ok) {
