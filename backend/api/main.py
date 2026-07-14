@@ -79,6 +79,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Prevent browsers from caching served HTML pages. Without this, an
+# updated HTML file on disk can be masked by the browser's cached
+# copy for hours after the fix is deployed. Applies to any response
+# whose path ends in .html — covers the StaticFiles mount at /static
+# as well as any custom HTML routes.
+@app.middleware("http")
+async def add_no_cache_headers_for_html(request, call_next):
+    response = await call_next(request)
+    if request.url.path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+    return response
+
 # Authentication dependency
 async def verify_admin_key(x_api_key: Optional[str] = Header(None)):
     """Verify admin API key for protected endpoints."""
@@ -2464,10 +2477,7 @@ async def serve_login_page(request: Request):
             return RedirectResponse(url="/static/gate.html", status_code=303)
 
     # Gate token valid or gate not enabled - serve login page
-    return FileResponse(
-        os.path.join(static_dir, "login.html"),
-        headers={"Cache-Control": "no-store, must-revalidate"},
-    )
+    return FileResponse(os.path.join(static_dir, "login.html"))
 
 
 @app.get("/static/index.html")
@@ -2484,10 +2494,7 @@ async def serve_index_page(request: Request):
             return RedirectResponse(url="/static/gate.html", status_code=303)
 
     # Gate token valid or gate not enabled - serve index page
-    return FileResponse(
-        os.path.join(static_dir, "index.html"),
-        headers={"Cache-Control": "no-store, must-revalidate"},
-    )
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 
 @app.get("/static/docs.html")
@@ -2504,10 +2511,7 @@ async def serve_docs_page(request: Request):
             return RedirectResponse(url="/static/gate.html", status_code=303)
 
     # Gate token valid or gate not enabled - serve docs page
-    return FileResponse(
-        os.path.join(static_dir, "docs.html"),
-        headers={"Cache-Control": "no-store, must-revalidate"},
-    )
+    return FileResponse(os.path.join(static_dir, "docs.html"))
 
 
 @app.get("/static/training_sets.html")
@@ -2524,10 +2528,7 @@ async def serve_training_sets_page(request: Request):
             return RedirectResponse(url="/static/gate.html", status_code=303)
 
     # Gate token valid or gate not enabled - serve training sets page
-    return FileResponse(
-        os.path.join(static_dir, "training_sets.html"),
-        headers={"Cache-Control": "no-store, must-revalidate"},
-    )
+    return FileResponse(os.path.join(static_dir, "training_sets.html"))
 
 
 if __name__ == "__main__":
