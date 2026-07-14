@@ -50,9 +50,10 @@ instance are unaffected.
 ## Getting to help
 
 The in-app documentation (this page and its siblings) is
-available under a Docs link from the header on any page. You
-can search it with the filter box on the left side of the docs
-viewer.
+reached from the **📖 Docs** button in the header of the main
+dashboard. You can filter the list with the search box on the
+left side of the docs viewer. Return to the app with the
+**Back to App** button in the docs viewer's header.
 
 For issues the docs do not cover, contact the person who
 administers your TrainingBench instance.
