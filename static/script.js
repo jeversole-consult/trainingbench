@@ -280,6 +280,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (userDisplay && currentUser.username) {
             userDisplay.textContent = `Signed in as ${currentUser.username}`;
         }
+        const userMgmtBtn = document.getElementById('user-mgmt-btn');
+        if (userMgmtBtn && currentUser.user_type === 'super') {
+            userMgmtBtn.style.display = 'inline-block';
+        }
         // Apply role-based UI after authentication
         applyRoleBasedUI();
 

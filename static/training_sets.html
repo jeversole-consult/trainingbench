@@ -368,6 +368,7 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <span id="current-user-display" style="font-size: 0.85em; color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 20px; white-space: nowrap;"></span>
+                    <button onclick="openUserManagement()" style="padding: 10px 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer;">👥 Users</button>
                     <button onclick="window.location.href='index.html'" class="back-btn" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">← Back to Main</button>
                     <button onclick="window.location.href='/static/docs.html?v=' + Date.now()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">📖 Docs</button>
                     <button id="logout-btn" onclick="logout()" class="logout-btn">Logout</button>
@@ -681,6 +682,7 @@
     </footer>
 
     <script src="script.js"></script>
+    <script src="user_management.js?v=20260721a"></script>
     <script>
         // Load version dynamically from backend
         fetch(`${API_BASE}/version`)

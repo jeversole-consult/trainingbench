@@ -549,6 +549,7 @@
             <h1>🏃 Training Runs</h1>
             <div class="header-actions">
                 <div class="user-info" id="userInfo">Loading...</div>
+                <button onclick="openUserManagement()" class="btn btn-secondary" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none;">👥 Users</button>
                 <a href="/static/training_sets.html" class="btn btn-secondary">Training Sets</a>
                 <a href="/static/index.html" class="btn btn-secondary">Main App</a>
                 <a href="#" onclick="event.preventDefault(); window.location.href='/static/docs.html?v=' + Date.now();" class="btn btn-secondary">📖 Docs</a>
@@ -710,6 +711,7 @@
         <button class="btn btn-secondary btn-small" onclick="clearSelection()">Clear</button>
     </div>
 
+    <script src="user_management.js?v=20260721a"></script>
     <script>
         // Global state
         let authToken = '';
