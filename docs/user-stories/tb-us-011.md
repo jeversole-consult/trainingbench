@@ -1,9 +1,9 @@
 # TB-US-011: Ownership-based training-set access for training-role users
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-07-21
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: c24ab87
 
 ## Story
 
@@ -46,25 +46,25 @@ non-super users lose access to the button and the page entirely.
 
 ## Requirements
 
-- [ ] R1: Backend read endpoints for training sets accept
+- [x] R1: Backend read endpoints for training sets accept
       training-role callers. `GET /training/sets` returns only the
       caller's own sets when the caller is a training user; server
       ignores or overrides any client-supplied `created_by` filter for
       those callers. `GET /training/sets/{id}` and `/data` return 404
       (not 403 — no ownership leak) when a training user requests a
       set they don't own.
-- [ ] R2: Backend write endpoints for training sets accept
+- [x] R2: Backend write endpoints for training sets accept
       training-role callers, but only against sets they own. `POST
       /training/sets` accepts training callers (created_by comes from
       the session, not the request body). `PUT`, `DELETE`, `clone` on
       `/training/sets/{id}` succeed for super users and for training
       users who own the target set; return 404 otherwise (same
       no-leak rule as R1).
-- [ ] R3: `POST /training/sets/from-ratings` accepts training callers,
+- [x] R3: `POST /training/sets/from-ratings` accepts training callers,
       with the caller's own username server-forced into the
       `username` filter. A training user cannot build a training set
       from another user's ratings, regardless of what they submit.
-- [ ] R4: `POST /training/sets/from-query-log` accepts training
+- [x] R4: `POST /training/sets/from-query-log` accepts training
       callers, with the caller's own username server-forced into
       `filters['username']` before the manager is invoked. Any
       client-supplied `username` filter is overwritten for
@@ -74,15 +74,15 @@ non-super users lose access to the button and the page entirely.
       (`backend/api/query_logger.py:100-107`), and the manager
       already honors a `username` filter
       (`backend/api/training_manager.py:690`).
-- [ ] R5: The "🎓 Training Sets" button in `static/index.html` is
+- [x] R5: The "🎓 Training Sets" button in `static/index.html` is
       hidden by default and unhidden by `script.js` only when the
       caller's `user_type` is `super` or `training`. Chat and
       standard users no longer see the button.
-- [ ] R6: `static/training_sets.html` performs a page-level user-type
+- [x] R6: `static/training_sets.html` performs a page-level user-type
       check on load. Callers whose `user_type` is not `super` or
       `training` are redirected to `/static/index.html` (same
       pattern `training_runs.html` already uses at line 762).
-- [ ] R7: In `training_sets.html`, training-role callers see the
+- [x] R7: In `training_sets.html`, training-role callers see the
       full UI (create, edit, delete, clone, from-ratings,
       from-query-log) — the backend enforces ownership, and the
       UI does not pre-hide tabs based on role. The delete button
@@ -95,26 +95,26 @@ non-super users lose access to the button and the page entirely.
 
 ## Acceptance Criteria
 
-- [ ] AC1: Logged in as a training user, the "🎓 Training Sets"
+- [x] AC1: Logged in as a training user, the "🎓 Training Sets"
       button appears in the header on `index.html`. Clicking it
       loads `training_sets.html` without a redirect.
-- [ ] AC2: Logged in as a chat or standard user, the "🎓 Training
+- [x] AC2: Logged in as a chat or standard user, the "🎓 Training
       Sets" button does not appear on `index.html`, and directly
       navigating to `/static/training_sets.html` redirects back to
       `index.html`.
-- [ ] AC3: Two training users (say `trainer_a` and `trainer_b`) each
+- [x] AC3: Two training users (say `trainer_a` and `trainer_b`) each
       create a training set. `trainer_a` sees only their set in the
       list; `trainer_b` sees only theirs. Neither sees the other's.
-- [ ] AC4: A super user sees both `trainer_a`'s and `trainer_b`'s
+- [x] AC4: A super user sees both `trainer_a`'s and `trainer_b`'s
       training sets in the list, along with any super-authored sets.
-- [ ] AC5: `trainer_a` requesting `GET /training/sets/{trainer_b_set_id}`
+- [x] AC5: `trainer_a` requesting `GET /training/sets/{trainer_b_set_id}`
       directly (via curl or dev tools) receives 404, not the set data.
       Same for `/data`, `PUT`, `DELETE`, `clone`.
-- [ ] AC6: A training user runs "From Ratings" with a username
+- [x] AC6: A training user runs "From Ratings" with a username
       filter set to another user's name in the request body. The
       returned training set contains only the caller's own ratings
       (server-forced), and `created_by` is the caller.
-- [ ] AC7: A training user runs "From Query Log" with either no
+- [x] AC7: A training user runs "From Query Log" with either no
       username filter or a filter naming another user. The
       returned training set contains only entries where
       `user_info.username == the caller`, and `created_by` is

@@ -39,3 +39,4 @@ Post-sprint:
 |---|---|---|
 | [TB-US-010](docs/user-stories/tb-us-010.md) | Add in-app user management UI for super users | — |
 | [TB-US-008](docs/user-stories/tb-us-008.md) | Move Database Statistics from top of admin page to per-database controls | — |
+| [TB-US-011](docs/user-stories/tb-us-011.md) | Ownership-based training-set access for training-role users | — |
