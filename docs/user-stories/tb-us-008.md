@@ -1,9 +1,9 @@
 # TB-US-008: Move Database Statistics from top of admin page to per-database controls
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-07-09
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <to fill on commit>
 
 ## Story
 
@@ -39,30 +39,30 @@ actions.
 
 ## Requirements
 
-- [ ] R1: The always-visible "Database Statistics" section at the
+- [x] R1: The always-visible "Database Statistics" section at the
       top of the admin page is removed. The active-database
       selector migrates elsewhere (see R2). Zero page-level
       metric tiles remain above the tabs.
-- [ ] R2: The active-database selector remains reachable from any
+- [x] R2: The active-database selector remains reachable from any
       tab — either as a compact header control (small
       chip/dropdown near the user badge) or as a control at the
       top of every tab that needs it. Switching databases
       continues to route to the same `switchActiveDatabase()`
       handler.
-- [ ] R3: In the Manage Databases tab, every row rendered by
+- [x] R3: In the Manage Databases tab, every row rendered by
       `#databases-list` gains a "Statistics" control that reveals
       the same five metrics currently displayed at the top
       (Web Pages, Uploaded Docs, Document Chunks, Total Queries,
       Avg Response Time) *for that specific database*.
-- [ ] R4: The "Clear Database" destructive action, currently a
+- [x] R4: The "Clear Database" destructive action, currently a
       page-level button in the Statistics section, moves to a
       per-row control in Manage Databases. Confirmation prompt
       names the database being cleared.
-- [ ] R5: The `refreshStats()` JS function either becomes
+- [x] R5: The `refreshStats()` JS function either becomes
       per-database (accepts a database ID) or is replaced by an
       equivalent per-database call. Callers that used it purely
       to refresh the top block are updated or removed.
-- [ ] R6: Role-based UI hiding still works: users whose tab
+- [x] R6: Role-based UI hiding still works: users whose tab
       permissions exclude Manage Databases do not see the stats
       controls. The previous `hide the entire database statistics
       section` code paths (script.js lines 125, 141) are updated
@@ -70,21 +70,21 @@ actions.
 
 ## Acceptance Criteria
 
-- [ ] AC1: Loading the admin page as a super-user shows tabs
+- [x] AC1: Loading the admin page as a super-user shows tabs
       immediately below the header — no metric tiles above the
       tabs.
-- [ ] AC2: Opening Manage Databases and clicking Statistics on a
+- [x] AC2: Opening Manage Databases and clicking Statistics on a
       row shows the five metrics for that row's database. Opening
       Statistics on a different row shows *that* database's
       metrics.
-- [ ] AC3: Clicking Clear Database on a row prompts with the
+- [x] AC3: Clicking Clear Database on a row prompts with the
       database name and, on confirm, clears only that database's
       contents. The row's Statistics view refreshes.
-- [ ] AC4: A user whose role is not super does not see the
+- [x] AC4: A user whose role is not super does not see the
       Statistics or Clear Database controls anywhere. The Manage
       Databases tab is either hidden or read-only per prior
       role-tab rules.
-- [ ] AC5: The active-database selector is discoverable from the
+- [x] AC5: The active-database selector is discoverable from the
       Chat / Ask Questions tab (or wherever queries actually run)
       so a user still knows which database will answer their
       query.

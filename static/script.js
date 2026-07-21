@@ -121,12 +121,6 @@ function applyRoleBasedUI() {
             headerSubtitle.style.fontSize = '1.3em';
             headerSubtitle.style.fontWeight = '500';
         }
-
-        // Hide the entire database statistics section
-        const statsSection = document.querySelector('.section[style*="border-bottom"]');
-        if (statsSection) {
-            statsSection.style.display = 'none';
-        }
     } else if (userType === 'training') {
         console.log('🎓 TRAINING USER MODE ACTIVATED');
 
@@ -136,12 +130,6 @@ function applyRoleBasedUI() {
             headerSubtitle.textContent = 'AI Training Agent';
             headerSubtitle.style.fontSize = '1.3em';
             headerSubtitle.style.fontWeight = '500';
-        }
-
-        // Hide the entire database statistics section for training users
-        const statsSection = document.querySelector('.section[style*="border-bottom"]');
-        if (statsSection) {
-            statsSection.style.display = 'none';
         }
 
         // Change "Ask Questions" heading to "Training Question Entry"
@@ -218,11 +206,6 @@ function applyRoleBasedUI() {
             headerSubtitle.style.fontSize = '';
             headerSubtitle.style.fontWeight = '';
         }
-
-        const statsSection = document.querySelector('.section[style*="border-bottom"]');
-        if (statsSection) {
-            statsSection.style.display = '';
-        }
     }
 
     // If current active tab is not allowed, switch to first allowed tab
@@ -284,11 +267,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (userMgmtBtn && currentUser.user_type === 'super') {
             userMgmtBtn.style.display = 'inline-block';
         }
+        const headerDbChip = document.getElementById('header-db-chip');
+        if (headerDbChip && currentUser.user_type === 'super') {
+            headerDbChip.style.display = 'inline-flex';
+        }
         // Apply role-based UI after authentication
         applyRoleBasedUI();
 
         await loadDatabaseSelector();
-        refreshStats();
         loadAvailableModels();
         loadModeIndicator();
     }
@@ -507,7 +493,6 @@ async function scrapeWebsite() {
                 `Success! Scraped ${data.pages_scraped} pages (${pdfCount} PDFs, ${data.pages_scraped - pdfCount} HTML). You can now ask questions.`,
                 'success'
             );
-            refreshStats();
         } else {
             showStatus(statusDiv, `Error: ${data.detail}`, 'error');
         }
@@ -749,60 +734,81 @@ function removeMessage(id) {
     }
 }
 
-// Refresh stats
-async function refreshStats() {
-    const statsDisplay = document.getElementById('stats-display');
-
+// Fetch stats for a specific database and render them into targetEl.
+// Called by the per-row Statistics expander in the Manage Databases tab.
+async function refreshStatsFor(dbId, targetEl) {
+    if (!targetEl) return;
+    targetEl.innerHTML = '<p style="color: #999; margin: 10px 0;">Loading stats…</p>';
     try {
-        const response = await fetch(`${API_BASE}/stats`);
+        const response = await fetch(`${API_BASE}/stats?database_id=${encodeURIComponent(dbId)}`);
         const data = await response.json();
-
-        statsDisplay.innerHTML = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold;">${data.webpage_count.toLocaleString()}</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Web Pages</div>
+        if (!response.ok) {
+            targetEl.innerHTML = `<p style="color: red;">Error loading stats: ${data.detail || response.status}</p>`;
+            return;
+        }
+        const chunks = (data.vector_store && data.vector_store.count) || 0;
+        const totalQueries = (data.query_logs && data.query_logs.total_queries) || 0;
+        const avgResp = (data.query_logs && data.query_logs.avg_response_time) || 0;
+        targetEl.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 10px 0;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="font-size: 1.5em; font-weight: bold;">${(data.webpage_count || 0).toLocaleString()}</div>
+                    <div style="font-size: 0.8em; opacity: 0.9;">Web Pages</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold;">${data.uploaded_count.toLocaleString()}</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Uploaded Docs</div>
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="font-size: 1.5em; font-weight: bold;">${(data.uploaded_count || 0).toLocaleString()}</div>
+                    <div style="font-size: 0.8em; opacity: 0.9;">Uploaded Docs</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold;">${data.vector_store.count.toLocaleString()}</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Document Chunks</div>
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="font-size: 1.5em; font-weight: bold;">${chunks.toLocaleString()}</div>
+                    <div style="font-size: 0.8em; opacity: 0.9;">Document Chunks</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold;">${data.query_logs.total_queries}</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Total Queries</div>
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="font-size: 1.5em; font-weight: bold;">${totalQueries.toLocaleString()}</div>
+                    <div style="font-size: 0.8em; opacity: 0.9;">Total Queries</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold;">${data.query_logs.avg_response_time.toFixed(2)}s</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Avg Response Time</div>
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                    <div style="font-size: 1.5em; font-weight: bold;">${avgResp.toFixed(2)}s</div>
+                    <div style="font-size: 0.8em; opacity: 0.9;">Avg Response Time</div>
                 </div>
             </div>
         `;
     } catch (error) {
-        statsDisplay.innerHTML = `<p style="color: red;">Error loading stats: ${error.message}</p>`;
+        targetEl.innerHTML = `<p style="color: red;">Error loading stats: ${error.message}</p>`;
     }
 }
 
-// Clear database
-async function clearDatabase() {
-    if (!confirm('Are you sure you want to clear all data from the database?')) {
+// Toggle the per-row Statistics expander in the Manage Databases tab.
+function toggleDbStats(dbId) {
+    const panel = document.getElementById(`db-stats-panel-${dbId}`);
+    if (!panel) return;
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        refreshStatsFor(dbId, panel);
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+// Clear a specific database's vector store. Confirmation names the DB.
+async function clearDatabaseById(dbId, dbName) {
+    if (!confirm(`Clear all documents from '${dbName}'?\n\nThis removes every ingested chunk from that database. It does not affect other databases.`)) {
         return;
     }
-
     try {
-        const response = await fetch(`${API_BASE}/clear`, {
-            method: 'POST'
+        const token = sessionStorage.getItem('session_token');
+        const response = await fetch(`${API_BASE}/databases/${encodeURIComponent(dbId)}/clear`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-
         const data = await response.json();
-
         if (response.ok) {
-            alert('Database cleared successfully');
-            refreshStats();
-            document.getElementById('chat-messages').innerHTML = '';
+            alert(data.message || `Cleared '${dbName}'`);
+            const panel = document.getElementById(`db-stats-panel-${dbId}`);
+            if (panel && panel.style.display === 'block') {
+                refreshStatsFor(dbId, panel);
+            }
+            await loadDatabases();
         } else {
             alert(`Error: ${data.detail}`);
         }
@@ -1014,7 +1020,6 @@ async function uploadDocument() {
             uploadStatus.textContent = `✅ ${data.message} (${data.chunks_created} chunks created)`;
             uploadStatus.className = 'status-message success';
             fileInput.value = ''; // Clear the file input
-            refreshStats(); // Update stats
         } else {
             uploadStatus.textContent = `❌ Error: ${data.detail}`;
             uploadStatus.className = 'status-message error';
@@ -1105,9 +1110,6 @@ async function switchActiveDatabase() {
             // Update the database label in the chat tab
             updateDatabaseLabel(data.name);
 
-            // Refresh stats to show new database
-            refreshStats();
-
             // Check if we're on the databases tab and refresh the list
             const databasesTab = document.getElementById('databases-tab');
             if (databasesTab && databasesTab.classList.contains('active')) {
@@ -1154,22 +1156,29 @@ async function loadDatabases() {
                 dbCard.style.borderLeft = db.is_active ? '4px solid #4CAF50' : '4px solid #667eea';
 
                 dbCard.innerHTML = `
-                    <div class="document-info">
-                        <strong>${escapeHtml(db.name)}</strong>
-                        ${db.is_active ? ' <span style="color: #4CAF50; font-weight: bold;">● ACTIVE</span>' : ''}
-                        ${db.is_default ? ' <span style="color: #667eea;">[Default]</span>' : ''}
-                        <small>
-                            ID: ${escapeHtml(db.id)} |
-                            Web Pages: ${db.webpage_count || 0} |
-                            Uploaded Docs: ${db.uploaded_count || 0} |
-                            Chunks: ${db.chunk_count} |
-                            ${db.description ? escapeHtml(db.description) : 'No description'}
-                        </small>
-                    </div>
-                    <div class="document-actions">
-                        ${!db.is_active ? `<button onclick="switchToDatabaseFromList('${escapeHtml(db.id)}')" style="background: #4CAF50;">Switch To</button>` : ''}
-                        <button onclick="duplicateDatabase('${escapeHtml(db.id)}', '${escapeHtml(db.name)}')" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">Duplicate</button>
-                        ${!db.is_default ? `<button class="delete-btn" onclick="deleteDatabase('${escapeHtml(db.id)}')">Delete</button>` : ''}
+                    <div style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                            <div class="document-info">
+                                <strong>${escapeHtml(db.name)}</strong>
+                                ${db.is_active ? ' <span style="color: #4CAF50; font-weight: bold;">● ACTIVE</span>' : ''}
+                                ${db.is_default ? ' <span style="color: #667eea;">[Default]</span>' : ''}
+                                <small>
+                                    ID: ${escapeHtml(db.id)} |
+                                    Web Pages: ${db.webpage_count || 0} |
+                                    Uploaded Docs: ${db.uploaded_count || 0} |
+                                    Chunks: ${db.chunk_count} |
+                                    ${db.description ? escapeHtml(db.description) : 'No description'}
+                                </small>
+                            </div>
+                            <div class="document-actions" style="flex-shrink: 0;">
+                                <button onclick="toggleDbStats('${escapeHtml(db.id)}')" style="background: #667eea;">Statistics</button>
+                                ${!db.is_active ? `<button onclick="switchToDatabaseFromList('${escapeHtml(db.id)}')" style="background: #4CAF50;">Switch To</button>` : ''}
+                                <button onclick="duplicateDatabase('${escapeHtml(db.id)}', '${escapeHtml(db.name)}')" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">Duplicate</button>
+                                <button onclick="clearDatabaseById('${escapeHtml(db.id)}', '${escapeHtml(db.name)}')" class="danger-btn">Clear</button>
+                                ${!db.is_default ? `<button class="delete-btn" onclick="deleteDatabase('${escapeHtml(db.id)}')">Delete</button>` : ''}
+                            </div>
+                        </div>
+                        <div id="db-stats-panel-${escapeHtml(db.id)}" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd;"></div>
                     </div>
                 `;
                 listDiv.appendChild(dbCard);
@@ -1253,7 +1262,6 @@ async function switchToDatabaseFromList(dbId) {
             // Await the database list reload to ensure the UI updates
             await loadDatabases();
             await loadDatabaseSelector();
-            refreshStats();
             console.log('Database list reloaded');
         } else {
             showStatus(statusDiv, `Error: ${data.detail}`, 'error');

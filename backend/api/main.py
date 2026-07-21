@@ -806,34 +806,44 @@ async def rate_response(
 
 
 @app.get("/stats")
-async def get_stats():
+async def get_stats(database_id: Optional[str] = None):
     """
-    Get statistics about the RAG system and query logs for the active database.
+    Get statistics about the RAG system and query logs for a database.
+    If database_id is omitted, uses the active database. If a non-active
+    database_id is supplied, chunk-level metrics come from the target
+    database's ChromaDB, not the active RAG system.
     """
     try:
-        # Get active database ID
-        active_db_id = db_manager.active_database
+        target_db_id = database_id or db_manager.active_database
 
-        # Get RAG stats
-        rag_stats = rag_system.get_stats()
-
-        # Get database-specific query log stats
-        log_stats = query_logger.get_stats(database_id=active_db_id)
-
-        # Get webpage and document counts from database manager
         db_list = db_manager.list_databases()
-        active_db_info = next((db for db in db_list if db['id'] == active_db_id), None)
+        target_db_info = next((db for db in db_list if db['id'] == target_db_id), None)
+        if not target_db_info:
+            raise HTTPException(status_code=404, detail=f"Database '{target_db_id}' not found")
 
-        webpage_count = active_db_info['webpage_count'] if active_db_info else 0
-        uploaded_count = active_db_info['uploaded_count'] if active_db_info else 0
+        log_stats = query_logger.get_stats(database_id=target_db_id)
+        webpage_count = target_db_info['webpage_count']
+        uploaded_count = target_db_info['uploaded_count']
+
+        if target_db_id == db_manager.active_database:
+            rag_stats = rag_system.get_stats()
+        else:
+            # For non-active DBs, list_databases() already read the chunk
+            # count. Wrap into the same shape the frontend expects so the
+            # renderer stays uniform across active/non-active.
+            rag_stats = {
+                "vector_store": {"count": target_db_info['chunk_count']}
+            }
 
         return {
             **rag_stats,
             "query_logs": log_stats,
             "webpage_count": webpage_count,
             "uploaded_count": uploaded_count,
-            "database_id": active_db_id
+            "database_id": target_db_id
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1237,6 +1247,39 @@ async def clear_database(authorized: bool = Depends(verify_admin_key)):
         return {
             "success": True,
             "message": "Vector store cleared successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/databases/{db_id}/clear")
+async def clear_specific_database(
+    db_id: str,
+    user_info: Dict = Depends(verify_super_user)
+):
+    """
+    Clear all documents from a specific database's vector store.
+    Super-user-gated. For the active database, delegates to the live
+    RAG system's vector store; for a non-active database, opens the
+    target ChromaDB directly and clears its collection.
+    """
+    if DEMO_MODE:
+        raise HTTPException(status_code=403, detail="This operation is disabled in demo mode")
+    db_list = db_manager.list_databases()
+    target = next((db for db in db_list if db['id'] == db_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"Database '{db_id}' not found")
+    try:
+        if db_id == db_manager.active_database:
+            rag_system.vector_store.clear_collection()
+        else:
+            from rag.vector_store import VectorStore
+            VectorStore(persist_directory=target['path']).clear_collection()
+        return {
+            "success": True,
+            "db_id": db_id,
+            "name": target['name'],
+            "message": f"Cleared database '{target['name']}'"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
