@@ -553,7 +553,7 @@
                     </label>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="qlog-user-type-group">
                     <label>User Type</label>
                     <select id="qlog-user-type">
                         <option value="">All Users</option>
@@ -563,7 +563,7 @@
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="qlog-username-group">
                     <label>Specific Username (optional)</label>
                     <input type="text" id="qlog-username" placeholder="Filter by specific user...">
                 </div>
@@ -633,7 +633,7 @@
                     <small style="color: #666;">Note: "Needs Improvement" ratings will include user feedback</small>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="ratings-username-group">
                     <label>Specific Training User (optional)</label>
                     <input type="text" id="ratings-username" placeholder="Filter by specific training user...">
                 </div>
@@ -944,7 +944,7 @@
                         <div class="training-set-actions">
                             <button class="btn-small btn-view" onclick="viewTrainingSet(${ts.id})">View Data</button>
                             <button class="btn-small btn-clone" onclick="cloneTrainingSet(${ts.id})">Duplicate</button>
-                            ${currentUser.user_type === 'super' ? `<button class="btn-small btn-delete" onclick="deleteTrainingSet(${ts.id}, '${escapeHtml(ts.name)}')">Delete</button>` : ''}
+                            ${(currentUser.user_type === 'super' || (currentUser.user_type === 'training' && ts.created_by === currentUser.username)) ? `<button class="btn-small btn-delete" onclick="deleteTrainingSet(${ts.id}, '${escapeHtml(ts.name)}')">Delete</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -1690,10 +1690,33 @@
             const isAuthenticated = await checkAuth();
             if (!isAuthenticated) return; // checkAuth already redirects to login
 
+            // Page-level role gate: only super and training users may access.
+            if (currentUser.user_type !== 'super' && currentUser.user_type !== 'training') {
+                window.location.href = '/static/index.html';
+                return;
+            }
+
             // Show logged-in user in header
             const userDisplay = document.getElementById('current-user-display');
             if (userDisplay && currentUser.username) {
                 userDisplay.textContent = `Signed in as ${currentUser.username}`;
+            }
+
+            // Unhide the create / from-query-log / from-ratings tabs. These
+            // ship hidden in the HTML markup; both roles allowed on this page
+            // need them.
+            document.querySelectorAll('.tabs .tab').forEach(btn => {
+                btn.style.display = '';
+            });
+
+            // Training users are server-scoped to their own ratings / query-log
+            // entries, so per-user filter controls would only mislead — hide them.
+            if (currentUser.user_type === 'training') {
+                const hideIds = ['qlog-user-type-group', 'qlog-username-group', 'ratings-username-group'];
+                hideIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
             }
 
             // Ensure the list tab is active and visible

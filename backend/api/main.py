@@ -404,6 +404,33 @@ async def verify_super_user(authorization: Optional[str] = Header(None)):
     return user_info
 
 
+async def verify_training_or_super(authorization: Optional[str] = Header(None)):
+    """Verify user is authenticated as either a super or training user."""
+    user_info = await verify_web_auth(authorization)
+    if user_info['user_type'] not in ('super', 'training'):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. This operation requires super or training user privileges."
+        )
+    return user_info
+
+
+def _authorize_training_set(user_info: Dict, ts_id: int) -> Dict:
+    """Return the training set if the caller may act on it, else 404.
+
+    Super users act on any set; training users act only on sets they
+    authored. 404 (not 403) on cross-user access to avoid leaking IDs.
+    """
+    ts = training_manager.get_training_set(ts_id)
+    if not ts:
+        raise HTTPException(status_code=404, detail="Training set not found")
+    if user_info['user_type'] == 'super':
+        return ts
+    if user_info['user_type'] == 'training' and ts.get('created_by') == user_info['username']:
+        return ts
+    raise HTTPException(status_code=404, detail="Training set not found")
+
+
 # Routes
 @app.get("/")
 async def root():
@@ -1699,28 +1726,21 @@ async def deactivate_user(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Training Set Management Endpoints (Super User Only)
+# Training Set Management Endpoints (Super + Training)
 @app.get("/training/sets")
 async def list_training_sets(
     status: Optional[str] = None,
     search: Optional[str] = None,
     created_by: Optional[str] = None,
     limit: Optional[int] = None,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
     """
-    List all training sets with optional filtering.
-    Requires super user privileges.
-
-    Args:
-        status: Filter by status (active, archived, deprecated)
-        search: Search in name and description
-        created_by: Filter by creator
-        limit: Limit number of results
-
-    Returns:
-        List of training sets
+    List training sets. Super users see all; training users see only
+    those they authored (server-forced `created_by` scope).
     """
+    if user_info['user_type'] == 'training':
+        created_by = user_info['username']
     try:
         training_sets = training_manager.list_training_sets(
             status=status,
@@ -1736,17 +1756,11 @@ async def list_training_sets(
 @app.post("/training/sets")
 async def create_training_set(
     ts_req: CreateTrainingSetRequest,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
     """
-    Create a new training set.
-    Requires super user privileges.
-
-    Args:
-        ts_req: Training set creation details
-
-    Returns:
-        Created training set info
+    Create a new training set. Super and training users may create;
+    `created_by` is always the authenticated caller.
     """
     try:
         result = training_manager.create_training_set(
@@ -1776,24 +1790,11 @@ async def create_training_set(
 @app.get("/training/sets/{ts_id}")
 async def get_training_set(
     ts_id: int,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
-    """
-    Get training set details by ID.
-    Requires super user privileges.
-
-    Args:
-        ts_id: Training set ID
-
-    Returns:
-        Training set details
-    """
+    """Get training set details. Training users may only fetch sets they own."""
     try:
-        training_set = training_manager.get_training_set(ts_id)
-        if not training_set:
-            raise HTTPException(status_code=404, detail="Training set not found")
-
-        return training_set
+        return _authorize_training_set(user_info, ts_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -1803,19 +1804,11 @@ async def get_training_set(
 @app.get("/training/sets/{ts_id}/data")
 async def get_training_set_data(
     ts_id: int,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
-    """
-    Get the actual training data from a training set.
-    Requires super user privileges.
-
-    Args:
-        ts_id: Training set ID
-
-    Returns:
-        List of training examples
-    """
+    """Get training data. Training users may only fetch data from sets they own."""
     try:
+        _authorize_training_set(user_info, ts_id)
         data = training_manager.get_training_data(ts_id)
         if data is None:
             raise HTTPException(status_code=404, detail="Training set not found or data file missing")
@@ -1831,20 +1824,11 @@ async def get_training_set_data(
 async def update_training_set(
     ts_id: int,
     ts_req: UpdateTrainingSetRequest,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
-    """
-    Update training set metadata.
-    Requires super user privileges.
-
-    Args:
-        ts_id: Training set ID
-        ts_req: Update details
-
-    Returns:
-        Update status
-    """
+    """Update training set metadata. Training users may only update sets they own."""
     try:
+        _authorize_training_set(user_info, ts_id)
         result = training_manager.update_training_set(
             training_set_id=ts_id,
             modified_by=user_info['username'],
@@ -1873,20 +1857,11 @@ async def update_training_set(
 async def delete_training_set(
     ts_id: int,
     delete_file: bool = True,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
-    """
-    Delete a training set.
-    Requires super user privileges.
-
-    Args:
-        ts_id: Training set ID
-        delete_file: Whether to delete the actual file (default: True)
-
-    Returns:
-        Deletion status
-    """
+    """Delete a training set. Training users may only delete sets they own."""
     try:
+        _authorize_training_set(user_info, ts_id)
         result = training_manager.delete_training_set(ts_id, delete_file=delete_file)
 
         if result['status'] == 'error':
@@ -1907,20 +1882,11 @@ async def delete_training_set(
 async def clone_training_set(
     ts_id: int,
     clone_req: CloneTrainingSetRequest,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
-    """
-    Clone an existing training set.
-    Requires super user privileges.
-
-    Args:
-        ts_id: Training set ID to clone
-        clone_req: Clone details (new name, description)
-
-    Returns:
-        Cloned training set info
-    """
+    """Clone a training set. Training users may only clone sets they own; the clone is owned by them."""
     try:
+        _authorize_training_set(user_info, ts_id)
         result = training_manager.clone_training_set(
             training_set_id=ts_id,
             new_name=clone_req.new_name,
@@ -1945,30 +1911,21 @@ async def clone_training_set(
 @app.post("/training/sets/from-query-log")
 async def create_training_set_from_query_log(
     req: CreateFromQueryLogRequest,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
     """
     Create a training set from master query log with optional filtering.
-    Requires super user privileges.
-
-    Args:
-        req: Request details including name, filters, and metadata
-
-    Returns:
-        Created training set info
-
-    Filter options:
-        - success_only: Only include successful queries (default: True)
-        - user_type: Filter by user type (super, training, standard)
-        - username: Filter by specific username
-        - database_id: Filter by database ID
-        - max_examples: Limit number of examples to include
+    Training users are server-scoped to their own log entries via
+    `filters['username']`; super users may filter freely.
     """
+    filters = dict(req.filters or {})
+    if user_info['user_type'] == 'training':
+        filters['username'] = user_info['username']
     try:
         result = training_manager.create_from_query_log(
             name=req.name,
             created_by=user_info['username'],
-            filters=req.filters or {},
+            filters=filters,
             description=req.description,
             categories=req.categories,
             tags=req.tags
@@ -1991,29 +1948,21 @@ async def create_training_set_from_query_log(
 @app.post("/training/sets/from-ratings")
 async def create_training_set_from_ratings(
     req: CreateFromRatingsRequest,
-    user_info: Dict = Depends(verify_super_user)
+    user_info: Dict = Depends(verify_training_or_super)
 ):
     """
-    Create a training set from training user ratings.
-    Requires super user privileges.
-
-    Args:
-        req: Request details including name, rating filter, and metadata
-
-    Returns:
-        Created training set info
-
-    Rating filter options:
-        - acceptable: Only include responses rated as acceptable
-        - needs_improvement: Only include responses rated as needs improvement (includes feedback)
-        - all: Include all ratings
+    Create a training set from training user ratings. Training users
+    are server-scoped to their own ratings; super users may filter freely.
     """
+    username_filter = req.username
+    if user_info['user_type'] == 'training':
+        username_filter = user_info['username']
     try:
         result = training_manager.create_from_ratings(
             name=req.name,
             created_by=user_info['username'],
             rating_filter=req.rating_filter,
-            username=req.username,
+            username=username_filter,
             description=req.description,
             categories=req.categories,
             tags=req.tags

@@ -271,6 +271,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (headerDbChip && currentUser.user_type === 'super') {
             headerDbChip.style.display = 'inline-flex';
         }
+        const trainingSetsBtn = document.getElementById('training-sets-btn');
+        if (trainingSetsBtn && (currentUser.user_type === 'super' || currentUser.user_type === 'training')) {
+            trainingSetsBtn.style.display = 'inline-block';
+        }
         // Apply role-based UI after authentication
         applyRoleBasedUI();
 
