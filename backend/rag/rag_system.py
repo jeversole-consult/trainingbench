@@ -24,6 +24,7 @@ from datetime import datetime
 import hashlib
 import json
 import os
+import re  # TB-US-040: query-route pattern compilation
 
 
 # Provider-specific default model identifiers (env-overridable).
@@ -118,11 +119,110 @@ class RAGSystem:
         self.llm = None
         self._init_llm(llm_provider, model_name)
 
-        # Prompt template — caller may override
+        # Prompt template — caller may override; TB-US-040 may update
+        # this from AppSettings on each query via _refresh_prompt_template.
+        self._template_str = prompt_template or DEFAULT_RAG_PROMPT
         self.prompt_template = PromptTemplate(
             input_variables=["context", "question"],
-            template=prompt_template or DEFAULT_RAG_PROMPT,
+            template=self._template_str,
         )
+
+        # TB-US-040: query routes cache (loaded lazily from AppSettings).
+        # _routes_str holds the JSON serialization of the last-seen routes
+        # list for change detection; _compiled_routes holds the compiled
+        # (name, [patterns], augmentation, position) tuples.
+        self._routes_str: str = ""
+        self._compiled_routes: List = []
+
+    def _refresh_prompt_template(self) -> None:
+        """TB-US-040: Reload the prompt template from AppSettings if changed.
+
+        Fail-soft: AppSettings import error or missing value falls through to
+        the init-time template. Caches the last-seen template string so we
+        only rebuild the LangChain PromptTemplate when the stored value
+        actually changes.
+        """
+        try:
+            from api.app_settings import AppSettings
+            current = AppSettings.rag_prompt()
+        except Exception as e:
+            print(f"rag_system: could not load prompt from AppSettings ({e}); using built-in fallback")
+            try:
+                from api.app_settings import DEFAULT_RAG_PROMPT as APPSETTINGS_DEFAULT
+                current = APPSETTINGS_DEFAULT
+            except Exception:
+                current = self._template_str  # last-known good
+        if current != self._template_str:
+            self.prompt_template = PromptTemplate(
+                input_variables=["context", "question"],
+                template=current,
+            )
+            self._template_str = current
+
+    def _refresh_query_routes(self) -> None:
+        """TB-US-040: Reload query routes from AppSettings and recompile patterns if changed.
+
+        Fail-soft: on AppSettings error, route augmentation is skipped entirely
+        (empty compiled list). Routes with `enabled: false` are skipped.
+        Routes with malformed regex patterns are silently skipped and logged.
+        """
+        try:
+            from api.app_settings import AppSettings
+            current = AppSettings.query_routes()
+        except Exception as e:
+            print(f"rag_system: could not load query routes ({e}); skipping rewrite layer")
+            self._compiled_routes = []
+            self._routes_str = ""
+            return
+
+        current_str = json.dumps(current, sort_keys=True)
+        if current_str == self._routes_str:
+            return
+
+        compiled = []
+        for route in current:
+            if not isinstance(route, dict) or not route.get("enabled", True):
+                continue
+            try:
+                patterns = [
+                    re.compile(p, re.IGNORECASE)
+                    for p in route.get("patterns", [])
+                    if isinstance(p, str) and p
+                ]
+            except re.error as e:
+                print(f"rag_system: skipping route '{route.get('name')}' due to regex error: {e}")
+                continue
+            if not patterns:
+                continue
+            compiled.append((
+                route.get("name", "unnamed"),
+                patterns,
+                route.get("augmentation", ""),
+                route.get("augmentation_position", "prefix"),
+            ))
+        self._compiled_routes = compiled
+        self._routes_str = current_str
+
+    def _maybe_augment_query(self, question: str) -> tuple:
+        """TB-US-040: Apply the first matching query route to the search string.
+
+        Returns (search_query, matched_route_name). If no route matches, the
+        search query is unchanged and matched_route_name is None.
+
+        Note: the ORIGINAL question goes to the LLM; only the retrieval
+        similarity-search query is augmented. The augmentation is a
+        retrieval hint, not a question rewrite.
+        """
+        self._refresh_query_routes()
+        for name, patterns, augmentation, position in self._compiled_routes:
+            for pattern in patterns:
+                if pattern.search(question):
+                    if position == "suffix":
+                        augmented = f"{question} {augmentation}".strip()
+                    else:
+                        augmented = f"{augmentation}{question}"
+                    return augmented, name
+        return question, None
 
     def _init_llm(self, provider: str, model_name: Optional[str]):
         """Initialize the LLM based on provider."""
@@ -264,10 +364,19 @@ class RAGSystem:
                 }
 
         # 3. Retrieval + generation
-        relevant_docs = self.vector_store.similarity_search(question, k=k)
+        # TB-US-040: apply configured query-route augmentation to the
+        # retrieval query before similarity search. The ORIGINAL question
+        # still goes to the LLM.
+        search_query, matched_route = self._maybe_augment_query(question)
+        if matched_route:
+            print(f"query_routes: matched '{matched_route}', augmented search = {search_query!r}")
+        relevant_docs = self.vector_store.similarity_search(search_query, k=k)
         context = "\n\n".join([doc["content"] for doc in relevant_docs]) if relevant_docs else ""
 
         if self.llm:
+            # TB-US-040: pick up any operator-updated RAG prompt from
+            # AppSettings before invoking the LLM.
+            self._refresh_prompt_template()
             prompt = self.prompt_template.format(context=context, question=question)
             answer = self.llm.invoke(prompt)
 

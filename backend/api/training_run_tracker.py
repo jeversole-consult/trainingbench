@@ -129,6 +129,31 @@ class TrainingRunTracker:
                 )
             """)
 
+            # TB-US-065: idempotent ALTER TABLE for pid column (nullable).
+            # Captures the subprocess PID so startup reconciliation can
+            # detect orphaned 'running' rows after a TB restart.
+            try:
+                cursor.execute("ALTER TABLE training_runs ADD COLUMN pid INTEGER")
+            except sqlite3.OperationalError:
+                pass  # column already exists; idempotent on repeat starts
+
+            # TB-US-065: idempotent ALTER TABLE for agent_id + training_set_version_id.
+            # Lets launch endpoints tie runs back to the two-tier architecture
+            # (TB-US-044) + the versioned training sets (TB-US-052).
+            try:
+                cursor.execute("ALTER TABLE training_runs ADD COLUMN agent_id INTEGER")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                cursor.execute("ALTER TABLE training_runs ADD COLUMN training_set_version_id INTEGER")
+            except sqlite3.OperationalError:
+                pass
+
+            # TB-US-065: 'cancelled' status for operator-aborted runs.
+            # SQLite doesn't support ALTER on CHECK constraints without
+            # a full rebuild; we accept 'stopped' as the existing enum
+            # value and use 'stopped' at the API layer for cancels.
+
             conn.commit()
             print("Training run tracker database initialized")
 
@@ -250,7 +275,11 @@ class TrainingRunTracker:
                     "created_by": row['created_by'],
                     "gpu_info": row['gpu_info'],
                     "notes": row['notes'],
-                    "metadata": json.loads(row['metadata']) if row['metadata'] else {}
+                    "metadata": json.loads(row['metadata']) if row['metadata'] else {},
+                    # TB-US-065 additions
+                    "pid": row['pid'] if 'pid' in row.keys() else None,
+                    "agent_id": row['agent_id'] if 'agent_id' in row.keys() else None,
+                    "training_set_version_id": row['training_set_version_id'] if 'training_set_version_id' in row.keys() else None,
                 }
 
             return None
@@ -687,6 +716,174 @@ class TrainingRunTracker:
 
         except Exception as e:
             return {"status": "error", "error": str(e)}
+
+    # ------------------------------------------------------------------ #
+    # TB-US-065: launch-flow helpers
+    # ------------------------------------------------------------------ #
+
+    def get_active_run(self) -> Optional[Dict]:
+        """Return the currently-running training run (if any), else None.
+
+        Used by `POST /training/runs/launch` to enforce the single-slot
+        queue (409 Conflict on concurrent launch).
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM training_runs WHERE status = 'running' LIMIT 1"
+            ).fetchone()
+        return dict(row) if row else None
+
+    def create_launched_run(
+        self,
+        run_name: str,
+        description: Optional[str],
+        base_model: str,
+        adapter_output_path: str,
+        config: Dict,
+        created_by: str,
+        agent_id: Optional[int] = None,
+        training_set_version_id: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> Dict:
+        """Create a training_runs row BEFORE spawning the subprocess.
+
+        Status is 'running' from the moment the row is inserted; the
+        parent process spawns `train.py --run-id <row.id>` immediately
+        after this call.
+
+        Mirrors `create_training_run` but tracks the two-tier +
+        versioning linkage (agent_id + training_set_version_id)
+        rather than the legacy training_set_id column.
+        """
+        started_at = datetime.now().isoformat()
+        config_json = json.dumps(config)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO training_runs (
+                    run_name, description, training_set_id, base_model,
+                    adapter_output_path, config, started_at, status,
+                    created_by, notes, agent_id, training_set_version_id
+                ) VALUES (?, ?, NULL, ?, ?, ?, ?, 'running', ?, ?, ?, ?)
+                """,
+                (
+                    run_name, description, base_model, adapter_output_path,
+                    config_json, started_at, created_by, notes,
+                    agent_id, training_set_version_id,
+                ),
+            )
+            run_id = cursor.lastrowid
+            conn.commit()
+        return self.get_training_run(run_id)
+
+    def set_run_pid(self, run_id: int, pid: int) -> None:
+        """Attach the spawned subprocess PID to a running row."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "UPDATE training_runs SET pid = ? WHERE id = ?",
+                (pid, run_id),
+            )
+            conn.commit()
+
+    def startup_reconcile(self) -> List[Dict]:
+        """TB-US-065 R9: on TB startup, scan for stale 'running' rows.
+
+        A 'running' row whose PID is dead (or null) means the subprocess
+        died when TB was restarted. Flip it to 'failed' with a note so
+        downstream launches aren't blocked by the stale row.
+
+        Returns the list of rows that were flipped.
+        """
+        import os
+        flipped: List[Dict] = []
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT id, pid, run_name FROM training_runs WHERE status = 'running'"
+            ).fetchall()
+            now = datetime.now().isoformat()
+            for row in rows:
+                pid = row["pid"]
+                alive = False
+                if pid is not None:
+                    try:
+                        os.kill(pid, 0)  # raises if dead
+                        alive = True
+                    except OSError:
+                        alive = False
+                if not alive:
+                    note = f"TB restarted at {now}; process died (pid={pid})."
+                    conn.execute(
+                        """
+                        UPDATE training_runs
+                        SET status = 'failed',
+                            completed_at = ?,
+                            notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || char(10) || ? END
+                        WHERE id = ?
+                        """,
+                        (now, note, note, row["id"]),
+                    )
+                    flipped.append({"id": row["id"], "run_name": row["run_name"], "pid": pid})
+            if flipped:
+                conn.commit()
+        return flipped
+
+    def cancel_run(self, run_id: int, cancelled_by: str) -> Dict:
+        """TB-US-065 R10: SIGTERM then SIGKILL fallback; flip to 'stopped'.
+
+        Partial checkpoint files remain on disk for forensics. Operator
+        manually cleans up if desired.
+        """
+        import os
+        import time
+        import signal
+        run = self.get_training_run(run_id)
+        if not run:
+            return {"status": "error", "error": f"Run {run_id} not found"}
+        if run.get("status") != "running":
+            return {"status": "error", "error": f"Run is {run.get('status')!r}, not running"}
+
+        pid = run.get("pid")
+        signal_result = {"sigterm": False, "sigkill": False, "exit_detected": False}
+        if pid:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                signal_result["sigterm"] = True
+            except ProcessLookupError:
+                signal_result["exit_detected"] = True
+            # Wait up to 10s for the process to exit cleanly
+            for _ in range(20):
+                try:
+                    os.kill(pid, 0)
+                    time.sleep(0.5)
+                except OSError:
+                    signal_result["exit_detected"] = True
+                    break
+            # SIGKILL if still alive
+            if not signal_result["exit_detected"]:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    signal_result["sigkill"] = True
+                except OSError:
+                    signal_result["exit_detected"] = True
+
+        now = datetime.now().isoformat()
+        note = f"Cancelled by {cancelled_by} at {now}; signals={signal_result}"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE training_runs
+                SET status = 'stopped',
+                    completed_at = ?,
+                    notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || char(10) || ? END
+                WHERE id = ?
+                """,
+                (now, note, note, run_id),
+            )
+            conn.commit()
+        return {"status": "success", "id": run_id, "signals": signal_result}
 
     def compare_runs(self, run_ids: List[int]) -> Dict:
         """
