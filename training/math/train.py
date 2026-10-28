@@ -239,7 +239,8 @@ def train(
     max_train_samples=None,
     max_eval_samples=None,
     use_tracking=True,
-    run_name=None
+    run_name=None,
+    extra_callbacks=None,   # TB-US-065: inject the DB-writing callback
 ):
     """
     Run QLoRA training on GSM8K.
@@ -349,7 +350,7 @@ def train(
         fp16=True,
         optim="paged_adamw_8bit",
         logging_dir=str(logs_dir / "gsm8k"),
-        report_to=["tensorboard"],
+        report_to="none",   # TB-US-066 fix: tensorboard not installed; our own TB-US-065 DB callback writes progress to training_runs* tables.
         gradient_checkpointing=True,
         max_grad_norm=0.3,
         weight_decay=0.001,
@@ -372,6 +373,11 @@ def train(
 
         tracker_callback = TrainingTrackerCallback(run_name=run_name)
         callbacks.append(tracker_callback)
+
+    # TB-US-065: append the DB-writing callback injected by main() when
+    # --run-id was passed.
+    if extra_callbacks:
+        callbacks.extend(extra_callbacks)
 
     # Create trainer
     trainer = Trainer(
@@ -516,10 +522,82 @@ def main():
     parser.add_argument("--run-name", type=str, default=None,
                         help="Name for this training run (for tracking)")
 
+    # TB-US-065: if --run-id is provided, this run was launched by TB's
+    # `POST /training/runs/launch`. Load config from the DB row + write
+    # progress to the tracker DB during the run + auto-register the
+    # trained adapter on completion.
+    parser.add_argument("--run-id", type=int, default=None,
+                        help="Internal: TB launch flow passes this to tie the "
+                             "subprocess back to a training_runs row (TB-US-065)")
+
     args = parser.parse_args()
+
+    # TB-US-065: if --run-id is set, override CLI args with the DB row's
+    # launch-time hyperparameters.
+    tb_db_callback = None
+    tb_run_config = None
+    if args.run_id is not None:
+        try:
+            from tb_db_callback import (
+                TBDBTrainerCallback, mark_run_completed, mark_run_failed,
+                load_run_config,
+            )
+        except ImportError:
+            # tb_db_callback.py lives next to train.py; make sure cwd / path works
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).parent))
+            from tb_db_callback import (
+                TBDBTrainerCallback, mark_run_completed, mark_run_failed,
+                load_run_config,
+            )
+        tb_run_config = load_run_config(args.run_id)
+        # Override CLI args with DB-provided hyperparameters
+        hp = tb_run_config
+        if "epochs" in hp:
+            args.epochs = int(hp["epochs"])
+        if "batch_size" in hp:
+            args.batch_size = int(hp["batch_size"])
+        if "gradient_accumulation_steps" in hp:
+            args.gradient_accum = int(hp["gradient_accumulation_steps"])
+        if "learning_rate" in hp:
+            args.lr = float(hp["learning_rate"])
+        if "lora_rank" in hp:
+            args.lora_r = int(hp["lora_rank"])
+        if "lora_alpha" in hp:
+            args.lora_alpha = int(hp["lora_alpha"])
+        if "lora_dropout" in hp:
+            args.lora_dropout = float(hp["lora_dropout"])
+        # TB-US-066 bugfix 2026-10-24: dataset-sampling + logging/save/warmup
+        # cadence were missing from the override block, so short-test runs
+        # defaulted to the full GSM8K training set. Added here.
+        if "max_train_samples" in hp:
+            args.max_train_samples = int(hp["max_train_samples"])
+        if "max_eval_samples" in hp:
+            args.max_eval_samples = int(hp["max_eval_samples"])
+        if "max_length" in hp:
+            args.max_length = int(hp["max_length"])
+        if "warmup_steps" in hp:
+            args.warmup_steps = int(hp["warmup_steps"])
+        if "logging_steps" in hp:
+            args.logging_steps = int(hp["logging_steps"])
+        if "save_steps" in hp:
+            args.save_steps = int(hp["save_steps"])
+        if "eval_steps" in hp:
+            args.eval_steps = int(hp["eval_steps"]) if hp["eval_steps"] else None
+        if hp.get("_base_model"):
+            args.model = hp["_base_model"]
+        if hp.get("_adapter_output_path"):
+            args.output_dir = hp["_adapter_output_path"]
+        if hp.get("_run_name"):
+            args.run_name = hp["_run_name"]
+        tb_db_callback = TBDBTrainerCallback(run_id=args.run_id)
+        print(f"[TB-US-065] Launched by TB; run_id={args.run_id}, "
+              f"run_name={args.run_name}, output={args.output_dir}")
 
     # Run training
     try:
+        _start_time = datetime.now()
+        extra_callbacks = [tb_db_callback] if tb_db_callback else None
         success = train(
             model_name=args.model,
             dataset_path=args.dataset_path,
@@ -541,16 +619,82 @@ def main():
             max_train_samples=args.max_train_samples,
             max_eval_samples=args.max_eval_samples,
             use_tracking=not args.no_tracking,
-            run_name=args.run_name
+            run_name=args.run_name,
+            extra_callbacks=extra_callbacks,
         )
+        # TB-US-065 R7: mark run completed + auto-register adapter
+        if args.run_id is not None and success:
+            duration = int((datetime.now() - _start_time).total_seconds())
+            mark_run_completed(
+                run_id=args.run_id,
+                duration_seconds=duration,
+                adapter_output_path=args.output_dir,
+            )
+            # Auto-register adapter via AdapterVersionManager (TB-US-063).
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
+                from api.adapter_version_manager import AdapterVersionManager
+                from api.agent_manager import AgentManager
+                agent_id = tb_run_config.get("_agent_id") if tb_run_config else None
+                ts_version_id = tb_run_config.get("_training_set_version_id") if tb_run_config else None
+                if agent_id is not None:
+                    agent_row = AgentManager().get_by_id(agent_id)
+                    agent_slug = agent_row["name"] if agent_row else f"agent-{agent_id}"
+                    # TB-US-065 bugfix 2026-10-25: HF Trainer saves the final
+                    # adapter to <output_dir>/final/, not <output_dir>/.
+                    # Fall back to output_dir if final/ doesn't exist (older
+                    # train scripts / custom checkpointing).
+                    final_dir = Path(args.output_dir) / "final"
+                    source_dir = final_dir if final_dir.exists() else Path(args.output_dir)
+                    adapter_row = AdapterVersionManager().register_existing_adapter(
+                        agent_id=agent_id,
+                        agent_slug=agent_slug,
+                        source_dir=source_dir,
+                        base_model=args.model,
+                        created_by="training-run",
+                        training_set_version_id=ts_version_id,
+                        training_run_metadata={
+                            "run_id": args.run_id,
+                            "run_name": args.run_name,
+                            "duration_seconds": duration,
+                            "epochs": args.epochs,
+                            "lora_rank": args.lora_r,
+                            "lora_alpha": args.lora_alpha,
+                            "learning_rate": args.lr,
+                            "batch_size": args.batch_size,
+                        },
+                    )
+                    print(f"[TB-US-065] Auto-registered adapter_version_id={adapter_row['version_id']}")
+                else:
+                    print("[TB-US-065] Skipping auto-register: no agent_id in run config")
+            except Exception as e:
+                import traceback as _tb
+                print(f"[TB-US-065] Auto-register failed (non-fatal; adapter files still on disk): {e}")
+                _tb.print_exc()
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user.")
-        sys.exit(1)
+        # TB-US-065 R7: mark failed on cancel so DB reflects reality
+        if args.run_id is not None:
+            try:
+                mark_run_failed(run_id=args.run_id, error_message="KeyboardInterrupt (SIGINT/SIGTERM)")
+            except Exception:
+                pass
+        sys.exit(130)
     except Exception as e:
         print(f"\n\nError during training: {e}")
         import traceback
         traceback.print_exc()
+        # TB-US-065 R7: capture traceback into training_runs.notes
+        if args.run_id is not None:
+            try:
+                mark_run_failed(
+                    run_id=args.run_id,
+                    error_message=f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
+                )
+            except Exception:
+                pass
         sys.exit(1)
 
 
