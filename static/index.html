@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrainingBench</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261015d">
     <style>
         /* Additional styles for tabbed interface */
         .tabs {
@@ -29,7 +29,7 @@
         }
 
         .tab.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #CC785C;
             color: white;
             transform: translateY(2px);
         }
@@ -52,7 +52,7 @@
 
         .file-input-wrapper input[type="file"] {
             padding: 10px;
-            border: 2px dashed #667eea;
+            border: 2px dashed #CC785C;
             border-radius: 5px;
             width: 100%;
             background: #f8f9fa;
@@ -93,7 +93,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #CC785C;
         }
 
         .document-info {
@@ -127,7 +127,7 @@
 
         .loader {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border-top: 4px solid #CC785C;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -150,7 +150,7 @@
             padding: 15px;
             margin: 10px 0;
             border-radius: 5px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #CC785C;
         }
 
         .result-content {
@@ -175,7 +175,7 @@
 
         textarea:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #CC785C;
         }
 
         .crawl-options {
@@ -183,7 +183,7 @@
             padding: 20px;
             background: rgba(102, 126, 234, 0.1);
             border-radius: 5px;
-            border: 2px solid #667eea;
+            border: 2px solid #CC785C;
         }
 
         .crawl-options label {
@@ -246,36 +246,32 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; justify-content: flex-end;">
                     <span id="mode-pill" style="display: none; font-size: 0.85em; font-weight: bold; padding: 5px 12px; border-radius: 20px; white-space: nowrap; letter-spacing: 0.5px;" title=""></span>
-                    <span id="header-db-chip" style="display: none; align-items: center; gap: 6px; font-size: 0.85em; color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; white-space: nowrap;">
-                        <span style="font-weight: 500;">DB:</span>
-                        <select id="database-selector" onchange="switchActiveDatabase()" style="padding: 3px 6px; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; font-size: 0.9em; background: rgba(255,255,255,0.9); color: #333; cursor: pointer; max-width: 180px;">
-                            <option value="">Loading...</option>
-                        </select>
+                    <!-- TB-US-045: top-bar agent chip (replaces former DB chip; DB switcher still accessible via Databases tab) -->
+                    <span id="header-agent-chip" title="Current agent (switch via left-nav drawer)" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85em; color: #333; background: rgba(204, 120, 92, 0.1); border: 1px solid rgba(204, 120, 92, 0.3); padding: 4px 12px; border-radius: 20px; white-space: nowrap;">
+                        <span style="font-size: 1em;">🤖</span>
+                        <span style="color: #666;">Agent:</span>
+                        <strong id="header-agent-name" style="color: #CC785C;">default</strong>
                     </span>
-                    <span id="current-user-display" style="font-size: 0.85em; color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 20px; white-space: nowrap;"></span>
-                    <button id="user-mgmt-btn" onclick="openUserManagement()" style="display: none; padding: 10px 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;">👥 Users</button>
-                    <button id="training-sets-btn" onclick="window.location.href='training_sets.html'" style="display: none; padding: 10px 20px; background: linear-gradient(135deg, #764ba2 0%, #667eea 100%); color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;">🎓 Training Sets</button>
-                    <button onclick="window.location.href='/static/docs.html?v=' + Date.now()" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;">📖 Docs</button>
-                    <button id="logout-btn" onclick="logout()" class="logout-btn">Logout</button>
+                    <span id="current-user-display" style="font-size: 0.85em; color: #555; background: #F5F5F5; border: 1px solid #E0E0E0; padding: 5px 12px; border-radius: 20px; white-space: nowrap;"></span>
+                    <!-- TB-US-059: show-welcome re-trigger (only visible when banner has been dismissed) -->
+                    <button id="show-welcome-btn" onclick="resetWelcomeBanner()" title="Re-open the welcome banner" style="display: none; padding: 5px 10px; background: white; border: 1px solid #CC785C; color: #CC785C; border-radius: 20px; cursor: pointer; font-size: 0.8em; white-space: nowrap;">Show welcome</button>
+                    <!-- TB-US-045 Tweak 19: 👥 Users button moved from here to drawer-footer Admin group -->
+                    <!-- TB-US-045 Tweak 9: Training Sets button removed; redundant with left-nav drawer entry -->
+
+                    <button onclick="window.location.href='/static/docs.html?v=' + Date.now()" style="padding: 10px 20px; background: #CC785C; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap;">📖 Docs</button>
+                    <!-- TB-US-045 Tweak 8: Logout button moved to the drawer footer (left_nav.js) -->
+
                 </div>
             </div>
         </header>
 
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('upload')">Upload Documents</button>
-            <button class="tab" onclick="switchTab('scrape')">Scrape Websites</button>
-            <button class="tab" onclick="switchTab('chat')">Ask Questions</button>
-            <button class="tab" onclick="switchTab('powersearch')">Power Search</button>
-            <button class="tab" onclick="switchTab('compare')">Compare</button>
-            <button class="tab" onclick="switchTab('search')">Search Documents</button>
-            <button class="tab" onclick="switchTab('manage')">Manage Documents</button>
-            <button class="tab" id="history-tab-btn" onclick="switchTab('history')">Query History</button>
-            <button class="tab" onclick="switchTab('databases')">Manage Databases</button>
-        </div>
+        <!-- TB-US-018: horizontal tab bar replaced by collapsible left-nav
+             (hamburger upper-left). Nav items for the 9 tabs live in
+             static/left_nav.js. The .tab-content divs below are unchanged. -->
+
 
         <!-- Upload Tab -->
-        <div id="upload-tab" class="tab-content active section">
+        <div id="upload-tab" class="tab-content section">
             <h2>Upload Documents</h2>
             <p style="color: #666; margin: 10px 0;">Supported formats: PDF, DOCX, PPTX, TXT, MD, CSV, XLSX, XLS</p>
 
@@ -306,22 +302,22 @@
             <div class="crawl-options">
                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 15px;">
                     <input type="checkbox" id="deep-crawl-enabled" style="width: 20px; height: 20px; cursor: pointer;" onchange="toggleDeepCrawl()">
-                    <span style="font-weight: bold; font-size: 1.1em; color: #667eea;">Enable Deep Crawl Mode</span>
+                    <span style="font-weight: bold; font-size: 1.1em; color: #CC785C;">Enable Deep Crawl Mode</span>
                 </label>
 
                 <div id="deep-crawl-options" style="display: none;">
                     <label>
-                        Max Depth: <span id="depth-value" style="color: #667eea; font-weight: bold;">2</span>
+                        Max Depth: <span id="depth-value" style="color: #CC785C; font-weight: bold;">2</span>
                     </label>
                     <input type="range" id="max-depth" min="0" max="5" value="2" oninput="updateSlider('depth')">
 
                     <label>
-                        Max Pages: <span id="pages-value" style="color: #667eea; font-weight: bold;">50</span>
+                        Max Pages: <span id="pages-value" style="color: #CC785C; font-weight: bold;">50</span>
                     </label>
                     <input type="range" id="max-pages" min="10" max="200" value="50" step="10" oninput="updateSlider('pages')">
 
                     <label>
-                        Delay Between Requests: <span id="delay-value" style="color: #667eea; font-weight: bold;">1.0</span>s
+                        Delay Between Requests: <span id="delay-value" style="color: #CC785C; font-weight: bold;">1.0</span>s
                     </label>
                     <input type="range" id="delay-between" min="0.5" max="5.0" value="1.0" step="0.5" oninput="updateSlider('delay')">
                 </div>
@@ -333,7 +329,10 @@
         </div>
 
         <!-- Chat Tab -->
-        <div id="chat-tab" class="tab-content section">
+        <div id="chat-tab" class="tab-content active section">
+            <!-- TB-US-059: welcome banner (rendered + dismissed by script.js) -->
+            <div id="welcome-banner" style="display: none;"></div>
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div>
                     <h2 style="margin: 0;">Ask Questions</h2>
@@ -343,10 +342,10 @@
             </div>
 
             <!-- Training User Help Panel (hidden by default, shown only for training users) -->
-            <div id="training-help-panel" style="display: none; margin-bottom: 20px; padding: 15px 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #667eea; border-radius: 5px;">
+            <div id="training-help-panel" style="display: none; margin-bottom: 20px; padding: 15px 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #CC785C; border-radius: 5px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
                     <div style="flex: 1;">
-                        <h3 style="margin: 0 0 10px 0; color: #667eea; font-size: 1.1em;">📋 How to Train Your AI Agent</h3>
+                        <h3 style="margin: 0 0 10px 0; color: #CC785C; font-size: 1.1em;">📋 How to Train Your AI Agent</h3>
                         <p style="margin: 5px 0; color: #555; line-height: 1.6;">
                             • Use a training session to ask questions and provide your response<br>
                             • ✓ <strong>Acceptable</strong> — Answer is correct and helpful<br>
@@ -354,7 +353,7 @@
                             • Your feedback provides the training data necessary for continuous improvement of the Agent into the future
                         </p>
                     </div>
-                    <button onclick="openTrainingHelpModal()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">❓ Full Instructions</button>
+                    <button onclick="openTrainingHelpModal()" style="padding: 8px 16px; background: #CC785C; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">❓ Full Instructions</button>
                 </div>
             </div>
 
@@ -385,7 +384,7 @@
                             </div>
                         </div>
                         <div style="display: flex; gap: 10px; flex-direction: column;">
-                            <button onclick="completeTrainingSession()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">💾 Save & Complete</button>
+                            <button onclick="completeTrainingSession()" style="padding: 8px 16px; background: #CC785C; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">💾 Save & Complete</button>
                             <button onclick="cancelTrainingSession()" style="padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; font-size: 0.9em;">🗑️ Cancel Session</button>
                         </div>
                     </div>
@@ -395,16 +394,20 @@
 
             <div class="status-message" id="chat-status"></div>
 
-            <div style="margin: 15px 0; padding: 12px 15px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #667eea; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <span style="font-weight: 500; color: #667eea; white-space: nowrap;">Database:</span>
+            <div style="margin: 15px 0; padding: 12px 15px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #CC785C; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- TB-US-045 Tweak 18: agent name on the far left of the workflow strip -->
+                <span style="font-weight: 500; color: #CC785C; white-space: nowrap;">Agent:</span>
+                <span id="current-agent-label" style="font-weight: bold; color: #333;">default</span>
+                <span style="color: #ccc; margin: 0 5px;">|</span>
+                <span style="font-weight: 500; color: #CC785C; white-space: nowrap;">Database:</span>
                 <span id="current-database-label" style="font-weight: bold; color: #333;">Default Database</span>
                 <span style="color: #ccc; margin: 0 5px;">|</span>
-                <span style="font-weight: 500; color: #667eea; white-space: nowrap;">Model:</span>
+                <span style="font-weight: 500; color: #CC785C; white-space: nowrap;">Model:</span>
                 <span id="current-model-label" style="font-weight: bold; color: #333;">Llama 3.1 8B</span>
                 <span style="color: #ccc; margin: 0 5px;">|</span>
-                <span style="font-weight: 500; color: #667eea; white-space: nowrap;">Adapter:</span>
+                <span style="font-weight: 500; color: #CC785C; white-space: nowrap;">Adapter:</span>
                 <span id="current-adapter-label" style="font-weight: bold; color: #333;">Loading...</span>
-                <button onclick="openWorkflowModal()" style="margin-left: auto; padding: 5px 12px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">📊 View Workflow</button>
+                <button onclick="openWorkflowModal()" style="margin-left: auto; padding: 5px 12px; background: #CC785C; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">📊 View Workflow</button>
             </div>
 
             <div class="chat-input-container">
@@ -431,12 +434,12 @@
             <!-- Question Input -->
             <div style="margin: 20px 0;">
                 <label style="display: block; margin-bottom: 10px; font-weight: bold;">Your Question:</label>
-                <textarea id="powersearch-question" rows="4" placeholder="Enter your question..." style="width: 100%; padding: 15px; border: 2px solid #667eea; border-radius: 5px;"></textarea>
+                <textarea id="powersearch-question" rows="4" placeholder="Enter your question..." style="width: 100%; padding: 15px; border: 2px solid #CC785C; border-radius: 5px;"></textarea>
             </div>
 
             <!-- Service Selection -->
-            <div style="margin: 20px 0; padding: 20px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #667eea;">
-                <h3 style="margin-top: 0; color: #667eea;">Select AI Services:</h3>
+            <div style="margin: 20px 0; padding: 20px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #CC785C;">
+                <h3 style="margin-top: 0; color: #CC785C;">Select AI Services:</h3>
                 <div id="powersearch-services" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px;">
                     <!-- Services will be loaded dynamically -->
                 </div>
@@ -466,52 +469,52 @@
             <!-- Question Input -->
             <div style="margin: 20px 0;">
                 <label style="display: block; margin-bottom: 10px; font-weight: bold;">Research Question:</label>
-                <textarea id="compare-question" rows="3" placeholder="Enter your research question..." style="width: 100%; padding: 15px; border: 2px solid #667eea; border-radius: 5px;"></textarea>
+                <textarea id="compare-question" rows="3" placeholder="Enter your research question..." style="width: 100%; padding: 15px; border: 2px solid #CC785C; border-radius: 5px;"></textarea>
             </div>
 
             <!-- Two-Column Configuration -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
                 <!-- Left Side (Combo 1) -->
-                <div style="padding: 20px; background: rgba(102, 126, 234, 0.05); border-radius: 5px; border: 2px solid #667eea;">
-                    <h3 style="margin-top: 0; color: #667eea;">Configuration A</h3>
+                <div style="padding: 20px; background: rgba(102, 126, 234, 0.05); border-radius: 5px; border: 2px solid #CC785C;">
+                    <h3 style="margin-top: 0; color: #CC785C;">Configuration A</h3>
 
                     <label style="display: block; margin: 15px 0 5px 0; font-weight: 500;">Database:</label>
-                    <select id="compare-db-1" style="width: 100%; padding: 10px; border: 2px solid #667eea; border-radius: 5px; background: white;">
+                    <select id="compare-db-1" style="width: 100%; padding: 10px; border: 2px solid #CC785C; border-radius: 5px; background: white;">
                         <option value="">Select database...</option>
                     </select>
 
                     <label style="display: block; margin: 15px 0 5px 0; font-weight: 500;">Model:</label>
-                    <select id="compare-model-1" style="width: 100%; padding: 10px; border: 2px solid #667eea; border-radius: 5px; background: white;">
+                    <select id="compare-model-1" style="width: 100%; padding: 10px; border: 2px solid #CC785C; border-radius: 5px; background: white;">
                         <option value="">Select model...</option>
                     </select>
 
                     <label style="display: block; margin: 15px 0 5px 0; font-weight: 500;">Label/Tag:</label>
-                    <input type="text" id="compare-label-1" placeholder="e.g., Baseline, After update..." style="width: 100%; padding: 10px; border: 2px solid #667eea; border-radius: 5px;">
+                    <input type="text" id="compare-label-1" placeholder="e.g., Baseline, After update..." style="width: 100%; padding: 10px; border: 2px solid #CC785C; border-radius: 5px;">
                 </div>
 
                 <!-- Right Side (Combo 2) -->
-                <div style="padding: 20px; background: rgba(118, 75, 162, 0.05); border-radius: 5px; border: 2px solid #764ba2;">
-                    <h3 style="margin-top: 0; color: #764ba2;">Configuration B</h3>
+                <div style="padding: 20px; background: rgba(118, 75, 162, 0.05); border-radius: 5px; border: 2px solid #CC785C;">
+                    <h3 style="margin-top: 0; color: #CC785C;">Configuration B</h3>
 
                     <label style="display: block; margin: 15px 0 5px 0; font-weight: 500;">Database:</label>
-                    <select id="compare-db-2" style="width: 100%; padding: 10px; border: 2px solid #764ba2; border-radius: 5px; background: white;">
+                    <select id="compare-db-2" style="width: 100%; padding: 10px; border: 2px solid #CC785C; border-radius: 5px; background: white;">
                         <option value="">Select database...</option>
                     </select>
 
                     <label style="display: block; margin: 15px 0 5px 0; font-weight: 500;">Model:</label>
-                    <select id="compare-model-2" style="width: 100%; padding: 10px; border: 2px solid #764ba2; border-radius: 5px; background: white;">
+                    <select id="compare-model-2" style="width: 100%; padding: 10px; border: 2px solid #CC785C; border-radius: 5px; background: white;">
                         <option value="">Select model...</option>
                     </select>
 
                     <label style="display: block; margin: 15px 0 5px 0; font-weight: 500;">Label/Tag:</label>
-                    <input type="text" id="compare-label-2" placeholder="e.g., Experiment 1, With new data..." style="width: 100%; padding: 10px; border: 2px solid #764ba2; border-radius: 5px;">
+                    <input type="text" id="compare-label-2" placeholder="e.g., Experiment 1, With new data..." style="width: 100%; padding: 10px; border: 2px solid #CC785C; border-radius: 5px;">
                 </div>
             </div>
 
             <!-- Action Buttons -->
             <div style="display: flex; gap: 15px; margin: 20px 0;">
                 <button onclick="runComparison()" style="flex: 1;">Run Comparison</button>
-                <button onclick="exportComparison()" style="flex: 0 0 auto; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);" id="export-compare-btn" disabled>Export Results</button>
+                <button onclick="exportComparison()" style="flex: 0 0 auto; background: #43A047;" id="export-compare-btn" disabled>Export Results</button>
             </div>
 
             <div class="loader" id="compare-loader"></div>
@@ -521,17 +524,17 @@
                 <h3>Comparison Results</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
                     <!-- Result A -->
-                    <div id="compare-result-1" style="padding: 20px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #667eea;">
-                        <h4 style="color: #667eea; margin-top: 0;">Result A: <span id="result-label-1"></span></h4>
-                        <div id="result-time-1" style="font-size: 0.85em; color: #667eea; margin-bottom: 10px; font-weight: 500;"></div>
+                    <div id="compare-result-1" style="padding: 20px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #CC785C;">
+                        <h4 style="color: #CC785C; margin-top: 0;">Result A: <span id="result-label-1"></span></h4>
+                        <div id="result-time-1" style="font-size: 0.85em; color: #CC785C; margin-bottom: 10px; font-weight: 500;"></div>
                         <div id="result-content-1" style="white-space: pre-wrap; line-height: 1.6;"></div>
                         <div id="result-sources-1" style="margin-top: 15px; font-size: 0.9em; color: #666;"></div>
                     </div>
 
                     <!-- Result B -->
-                    <div id="compare-result-2" style="padding: 20px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #764ba2;">
-                        <h4 style="color: #764ba2; margin-top: 0;">Result B: <span id="result-label-2"></span></h4>
-                        <div id="result-time-2" style="font-size: 0.85em; color: #764ba2; margin-bottom: 10px; font-weight: 500;"></div>
+                    <div id="compare-result-2" style="padding: 20px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #CC785C;">
+                        <h4 style="color: #CC785C; margin-top: 0;">Result B: <span id="result-label-2"></span></h4>
+                        <div id="result-time-2" style="font-size: 0.85em; color: #CC785C; margin-bottom: 10px; font-weight: 500;"></div>
                         <div id="result-content-2" style="white-space: pre-wrap; line-height: 1.6;"></div>
                         <div id="result-sources-2" style="margin-top: 15px; font-size: 0.9em; color: #666;"></div>
                     </div>
@@ -599,12 +602,12 @@
 
             <div class="status-message" id="database-status"></div>
 
-            <div style="margin: 20px 0; padding: 20px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #667eea;">
-                <h3 style="margin-top: 0; color: #667eea;">Create New Database</h3>
+            <div style="margin: 20px 0; padding: 20px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; border: 2px solid #CC785C;">
+                <h3 style="margin-top: 0; color: #CC785C;">Create New Database</h3>
                 <div style="display: grid; grid-template-columns: 1fr 2fr 3fr auto; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="new-db-id" placeholder="Database ID" style="padding: 10px; border: 2px solid #667eea; border-radius: 5px;">
-                    <input type="text" id="new-db-name" placeholder="Database Name" style="padding: 10px; border: 2px solid #667eea; border-radius: 5px;">
-                    <input type="text" id="new-db-description" placeholder="Description (optional)" style="padding: 10px; border: 2px solid #667eea; border-radius: 5px;">
+                    <input type="text" id="new-db-id" placeholder="Database ID" style="padding: 10px; border: 2px solid #CC785C; border-radius: 5px;">
+                    <input type="text" id="new-db-name" placeholder="Database Name" style="padding: 10px; border: 2px solid #CC785C; border-radius: 5px;">
+                    <input type="text" id="new-db-description" placeholder="Description (optional)" style="padding: 10px; border: 2px solid #CC785C; border-radius: 5px;">
                     <button onclick="createNewDatabase()" style="white-space: nowrap;">Create Database</button>
                 </div>
             </div>
@@ -634,15 +637,15 @@
     <div id="training-help-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center;">
         <div style="background: white; border-radius: 10px; padding: 30px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;">
-                <h2 style="margin: 0; color: #667eea;">📚 Training User Guide</h2>
+                <h2 style="margin: 0; color: #CC785C;">📚 Training User Guide</h2>
                 <button onclick="closeTrainingHelpModal()" style="padding: 8px 16px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Close</button>
             </div>
 
             <div style="line-height: 1.7; color: #333;">
-                <h3 style="color: #667eea; margin-top: 0;">Objective</h3>
+                <h3 style="color: #CC785C; margin-top: 0;">Objective</h3>
                 <p>Training helps improve the Agent. Feedback on the Agent's answers creates high-quality training data that will make the Agent smarter and more accurate over time.</p>
 
-                <h3 style="color: #667eea; margin-top: 25px;">How It Works</h3>
+                <h3 style="color: #CC785C; margin-top: 25px;">How It Works</h3>
                 <ol style="padding-left: 20px;">
                     <li style="margin-bottom: 12px;"><strong>Ask Questions</strong> — Type questions relevant to your loaded knowledge base.</li>
                     <li style="margin-bottom: 12px;"><strong>Review the Answer</strong> — Read the Agent's response carefully.</li>
@@ -655,7 +658,7 @@
                     <li style="margin-bottom: 12px;"><strong>Provide Corrections</strong> (for "Needs Improvement") — When you mark an answer as needing improvement, you'll be asked to provide the correct answer or explain what's wrong.</li>
                 </ol>
 
-                <h3 style="color: #667eea; margin-top: 25px;">Tips for Effective Training</h3>
+                <h3 style="color: #CC785C; margin-top: 25px;">Tips for Effective Training</h3>
                 <ul style="padding-left: 20px;">
                     <li style="margin-bottom: 10px;">Ask a <strong>variety of questions</strong> — easy, medium, and difficult</li>
                     <li style="margin-bottom: 10px;">Be <strong>honest and accurate</strong> in your ratings</li>
@@ -663,7 +666,7 @@
                     <li style="margin-bottom: 10px;">Don't skip the feedback — it's what makes the training data valuable!</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px;">What Happens Next?</h3>
+                <h3 style="color: #CC785C; margin-top: 25px;">What Happens Next?</h3>
                 <p>Your rated Q&A pairs are stored in a training database. Administrators will use this data to:</p>
                 <ul style="padding-left: 20px;">
                     <li style="margin-bottom: 8px;">Create training sets from your feedback</li>
@@ -671,8 +674,8 @@
                     <li>Improve the system's accuracy for everyone</li>
                 </ul>
 
-                <div style="margin-top: 25px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; border-radius: 5px;">
-                    <strong style="color: #667eea;">Questions?</strong> Contact your system administrator if you need help or have questions about the training process.
+                <div style="margin-top: 25px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #CC785C; border-radius: 5px;">
+                    <strong style="color: #CC785C;">Questions?</strong> Contact your system administrator if you need help or have questions about the training process.
                 </div>
             </div>
         </div>
@@ -682,31 +685,31 @@
     <div id="workflow-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center;">
         <div style="background: white; border-radius: 10px; padding: 30px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;">
-                <h2 style="margin: 0; color: #667eea;">📊 Query Processing Workflow</h2>
+                <h2 style="margin: 0; color: #CC785C;">📊 Query Processing Workflow</h2>
                 <button onclick="closeWorkflowModal()" style="padding: 8px 16px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Close</button>
             </div>
 
             <div style="line-height: 1.7; color: #333;">
-                <h3 style="color: #667eea; margin-top: 0;">System Architecture</h3>
+                <h3 style="color: #CC785C; margin-top: 0;">System Architecture</h3>
                 <p>When you ask a question, your query flows through a multi-stage processing pipeline that combines multiple AI components to deliver accurate, contextual answers.</p>
 
                 <!-- Workflow Diagram -->
-                <div style="margin: 30px 0; padding: 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); border-radius: 10px; border: 2px solid #667eea;">
+                <div style="margin: 30px 0; padding: 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); border-radius: 10px; border: 2px solid #CC785C;">
                     <!-- Step 1 -->
                     <div style="display: flex; align-items: center; margin-bottom: 25px;">
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">1</div>
+                        <div style="background: #CC785C; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">1</div>
                         <div style="flex: 1; margin-left: 20px;">
-                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">User Question Input</div>
+                            <div style="font-weight: bold; font-size: 1.1em; color: #CC785C; margin-bottom: 5px;">User Question Input</div>
                             <div style="color: #666;">You enter a natural language question through the chat interface.</div>
                         </div>
                     </div>
-                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+                    <div style="text-align: center; color: #CC785C; font-size: 2em; margin: -10px 0;">↓</div>
 
                     <!-- Step 2 -->
                     <div style="display: flex; align-items: center; margin-bottom: 25px;">
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">2</div>
+                        <div style="background: #CC785C; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">2</div>
                         <div style="flex: 1; margin-left: 20px;">
-                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">RAG Database Retrieval</div>
+                            <div style="font-weight: bold; font-size: 1.1em; color: #CC785C; margin-bottom: 5px;">RAG Database Retrieval</div>
                             <div style="color: #666; margin-bottom: 5px;">The system searches through your knowledge base using vector similarity to find the most relevant document chunks.</div>
                             <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #11998e; margin-top: 8px;">
                                 <div style="font-size: 0.9em; color: #555;"><strong>🗄️ Active Database:</strong> <span id="workflow-db-name" style="color: #11998e; font-weight: 500;">Loading...</span></div>
@@ -714,38 +717,38 @@
                             </div>
                         </div>
                     </div>
-                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+                    <div style="text-align: center; color: #CC785C; font-size: 2em; margin: -10px 0;">↓</div>
 
                     <!-- Step 3 -->
                     <div style="display: flex; align-items: center; margin-bottom: 25px;">
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">3</div>
+                        <div style="background: #CC785C; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">3</div>
                         <div style="flex: 1; margin-left: 20px;">
-                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">Spreadsheet Calculator</div>
+                            <div style="font-weight: bold; font-size: 1.1em; color: #CC785C; margin-bottom: 5px;">Spreadsheet Calculator</div>
                             <div style="color: #666; margin-bottom: 5px;">If your question involves numerical data or calculations, the system automatically extracts values and performs computations.</div>
                             <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #FFA726; margin-top: 8px;">
                                 <div style="font-size: 0.85em; color: #777;">🧮 Handles arithmetic, financial calculations, and data analysis</div>
                             </div>
                         </div>
                     </div>
-                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+                    <div style="text-align: center; color: #CC785C; font-size: 2em; margin: -10px 0;">↓</div>
 
                     <!-- Step 4 -->
                     <div style="display: flex; align-items: center; margin-bottom: 25px;">
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">4</div>
+                        <div style="background: #CC785C; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">4</div>
                         <div style="flex: 1; margin-left: 20px;">
-                            <div style="font-weight: bold; font-size: 1.1em; color: #667eea; margin-bottom: 5px;">LLM Answer Generation</div>
+                            <div style="font-weight: bold; font-size: 1.1em; color: #CC785C; margin-bottom: 5px;">LLM Answer Generation</div>
                             <div style="color: #666; margin-bottom: 5px;">A language model synthesizes the retrieved context and calculations into a natural, coherent answer.</div>
-                            <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #764ba2; margin-top: 8px;">
-                                <div style="font-size: 0.9em; color: #555;"><strong>🤖 Active Model:</strong> <span id="workflow-llm-name" style="color: #764ba2; font-weight: 500;">Loading...</span></div>
+                            <div style="background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #CC785C; margin-top: 8px;">
+                                <div style="font-size: 0.9em; color: #555;"><strong>🤖 Active Model:</strong> <span id="workflow-llm-name" style="color: #CC785C; font-weight: 500;">Loading...</span></div>
                                 <div style="font-size: 0.85em; color: #777; margin-top: 3px;">PEFT adapters provide domain-specific fine-tuning</div>
                             </div>
                         </div>
                     </div>
-                    <div style="text-align: center; color: #667eea; font-size: 2em; margin: -10px 0;">↓</div>
+                    <div style="text-align: center; color: #CC785C; font-size: 2em; margin: -10px 0;">↓</div>
 
                     <!-- Step 5 -->
                     <div style="display: flex; align-items: center;">
-                        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">5</div>
+                        <div style="background: #43A047; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; font-weight: bold; flex-shrink: 0;">5</div>
                         <div style="flex: 1; margin-left: 20px;">
                             <div style="font-weight: bold; font-size: 1.1em; color: #11998e; margin-bottom: 5px;">Answer Delivery</div>
                             <div style="color: #666;">The complete answer is displayed with source citations, allowing you to verify accuracy and explore the original documents.</div>
@@ -753,10 +756,10 @@
                     </div>
                 </div>
 
-                <h3 style="color: #667eea; margin-top: 30px;">Component Details</h3>
+                <h3 style="color: #CC785C; margin-top: 30px;">Component Details</h3>
 
-                <div style="margin-top: 15px; padding: 15px; background: rgba(102, 126, 234, 0.05); border-left: 4px solid #667eea; border-radius: 5px;">
-                    <h4 style="margin-top: 0; color: #667eea;">RAG (Retrieval-Augmented Generation)</h4>
+                <div style="margin-top: 15px; padding: 15px; background: rgba(102, 126, 234, 0.05); border-left: 4px solid #CC785C; border-radius: 5px;">
+                    <h4 style="margin-top: 0; color: #CC785C;">RAG (Retrieval-Augmented Generation)</h4>
                     <p style="margin-bottom: 0;">Your documents are chunked and embedded as vectors in a ChromaDB database. When you ask a question, the system performs semantic search to find the most relevant chunks, which provide context to the language model.</p>
                 </div>
 
@@ -765,13 +768,13 @@
                     <p style="margin-bottom: 0;">When questions involve numerical data, the calculator component automatically extracts values, performs computations, and integrates results into the final answer. This enables financial analysis, data comparisons, and mathematical operations.</p>
                 </div>
 
-                <div style="margin-top: 15px; padding: 15px; background: rgba(118, 75, 162, 0.05); border-left: 4px solid #764ba2; border-radius: 5px;">
-                    <h4 style="margin-top: 0; color: #764ba2;">Language Model</h4>
+                <div style="margin-top: 15px; padding: 15px; background: rgba(118, 75, 162, 0.05); border-left: 4px solid #CC785C; border-radius: 5px;">
+                    <h4 style="margin-top: 0; color: #CC785C;">Language Model</h4>
                     <p style="margin-bottom: 0;">The system uses either standard Ollama models (like Llama 3.1 8B) or fine-tuned PEFT adapters trained on domain-specific data. PEFT adapters provide specialized knowledge while maintaining the base model's general capabilities.</p>
                 </div>
 
-                <div style="margin-top: 25px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; border-radius: 5px;">
-                    <strong style="color: #667eea;">💡 Pro Tip:</strong> The quality of answers depends on the knowledge base content. Upload relevant documents and scrape authoritative websites to improve response accuracy.
+                <div style="margin-top: 25px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #CC785C; border-radius: 5px;">
+                    <strong style="color: #CC785C;">💡 Pro Tip:</strong> The quality of answers depends on the knowledge base content. Upload relevant documents and scrape authoritative websites to improve response accuracy.
                 </div>
             </div>
         </div>
@@ -782,7 +785,7 @@
         <div style="background: white; border-radius: 10px; padding: 25px; max-width: 1000px; width: 92%; max-height: 88vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 12px; border-bottom: 2px solid #e0e0e0;">
                 <div>
-                    <h2 id="trainingset-viewer-title" style="margin: 0; color: #667eea;">Training Set</h2>
+                    <h2 id="trainingset-viewer-title" style="margin: 0; color: #CC785C;">Training Set</h2>
                     <div id="trainingset-viewer-meta" style="font-size: 0.85em; color: #777; margin-top: 4px;"></div>
                 </div>
                 <button onclick="closeTrainingSetViewer()" style="padding: 8px 16px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Close</button>
@@ -826,8 +829,12 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260721d"></script>
-    <script src="user_management.js?v=20260721a"></script>
+    <script src="script.js?v=20261022f"></script>
+    <script src="user_management.js?v=20261022a"></script>
+    <script src="active_run_strip.js?v=20261022a"></script>
+    <script src="agent_management.js?v=20261022c"</script>
+    <script src="api_key_management.js?v=20261022a"></script>
+    <script src="left_nav.js?v=20261022f"></script>
     <script>
         // Tab switching
         function switchTab(tabName) {

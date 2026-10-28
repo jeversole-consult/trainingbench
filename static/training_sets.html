@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Training Set Manager - TrainingBench</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261015d">
     <style>
         .tabs {
             display: flex;
@@ -27,7 +27,7 @@
         }
 
         .tab.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #CC785C;
             color: white;
             transform: translateY(2px);
         }
@@ -49,7 +49,7 @@
             padding: 20px;
             margin: 15px 0;
             border-radius: 5px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #CC785C;
         }
 
         .training-set-header {
@@ -87,7 +87,7 @@
         }
 
         .meta-item strong {
-            color: #667eea;
+            color: #CC785C;
         }
 
         .training-set-actions {
@@ -106,7 +106,7 @@
         }
 
         .btn-view {
-            background: #667eea;
+            background: #CC785C;
             color: white;
         }
 
@@ -137,10 +137,10 @@
             padding: 3px 10px;
             margin: 2px;
             background: rgba(102, 126, 234, 0.1);
-            border: 1px solid #667eea;
+            border: 1px solid #CC785C;
             border-radius: 12px;
             font-size: 0.8em;
-            color: #667eea;
+            color: #CC785C;
         }
 
         .filters-container {
@@ -151,14 +151,14 @@
             padding: 20px;
             background: rgba(102, 126, 234, 0.05);
             border-radius: 5px;
-            border: 2px solid #667eea;
+            border: 2px solid #CC785C;
         }
 
         .filters-container label {
             display: block;
             margin-bottom: 5px;
             font-weight: 500;
-            color: #667eea;
+            color: #CC785C;
         }
 
         .filters-container input,
@@ -198,7 +198,7 @@
 
         .loader {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border-top: 4px solid #CC785C;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -221,7 +221,7 @@
             padding: 15px;
             margin: 10px 0;
             border-radius: 5px;
-            border-left: 3px solid #667eea;
+            border-left: 3px solid #CC785C;
         }
 
         .example-item .instruction {
@@ -271,7 +271,7 @@
 
         .modal-header h2 {
             margin: 0;
-            color: #667eea;
+            color: #CC785C;
         }
 
         .close-btn {
@@ -331,12 +331,12 @@
             padding: 20px;
             background: rgba(102, 126, 234, 0.1);
             border-radius: 5px;
-            border: 2px solid #667eea;
+            border: 2px solid #CC785C;
         }
 
         .filter-options h4 {
             margin-top: 0;
-            color: #667eea;
+            color: #CC785C;
         }
 
         .checkbox-group {
@@ -368,10 +368,11 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <span id="current-user-display" style="font-size: 0.85em; color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 20px; white-space: nowrap;"></span>
-                    <button onclick="openUserManagement()" style="padding: 10px 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer;">👥 Users</button>
-                    <button onclick="window.location.href='index.html'" class="back-btn" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">← Back to Main</button>
-                    <button onclick="window.location.href='/static/docs.html?v=' + Date.now()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">📖 Docs</button>
-                    <button id="logout-btn" onclick="logout()" class="logout-btn">Logout</button>
+                    <button onclick="openUserManagement()" style="padding: 10px 20px; background: #43A047; color: white; border: none; border-radius: 5px; cursor: pointer;">👥 Users</button>
+                    <button onclick="window.location.href='index.html'" class="back-btn" style="padding: 10px 20px; background: #CC785C; color: white; border: none; border-radius: 5px; cursor: pointer;">← Back to Main</button>
+                    <button onclick="window.location.href='/static/docs.html?v=' + Date.now()" style="padding: 10px 20px; background: #CC785C; color: white; border: none; border-radius: 5px; cursor: pointer;">📖 Docs</button>
+                    <!-- TB-US-045 Tweak 8: Logout button moved to the drawer footer (left_nav.js) -->
+
                 </div>
             </div>
         </header>
@@ -421,8 +422,8 @@
             <div class="status-message" id="create-status"></div>
 
             <!-- Step 1: Setup -->
-            <div style="padding: 20px; background: rgba(102, 126, 234, 0.05); border: 2px solid #667eea; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="margin-top: 0; color: #667eea;">Step 1: Name Your Training Set</h3>
+            <div style="padding: 20px; background: rgba(102, 126, 234, 0.05); border: 2px solid #CC785C; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: #CC785C;">Step 1: Name Your Training Set</h3>
                 <div class="form-group">
                     <label>Name *</label>
                     <input type="text" id="manual-name" placeholder="e.g., my_dataset_v1">
@@ -432,7 +433,7 @@
                     <textarea id="manual-description" rows="2" placeholder="Describe the purpose of this training set..."></textarea>
                 </div>
                 <details style="margin-top: 10px;">
-                    <summary style="cursor: pointer; color: #667eea; font-size: 0.9em; font-weight: 500; user-select: none;">
+                    <summary style="cursor: pointer; color: #CC785C; font-size: 0.9em; font-weight: 500; user-select: none;">
                         Advanced: Topics &amp; Labels (optional)
                     </summary>
                     <div style="margin-top: 12px; padding: 12px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 5px;">
@@ -456,8 +457,8 @@
                     <label>Baseline Model <span style="font-weight: normal; color: #999; font-size: 0.9em;">(applies to all records in this set — locked once first record is added)</span></label>
                     <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px; flex-wrap: wrap;">
                         <span id="wizard-model-label" style="font-weight: bold; color: #333;">Loading...</span>
-                        <button onclick="toggleWizardModelSelector()" id="wizard-change-model-btn" style="padding: 3px 10px; background: none; border: 1px solid #667eea; border-radius: 3px; color: #667eea; cursor: pointer; font-size: 0.8em; white-space: nowrap;">Change</button>
-                        <select id="wizard-model-selector" onchange="updateWizardModelLabel(this)" style="display: none; padding: 8px; border: 2px solid #667eea; border-radius: 5px; font-size: 0.9em; background: white; cursor: pointer;">
+                        <button onclick="toggleWizardModelSelector()" id="wizard-change-model-btn" style="padding: 3px 10px; background: none; border: 1px solid #CC785C; border-radius: 3px; color: #CC785C; cursor: pointer; font-size: 0.8em; white-space: nowrap;">Change</button>
+                        <select id="wizard-model-selector" onchange="updateWizardModelLabel(this)" style="display: none; padding: 8px; border: 2px solid #CC785C; border-radius: 5px; font-size: 0.9em; background: white; cursor: pointer;">
                             <option value="llama3.1:8b">Llama 3.1 8B</option>
                         </select>
                     </div>
@@ -466,21 +467,21 @@
             </div>
 
             <!-- Step 2: Add records one at a time -->
-            <div style="padding: 20px; background: rgba(102, 126, 234, 0.05); border: 2px solid #667eea; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="margin-top: 0; color: #667eea;">Step 2: Add Training Records</h3>
+            <div style="padding: 20px; background: rgba(102, 126, 234, 0.05); border: 2px solid #CC785C; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: #CC785C;">Step 2: Add Training Records</h3>
 
                 <div class="form-group">
                     <label>Question</label>
                     <textarea id="wizard-question" rows="3" placeholder="Type or paste a question to ask the model..."></textarea>
                 </div>
 
-                <button onclick="getBaselineAnswer()" id="get-baseline-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">Get Baseline Answer</button>
+                <button onclick="getBaselineAnswer()" id="get-baseline-btn" style="background: #CC785C;">Get Baseline Answer</button>
                 <div class="loader" id="baseline-loader"></div>
 
                 <!-- Baseline answer + rating — hidden until baseline is fetched -->
                 <div id="baseline-section" style="display: none; margin-top: 20px;">
                     <div class="form-group">
-                        <label style="color: #667eea;">Baseline Answer <span style="font-weight: normal; color: #999; font-size: 0.9em;">(current model response — read only)</span></label>
+                        <label style="color: #CC785C;">Baseline Answer <span style="font-weight: normal; color: #999; font-size: 0.9em;">(current model response — read only)</span></label>
                         <div id="baseline-answer-display" style="padding: 12px; background: #f0f0f0; border: 2px solid #ddd; border-radius: 5px; white-space: pre-wrap; line-height: 1.6; color: #333; min-height: 60px;"></div>
                     </div>
 
@@ -488,7 +489,7 @@
                     <div style="margin-top: 15px;">
                         <p style="font-weight: 500; color: #333; margin-bottom: 12px;">Rate this answer:</p>
                         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                            <button onclick="rateWizardAnswer('acceptable')" style="padding: 10px 24px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: 500;">✓ Acceptable</button>
+                            <button onclick="rateWizardAnswer('acceptable')" style="padding: 10px 24px; background: #43A047; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: 500;">✓ Acceptable</button>
                             <button onclick="rateWizardAnswer('needs_improvement')" style="padding: 10px 24px; background: linear-gradient(135deg, #f44336 0%, #e91e63 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: 500;">✗ Needs Improvement</button>
                             <button onclick="clearWizardRecord()" style="padding: 10px 18px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Clear</button>
                         </div>
@@ -501,7 +502,7 @@
                             <textarea id="wizard-correct-answer" rows="5" placeholder="Enter the correct answer the model should learn..."></textarea>
                         </div>
                         <div style="display: flex; gap: 10px;">
-                            <button onclick="submitImprovedAnswer()" style="padding: 10px 24px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: 500;">+ Add to Training Set</button>
+                            <button onclick="submitImprovedAnswer()" style="padding: 10px 24px; background: #43A047; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: 500;">+ Add to Training Set</button>
                             <button onclick="document.getElementById('improvement-section').style.display='none'" style="padding: 10px 18px; background: #999; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">Cancel</button>
                         </div>
                     </div>
@@ -580,7 +581,7 @@
             </div>
 
             <details style="margin: 10px 0;">
-                <summary style="cursor: pointer; color: #667eea; font-size: 0.9em; font-weight: 500; user-select: none;">
+                <summary style="cursor: pointer; color: #CC785C; font-size: 0.9em; font-weight: 500; user-select: none;">
                     Advanced: Topics &amp; Labels (optional)
                 </summary>
                 <div style="margin-top: 12px; padding: 12px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 5px;">
@@ -640,7 +641,7 @@
             </div>
 
             <details style="margin: 10px 0;">
-                <summary style="cursor: pointer; color: #667eea; font-size: 0.9em; font-weight: 500; user-select: none;">
+                <summary style="cursor: pointer; color: #CC785C; font-size: 0.9em; font-weight: 500; user-select: none;">
                     Advanced: Topics &amp; Labels (optional)
                 </summary>
                 <div style="margin-top: 12px; padding: 12px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 5px;">
@@ -681,8 +682,12 @@
         <span style="font-size: 9px;">© 2025-2026 Jesse Eversole Consulting</span>
     </footer>
 
-    <script src="script.js"></script>
-    <script src="user_management.js?v=20260721a"></script>
+    <script src="script.js?v=20261017a"></script>
+    <script src="user_management.js?v=20261022a"></script>
+    <script src="active_run_strip.js?v=20261022a"></script>
+    <script src="agent_management.js?v=20261022c"></script>
+    <script src="api_key_management.js?v=20261022a"></script>
+    <script src="left_nav.js?v=20261022f"></script>
     <script>
         // Load version dynamically from backend
         fetch(`${API_BASE}/version`)
@@ -984,7 +989,7 @@
                     const meta = details.metadata;
                     if (meta) {
                         const sourceTag = meta.source
-                            ? `<span style="display:inline-block; padding:2px 10px; background:rgba(102,126,234,0.1); border:1px solid #667eea; border-radius:10px; font-size:0.8em; color:#667eea; margin-left:6px;">${escapeHtml(meta.source)}</span>`
+                            ? `<span style="display:inline-block; padding:2px 10px; background:rgba(102,126,234,0.1); border:1px solid #CC785C; border-radius:10px; font-size:0.8em; color:#CC785C; margin-left:6px;">${escapeHtml(meta.source)}</span>`
                             : '';
                         const modelsHtml = meta.models_used && meta.models_used.length
                             ? `<div style="margin-top:6px;"><strong>Models used:</strong> ${meta.models_used.map(m => `<code style="background:#eee; padding:1px 5px; border-radius:3px;">${escapeHtml(m)}</code>`).join(' &amp; ')}</div>`
@@ -996,8 +1001,8 @@
                                </div>`
                             : '';
                         metadataHtml = `
-                            <div style="margin-top:12px; padding:10px 14px; background:rgba(102,126,234,0.05); border:1px solid #667eea; border-radius:5px; font-size:0.9em;">
-                                <strong style="color:#667eea;">Provenance</strong>${sourceTag}
+                            <div style="margin-top:12px; padding:10px 14px; background:rgba(102,126,234,0.05); border:1px solid #CC785C; border-radius:5px; font-size:0.9em;">
+                                <strong style="color:#CC785C;">Provenance</strong>${sourceTag}
                                 ${modelsHtml}
                                 ${ratingHtml}
                             </div>`;
@@ -1025,7 +1030,7 @@
                             : '';
                         // Per-example model badge (if saved by wizard)
                         const modelBadge = example.baseline_model
-                            ? `<span style="display:inline-block; padding:2px 8px; background:rgba(102,126,234,0.12); border:1px solid #667eea; border-radius:10px; font-size:0.75em; color:#667eea;">🤖 ${escapeHtml(example.baseline_model)}</span>`
+                            ? `<span style="display:inline-block; padding:2px 8px; background:rgba(102,126,234,0.12); border:1px solid #CC785C; border-radius:10px; font-size:0.75em; color:#CC785C;">🤖 ${escapeHtml(example.baseline_model)}</span>`
                             : '';
                         // Per-example source badge (user correction vs artificial/baseline)
                         let sourceBadge = '';
@@ -1326,7 +1331,7 @@
                 const showCorrect = !isAcceptable
                     ? `<div style="color: #2e7d32; font-size: 0.9em; margin-top: 6px;"><strong>Correct:</strong> ${escapeHtml(correctPreview)}</div>` : '';
                 const modelBadge = record.model_label
-                    ? `<span style="display:inline-block; padding:2px 8px; background:rgba(102,126,234,0.12); border:1px solid #667eea; border-radius:10px; font-size:0.75em; color:#667eea;">🤖 ${escapeHtml(record.model_label)}</span>`
+                    ? `<span style="display:inline-block; padding:2px 8px; background:rgba(102,126,234,0.12); border:1px solid #CC785C; border-radius:10px; font-size:0.75em; color:#CC785C;">🤖 ${escapeHtml(record.model_label)}</span>`
                     : '';
                 item.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
@@ -1338,7 +1343,7 @@
                         <button onclick="removeWizardRecord(${idx})" style="padding: 3px 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.8em;">Remove</button>
                     </div>
                     <div style="margin-bottom: 8px;"><strong>Q:</strong> ${escapeHtml(record.instruction)}</div>
-                    <div style="color: #777; font-size: 0.9em;"><strong style="color: #667eea;">Baseline:</strong> ${escapeHtml(baselinePreview)}</div>
+                    <div style="color: #777; font-size: 0.9em;"><strong style="color: #CC785C;">Baseline:</strong> ${escapeHtml(baselinePreview)}</div>
                     ${showCorrect}
                 `;
                 list.appendChild(item);

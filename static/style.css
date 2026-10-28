@@ -6,7 +6,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #F5F5F5;
+    color: #1A1A1A;
     min-height: 100vh;
     padding: 20px;
 }
@@ -16,14 +17,15 @@ body {
     margin: 0 auto;
     background: white;
     border-radius: 10px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     overflow: hidden;
 }
 
 header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: #FFFFFF;
+    color: #1A1A1A;
     padding: 30px;
+    border-bottom: 1px solid #E0E0E0;
 }
 
 .header-content {
@@ -41,23 +43,27 @@ header {
 header h1 {
     font-size: 2.5em;
     margin-bottom: 10px;
+    color: #1A1A1A;
 }
 
 header p {
     font-size: 1.1em;
-    opacity: 0.9;
+    opacity: 0.75;
+    color: #555;
 }
 
 .logout-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid white;
+    background: #FFFFFF;
+    color: #555;
+    border: 1px solid #CCC;
     padding: 10px 20px;
     font-size: 0.9em;
     min-width: 100px;
 }
 
 .logout-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: #F5F5F5;
+    border-color: #999;
     transform: translateY(-2px);
 }
 
@@ -71,7 +77,7 @@ header p {
 }
 
 .section h2 {
-    color: #333;
+    color: #1A1A1A;
     margin-bottom: 20px;
     font-size: 1.5em;
 }
@@ -97,23 +103,24 @@ input[type="number"] {
 input[type="text"]:focus,
 input[type="number"]:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #CC785C;
 }
 
 button {
     padding: 12px 25px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #CC785C;
     color: white;
     border: none;
     border-radius: 5px;
     font-size: 1em;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 button:hover {
+    background: #B8694F;
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 5px 15px rgba(204, 120, 92, 0.3);
 }
 
 button:active {
@@ -127,8 +134,12 @@ button:disabled {
 }
 
 .danger-btn {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: #D32F2F;
     margin-left: 10px;
+}
+
+.danger-btn:hover {
+    background: #B71C1C;
 }
 
 .status-message {
@@ -196,7 +207,7 @@ button:disabled {
 }
 
 #voice-input-btn.listening {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: #D32F2F;
     animation: pulse 1.5s infinite;
 }
 
@@ -226,7 +237,7 @@ button:disabled {
 }
 
 .voice-btn.speaking {
-    color: #667eea;
+    color: #CC785C;
     animation: pulse 1.5s infinite;
 }
 
@@ -259,7 +270,7 @@ button:disabled {
 }
 
 .message.user .message-content {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #CC785C;
     color: white;
 }
 
@@ -292,12 +303,13 @@ button:disabled {
 }
 
 .source-item a {
-    color: #667eea;
+    color: #CC785C;
     text-decoration: none;
 }
 
 .source-item a:hover {
     text-decoration: underline;
+    color: #B8694F;
 }
 
 .loading-dots {
@@ -364,7 +376,11 @@ button:disabled {
 }
 
 .export-btn {
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    background: #43A047;
+}
+
+.export-btn:hover {
+    background: #388E3C;
 }
 
 #history-container {
@@ -382,11 +398,11 @@ button:disabled {
 }
 
 .history-loading {
-    color: #667eea;
+    color: #CC785C;
 }
 
 .history-error {
-    color: #f5576c;
+    color: #D32F2F;
 }
 
 .history-item {
@@ -415,7 +431,7 @@ button:disabled {
 
 .history-number {
     font-weight: bold;
-    color: #667eea;
+    color: #CC785C;
     font-size: 1.1em;
 }
 
@@ -425,7 +441,7 @@ button:disabled {
 }
 
 .history-response-time {
-    background: #667eea;
+    background: #CC785C;
     color: white;
     padding: 4px 12px;
     border-radius: 12px;
@@ -434,7 +450,7 @@ button:disabled {
 }
 
 .history-llm-model {
-    background: #11998e;
+    background: #43A047;
     color: white;
     padding: 4px 12px;
     border-radius: 12px;
@@ -447,11 +463,11 @@ button:disabled {
     padding: 15px;
     border-radius: 5px;
     margin-bottom: 10px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #CC785C;
 }
 
 .history-question strong {
-    color: #667eea;
+    color: #CC785C;
     margin-right: 8px;
 }
 
@@ -460,12 +476,12 @@ button:disabled {
     padding: 15px;
     border-radius: 5px;
     margin-bottom: 10px;
-    border-left: 4px solid #764ba2;
+    border-left: 4px solid #CC785C;
     white-space: pre-wrap;
 }
 
 .history-answer strong {
-    color: #764ba2;
+    color: #CC785C;
     margin-right: 8px;
 }
 

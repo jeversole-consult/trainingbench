@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #CC785C;
             min-height: 100vh;
             padding: 20px;
         }
@@ -35,7 +35,7 @@
         }
 
         h1 {
-            color: #667eea;
+            color: #CC785C;
             font-size: 28px;
         }
 
@@ -66,7 +66,7 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #CC785C;
             color: white;
         }
 
@@ -161,7 +161,7 @@
         .run-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            border-color: #667eea;
+            border-color: #CC785C;
         }
 
         .run-header {
@@ -267,7 +267,7 @@
 
         .progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, #CC785C 0%, #CC785C 100%);
             border-radius: 10px;
             transition: width 0.3s ease;
             position: relative;
@@ -300,7 +300,7 @@
         .metric-value {
             font-size: 18px;
             font-weight: bold;
-            color: #667eea;
+            color: #CC785C;
         }
 
         .metric-value.good {
@@ -352,7 +352,7 @@
         }
 
         .modal-header h2 {
-            color: #667eea;
+            color: #CC785C;
             font-size: 24px;
         }
 
@@ -444,8 +444,8 @@
         }
 
         .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
+            color: #CC785C;
+            border-bottom-color: #CC785C;
         }
 
         .tab-content {
@@ -521,7 +521,7 @@
         .selected-run-tag {
             display: inline-block;
             padding: 5px 10px;
-            background: #667eea;
+            background: #CC785C;
             color: white;
             border-radius: 5px;
             margin: 5px;
@@ -549,12 +549,14 @@
             <h1>🏃 Training Runs</h1>
             <div class="header-actions">
                 <div class="user-info" id="userInfo">Loading...</div>
-                <button onclick="openUserManagement()" class="btn btn-secondary" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none;">👥 Users</button>
-                <a href="/static/training_sets.html" class="btn btn-secondary">Training Sets</a>
-                <a href="/static/index.html" class="btn btn-secondary">Main App</a>
+                <button onclick="openUserManagement()" class="btn btn-secondary" style="background: #43A047; color: white; border: none;">👥 Users</button>
+                <!-- TB-US-045 Tweak 9: Training Sets link removed; redundant with left-nav drawer entry -->
+                <!-- TB-US-045 Tweak 10: Main App link removed; redundant with left-nav drawer (any index-tab item navigates to index.html; drawer → Chat lands on default Chat tab) -->
+
                 <a href="#" onclick="event.preventDefault(); window.location.href='/static/docs.html?v=' + Date.now();" class="btn btn-secondary">📖 Docs</a>
                 <button class="btn btn-primary" id="newRunBtn">+ New Training Run</button>
-                <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+                <!-- TB-US-045 Tweak 8: Logout button moved to the drawer footer (left_nav.js) -->
+
             </div>
         </header>
 
@@ -610,17 +612,18 @@
                     <label>Description</label>
                     <textarea id="runDescription" placeholder="Describe what this training run is testing..."></textarea>
                 </div>
+                <!-- TB-US-066: Agent + Training-set-version selects for launch flow -->
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Training Set *</label>
-                        <select id="runTrainingSet" required>
-                            <option value="">Select training set...</option>
+                        <label>Agent *</label>
+                        <select id="runAgent" required onchange="onAgentChange()">
+                            <option value="">Select agent...</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Test Set (Optional)</label>
-                        <select id="runTestSet">
-                            <option value="">No test set</option>
+                        <label>Training set version *</label>
+                        <select id="runTrainingSetVersion" required>
+                            <option value="">Pick agent first…</option>
                         </select>
                     </div>
                 </div>
@@ -654,7 +657,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <button type="submit" class="btn btn-primary">Create Training Run</button>
+                    <button type="submit" class="btn btn-primary">🚀 Launch Training Run</button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('newRunModal')">Cancel</button>
                 </div>
             </form>
@@ -711,7 +714,11 @@
         <button class="btn btn-secondary btn-small" onclick="clearSelection()">Clear</button>
     </div>
 
-    <script src="user_management.js?v=20260721a"></script>
+    <script src="user_management.js?v=20261022a"></script>
+    <script src="active_run_strip.js?v=20261022a"></script>
+    <script src="agent_management.js?v=20261022c"></script>
+    <script src="api_key_management.js?v=20261022a"></script>
+    <script src="left_nav.js?v=20261022f"></script>
     <script>
         // Global state
         let authToken = '';
@@ -728,7 +735,7 @@
 
         function setupEventListeners() {
             document.getElementById('newRunBtn').addEventListener('click', () => openModal('newRunModal'));
-            document.getElementById('logoutBtn').addEventListener('click', logout);
+            // TB-US-045 Tweak 8: Logout now triggered from drawer footer; direct listener removed.
             document.getElementById('newRunForm').addEventListener('submit', handleCreateRun);
             document.getElementById('searchInput').addEventListener('input', filterRuns);
             document.getElementById('statusFilter').addEventListener('change', filterRuns);
@@ -765,7 +772,7 @@
                     return;
                 }
 
-                await Promise.all([loadTrainingSets(), loadTrainingRuns()]);
+                await Promise.all([loadTrainingSets(), loadTrainingRuns(), loadAgents()]);
             } catch (error) {
                 console.error('Auth error:', error);
                 sessionStorage.removeItem('session_token');
@@ -1010,49 +1017,132 @@
             e.preventDefault();
 
             const config = document.getElementById('runConfig').value;
-            let configObj;
+            let hyperparameters;
             try {
-                configObj = JSON.parse(config);
+                hyperparameters = JSON.parse(config);
             } catch (error) {
                 alert('Invalid JSON in Training Configuration');
                 return;
             }
 
-            const runData = {
+            // TB-US-066: tack adapter_output_path into hyperparameters so the
+            // launch endpoint picks it up (per TB-US-065 R1 config schema).
+            const adapterPath = document.getElementById('runAdapterPath').value;
+            if (adapterPath && !hyperparameters.adapter_output_path) {
+                hyperparameters.adapter_output_path = adapterPath;
+            }
+
+            const launchPayload = {
                 run_name: document.getElementById('runName').value,
-                description: document.getElementById('runDescription').value,
-                training_set_id: parseInt(document.getElementById('runTrainingSet').value),
-                test_set_id: document.getElementById('runTestSet').value ? parseInt(document.getElementById('runTestSet').value) : null,
+                description: document.getElementById('runDescription').value || null,
+                training_set_version_id: parseInt(document.getElementById('runTrainingSetVersion').value),
                 base_model: document.getElementById('runBaseModel').value,
-                adapter_output_path: document.getElementById('runAdapterPath').value,
-                config: configObj,
-                gpu_info: document.getElementById('runGPU').value || null,
-                notes: document.getElementById('runNotes').value || null
+                hyperparameters: hyperparameters,
+                agent_id: parseInt(document.getElementById('runAgent').value),
+                notes: document.getElementById('runNotes').value || null,
             };
 
             try {
-                const response = await fetch('/training/runs', {
+                const response = await fetch('/training/runs/launch', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify(runData)
+                    body: JSON.stringify(launchPayload)
                 });
 
+                if (response.status === 409) {
+                    const data = await response.json();
+                    const d = data.detail || {};
+                    alert(`Another training run is already active:\n\n  "${d.active_run_name}" (id=${d.active_run_id})\n  Started: ${d.active_run_started_at}\n\nCancel it first via the Training Runs list before launching another.`);
+                    return;
+                }
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.detail || 'Failed to create run');
+                    throw new Error(error.detail || 'Failed to launch run');
                 }
 
                 const result = await response.json();
                 closeModal('newRunModal');
                 document.getElementById('newRunForm').reset();
                 await loadTrainingRuns();
-                showSuccess('Training run created successfully!');
+                showSuccess(`🚀 Training run #${result.run_id} launched (pid=${result.pid}). Watch progress in the status strip or detail view.`);
             } catch (error) {
-                console.error('Error creating run:', error);
+                console.error('Error launching run:', error);
                 alert('Error: ' + error.message);
+            }
+        }
+
+        // TB-US-066: Agent select loader + onchange handler
+        async function loadAgents() {
+            try {
+                const response = await fetch('/agents?include_retired=false', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('Failed to load agents');
+                const data = await response.json();
+                const agents = (data.agents || []).filter(a => a.state === 'active');
+                const select = document.getElementById('runAgent');
+                select.innerHTML = '<option value="">Select agent...</option>';
+                agents.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.agent_id;
+                    opt.textContent = `${a.name} — ${a.display_name || a.name}`;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('loadAgents:', e);
+            }
+        }
+
+        async function onAgentChange() {
+            const agentId = document.getElementById('runAgent').value;
+            const tsSelect = document.getElementById('runTrainingSetVersion');
+            tsSelect.innerHTML = '<option value="">Loading…</option>';
+            if (!agentId) {
+                tsSelect.innerHTML = '<option value="">Pick agent first…</option>';
+                return;
+            }
+            try {
+                const response = await fetch(`/agents/${agentId}/training-sets`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('Failed to load training-set versions');
+                const data = await response.json();
+                const versions = (data.versions || []).filter(v => v.state === 'released');
+                tsSelect.innerHTML = versions.length
+                    ? '<option value="">Select version...</option>'
+                    : '<option value="">No released training-set versions for this agent</option>';
+                versions.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.version_id;
+                    opt.textContent = `v${v.version_id} (${v.sample_count || 0} samples, hash ${(v.content_sha256 || '').slice(0, 8)})`;
+                    tsSelect.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('onAgentChange:', e);
+                tsSelect.innerHTML = `<option value="">Failed to load: ${e.message}</option>`;
+            }
+        }
+
+        // TB-US-066: Cancel action for an active run
+        async function cancelRun(runId) {
+            if (!confirm(`Cancel training run #${runId}?\n\nThis will SIGTERM the subprocess (then SIGKILL after 10s if needed). Partial checkpoint files are preserved on disk.`)) return;
+            try {
+                const response = await fetch(`/training/runs/${runId}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Cancel failed');
+                }
+                showSuccess(`Training run #${runId} cancelled`);
+                await loadTrainingRuns();
+                closeModal('runDetailsModal');
+            } catch (e) {
+                alert('Cancel failed: ' + e.message);
             }
         }
 
@@ -1079,12 +1169,18 @@
             const trainingSet = trainingSets.find(ts => ts.id === run.training_set_id);
             const testSet = run.test_set_id ? trainingSets.find(ts => ts.id === run.test_set_id) : null;
 
+            // TB-US-066: Cancel button appears only for running runs
+            const cancelButtonHTML = run.status === 'running'
+                ? `<button onclick="cancelRun(${run.id})" style="padding: 6px 14px; background: white; border: 1px solid #E65100; color: #E65100; border-radius: 4px; cursor: pointer; font-weight: 600; margin-left: 10px;" onmouseenter="this.style.background='rgba(230,81,0,0.08)'" onmouseleave="this.style.background='white'">🛑 Cancel run</button>`
+                : '';
+
             const overviewHTML = `
                 <div class="run-details" style="grid-template-columns: 1fr 1fr;">
                     <div class="detail-item">
                         <div class="detail-label">Status</div>
                         <div class="detail-value">
                             <span class="status-badge status-${run.status}">${run.status}</span>
+                            ${cancelButtonHTML}
                         </div>
                     </div>
                     <div class="detail-item">

@@ -81,6 +81,12 @@ document.getElementById('login-form').addEventListener('submit', async function(
             localStorage.removeItem('training_session_count');
             localStorage.removeItem('completed_training_sessions');
 
+            // TB-US-049: first-login forced password change
+            if (data.must_change_password) {
+                window.location.href = '/static/first-change-password.html';
+                return;
+            }
+
             // Redirect to main app
             window.location.href = '/static/index.html';
         } else {

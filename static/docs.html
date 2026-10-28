@@ -123,6 +123,11 @@
             margin-bottom: 2px;
         }
 
+        /* Indent nested subdirectories relative to their parent. */
+        .dir-files .dir-group {
+            padding-left: 12px;
+        }
+
         .dir-label {
             padding: 6px 16px;
             font-size: 0.78em;
@@ -496,13 +501,20 @@
                 const data = await res.json();
                 allFiles = data.files || [];
                 renderSidebar(allFiles);
+
+                // Auto-load the docs landing page if present. Defensive —
+                // keeps the current placeholder visible if the file is missing.
+                const landing = allFiles.find(f => f.path === 'docs/README.md');
+                if (landing) {
+                    loadDoc('docs/README.md');
+                }
             } catch (e) {
                 document.getElementById('sidebar-tree').innerHTML =
                     `<div style="padding: 16px; color: #f44336; font-size: 0.85em;">Error: ${e.message}</div>`;
             }
         }
 
-        function renderSidebar(files) {
+        function renderSidebar(files, collapsedByDefault = true) {
             const tree = document.getElementById('sidebar-tree');
 
             if (files.length === 0) {
@@ -510,54 +522,60 @@
                 return;
             }
 
-            // Group by directory
-            const groups = {};
+            // Build a nested tree from flat paths — each dir becomes a node
+            // with its own dirs + files, so "datasets/math/foo.md" renders as
+            // 📂 datasets > 📂 math > 📄 foo.md rather than one flat
+            // "📂 datasets/math" row.
+            const root = { dirs: {}, files: [] };
             files.forEach(f => {
                 const dir = f.dir || '';
-                if (!groups[dir]) groups[dir] = [];
-                groups[dir].push(f);
-            });
-
-            const sortedDirs = Object.keys(groups).sort((a, b) => {
-                if (a === '') return -1;
-                if (b === '') return 1;
-                return a.localeCompare(b);
-            });
-
-            let html = '';
-            sortedDirs.forEach(dir => {
-                const dirFiles = groups[dir];
                 if (dir === '') {
-                    // Root-level files
-                    dirFiles.forEach(f => {
-                        const active = f.path === currentPath ? ' active' : '';
-                        html += `<div class="file-entry root-file${active}"
-                                      onclick="loadDoc('${escapeAttr(f.path)}')"
-                                      title="${escapeAttr(f.path)}">
-                                    📄 ${escapeHtml(f.name)}
-                                 </div>`;
-                    });
-                } else {
-                    const dirId = 'dir-' + dir.replace(/[^a-zA-Z0-9]/g, '_');
-                    html += `<div class="dir-group">
-                        <div class="dir-label" onclick="toggleDir('${dirId}')">
-                            <span class="toggle-icon">▼</span>
-                            📂 ${escapeHtml(dir)}
-                        </div>
-                        <div class="dir-files" id="${dirId}">`;
-                    dirFiles.forEach(f => {
-                        const active = f.path === currentPath ? ' active' : '';
-                        html += `<div class="file-entry${active}"
-                                      onclick="loadDoc('${escapeAttr(f.path)}')"
-                                      title="${escapeAttr(f.path)}">
-                                    📄 ${escapeHtml(f.name)}
-                                 </div>`;
-                    });
-                    html += `    </div></div>`;
+                    root.files.push(f);
+                    return;
                 }
+                const parts = dir.split('/');
+                let node = root;
+                parts.forEach(part => {
+                    if (!node.dirs[part]) node.dirs[part] = { dirs: {}, files: [] };
+                    node = node.dirs[part];
+                });
+                node.files.push(f);
             });
 
-            tree.innerHTML = html;
+            function renderNode(node, pathPrefix, depth) {
+                let html = '';
+                if (depth === 0) {
+                    // Root-level loose files appear at the top of the tree.
+                    node.files.forEach(f => {
+                        const active = f.path === currentPath ? ' active' : '';
+                        html += `<div class="file-entry root-file${active}" onclick="loadDoc('${escapeAttr(f.path)}')" title="${escapeAttr(f.path)}">📄 ${escapeHtml(f.name)}</div>`;
+                    });
+                }
+                // Alphabetically-sorted subdirectories at this level.
+                const dirNames = Object.keys(node.dirs).sort();
+                dirNames.forEach(dirName => {
+                    const subNode = node.dirs[dirName];
+                    const fullDirPath = pathPrefix ? `${pathPrefix}/${dirName}` : dirName;
+                    const dirId = 'dir-' + fullDirPath.replace(/[^a-zA-Z0-9]/g, '_');
+                    const col = collapsedByDefault ? ' collapsed' : '';
+                    html += `<div class="dir-group">`;
+                    html += `  <div class="dir-label${col}" onclick="toggleDir('${dirId}')">`;
+                    html += `    <span class="toggle-icon">▼</span> 📂 ${escapeHtml(dirName)}`;
+                    html += `  </div>`;
+                    html += `  <div class="dir-files${col}" id="${dirId}">`;
+                    // Direct-child files first
+                    subNode.files.forEach(f => {
+                        const active = f.path === currentPath ? ' active' : '';
+                        html += `<div class="file-entry${active}" onclick="loadDoc('${escapeAttr(f.path)}')" title="${escapeAttr(f.path)}">📄 ${escapeHtml(f.name)}</div>`;
+                    });
+                    // Then nested subdirectories (recursion)
+                    html += renderNode(subNode, fullDirPath, depth + 1);
+                    html += `  </div></div>`;
+                });
+                return html;
+            }
+
+            tree.innerHTML = renderNode(root, '', 0);
         }
 
         function toggleDir(id) {
@@ -577,7 +595,8 @@
                 f.path.toLowerCase().includes(q) ||
                 f.name.toLowerCase().includes(q)
             );
-            renderSidebar(filtered);
+            // When filtering, expand groups so matches are visible.
+            renderSidebar(filtered, false);
         }
 
         // ── Document Loading ──────────────────────────────────────

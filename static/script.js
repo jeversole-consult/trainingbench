@@ -41,6 +41,14 @@ async function checkAuth() {
         const data = await response.json();
         currentUser.username = data.username;
         currentUser.user_type = data.user_type;
+        // TB-US-059: capture welcome-banner dismissal flag for renderWelcomeBanner()
+        currentUser.welcome_banner_dismissed = !!data.welcome_banner_dismissed;
+
+        // TB-US-049: forced password change for first-run admin
+        if (data.must_change_password) {
+            window.location.href = '/static/first-change-password.html';
+            return false;
+        }
 
         console.log('User authenticated:', currentUser);
 
@@ -263,18 +271,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (userDisplay && currentUser.username) {
             userDisplay.textContent = `Signed in as ${currentUser.username}`;
         }
-        const userMgmtBtn = document.getElementById('user-mgmt-btn');
-        if (userMgmtBtn && currentUser.user_type === 'super') {
-            userMgmtBtn.style.display = 'inline-block';
+        // TB-US-045 Tweak 19: Users entry moved from top-bar button to the
+        // drawer-footer Admin group (admin-tier surface above Logout).
+        // Guard retained — super-only visibility.
+        const adminGroup = document.getElementById('tb-nav-admin-group');
+        if (adminGroup && currentUser.user_type === 'super') {
+            adminGroup.style.display = 'block';
         }
-        const headerDbChip = document.getElementById('header-db-chip');
-        if (headerDbChip && currentUser.user_type === 'super') {
-            headerDbChip.style.display = 'inline-flex';
-        }
-        const trainingSetsBtn = document.getElementById('training-sets-btn');
-        if (trainingSetsBtn && (currentUser.user_type === 'super' || currentUser.user_type === 'training')) {
-            trainingSetsBtn.style.display = 'inline-block';
-        }
+        // TB-US-045: top-bar chip is now the current-agent indicator
+        // (replaces the former DB chip; DB switcher still accessible via
+        // the Databases tab in the drawer). Sync the chip label from
+        // sessionStorage and listen for drawer-initiated agent switches.
+        syncHeaderAgentChip();
+        document.addEventListener('tb:agent-changed', (e) => {
+            syncHeaderAgentChip(e && e.detail && e.detail.name);
+            renderWelcomeBanner();   // TB-US-059: refresh banner on agent switch
+        });
+
+        // TB-US-059: render welcome banner if not dismissed.
+        // (flag populated inside checkAuth where the /auth/verify response is in scope)
+        renderWelcomeBanner();
+        // TB-US-045 Tweak 9: #training-sets-btn removed; drawer handles Training Sets nav.
         // Apply role-based UI after authentication
         applyRoleBasedUI();
 
@@ -627,7 +644,7 @@ function addMessage(content, sender, sources = null) {
 
         const acceptableBtn = document.createElement('button');
         acceptableBtn.textContent = '✓ Acceptable';
-        acceptableBtn.style.cssText = 'padding: 8px 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;';
+        acceptableBtn.style.cssText = 'padding: 8px 20px; background: #43A047; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;';
         acceptableBtn.onclick = function() {
             rateResponse(messageId, 'acceptable', content);
             ratingDiv.style.display = 'none';
@@ -635,7 +652,7 @@ function addMessage(content, sender, sources = null) {
 
         const needsImprovementBtn = document.createElement('button');
         needsImprovementBtn.textContent = '✗ Needs Improvement';
-        needsImprovementBtn.style.cssText = 'padding: 8px 20px; background: linear-gradient(135deg, #f44336 0%, #e91e63 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;';
+        needsImprovementBtn.style.cssText = 'padding: 8px 20px; background: #D32F2F; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;';
         needsImprovementBtn.onclick = function() {
             // Show custom feedback modal
             showFeedbackModal(messageId, content, ratingDiv);
@@ -755,23 +772,23 @@ async function refreshStatsFor(dbId, targetEl) {
         const avgResp = (data.query_logs && data.query_logs.avg_response_time) || 0;
         targetEl.innerHTML = `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 10px 0;">
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="background: #CC785C; color: white; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 1.5em; font-weight: bold;">${(data.webpage_count || 0).toLocaleString()}</div>
                     <div style="font-size: 0.8em; opacity: 0.9;">Web Pages</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="background: #CC785C; color: white; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 1.5em; font-weight: bold;">${(data.uploaded_count || 0).toLocaleString()}</div>
                     <div style="font-size: 0.8em; opacity: 0.9;">Uploaded Docs</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="background: #CC785C; color: white; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 1.5em; font-weight: bold;">${chunks.toLocaleString()}</div>
                     <div style="font-size: 0.8em; opacity: 0.9;">Document Chunks</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="background: #CC785C; color: white; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 1.5em; font-weight: bold;">${totalQueries.toLocaleString()}</div>
                     <div style="font-size: 0.8em; opacity: 0.9;">Total Queries</div>
                 </div>
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="background: #CC785C; color: white; padding: 12px; border-radius: 6px; text-align: center;">
                     <div style="font-size: 1.5em; font-weight: bold;">${avgResp.toFixed(2)}s</div>
                     <div style="font-size: 0.8em; opacity: 0.9;">Avg Response Time</div>
                 </div>
@@ -1036,6 +1053,159 @@ async function uploadDocument() {
     }
 }
 
+// TB-US-045: keep the top-bar agent chip label in sync with the drawer's
+// current agent (sessionStorage.tb_current_agent). Called on load and on
+// the drawer's tb:agent-changed event.
+function syncHeaderAgentChip(nameOverride) {
+    const name = nameOverride || sessionStorage.getItem('tb_current_agent') || 'default';
+    const headerLabel = document.getElementById('header-agent-name');
+    if (headerLabel) headerLabel.textContent = name;
+    // TB-US-045 Tweak 18: also update the agent label inside the Chat tab's
+    // workflow strip so the agent is visible both in the header and in the
+    // "upfront view" row of (Agent | DB | Model | Adapter).
+    const workflowLabel = document.getElementById('current-agent-label');
+    if (workflowLabel) workflowLabel.textContent = name;
+}
+
+// ------------------------------------------------------------------ //
+// TB-US-059: welcome banner render + dismiss logic
+// ------------------------------------------------------------------ //
+
+async function renderWelcomeBanner() {
+    const el = document.getElementById('welcome-banner');
+    const btn = document.getElementById('show-welcome-btn');
+    if (!el) return;
+
+    // If dismissed, hide the banner and offer "Show welcome" chip.
+    if (currentUser.welcome_banner_dismissed) {
+        el.style.display = 'none';
+        if (btn) btn.style.display = 'inline-block';
+        return;
+    }
+    if (btn) btn.style.display = 'none';
+
+    // Which variant? Check if math-example agent exists.
+    const token = sessionStorage.getItem('session_token');
+    let agents = [];
+    try {
+        const res = await fetch(`${API_BASE}/agents?include_retired=false`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            agents = (data.agents || []).filter(a => a.state === 'active');
+        }
+    } catch (e) { /* fail soft, fall through to generic variant */ }
+
+    const mathExample = agents.find(a => a.name === 'math-example');
+    const currentAgent = sessionStorage.getItem('tb_current_agent') || 'default';
+    const html = mathExample
+        ? renderMathExampleVariant(currentAgent === 'math-example')
+        : renderGenericVariant(agents.length);
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+
+function renderGenericVariant(agentCount) {
+    const prompt = agentCount > 0
+        ? `You have ${agentCount} agent${agentCount === 1 ? '' : 's'} configured. Create another or upload documents to the current one.`
+        : 'Create your first agent to get started building, then upload documents, train an adapter, and run experiments.';
+    return `
+<div style="margin-bottom: 20px; padding: 20px 24px; background: linear-gradient(135deg, rgba(204, 120, 92, 0.08) 0%, rgba(204, 120, 92, 0.02) 100%); border-left: 4px solid #CC785C; border-radius: 6px; position: relative;">
+    <button onclick="dismissWelcomeBanner()" title="Dismiss" aria-label="Dismiss welcome banner" style="position: absolute; top: 10px; right: 10px; background: none; border: 1px solid #E0E0E0; border-radius: 4px; padding: 2px 10px; cursor: pointer; font-size: 1.2em; line-height: 1; color: #555; font-weight: 600;">&#x2715;</button>
+    <h3 style="margin: 0 0 6px 0; color: #CC785C; font-size: 1.15em;">👋 Welcome to TrainingBench</h3>
+    <p style="margin: 0 0 14px 0; color: #555; font-size: 0.95em;">${escapeHtmlLite(prompt)}</p>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button onclick="window.openAgentManagement && window.openAgentManagement()" style="padding: 8px 16px; background: #CC785C; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9em;">Create an agent →</button>
+        <button onclick="window.location.href='/static/docs.html'" style="padding: 8px 16px; background: white; border: 1px solid #CC785C; color: #CC785C; border-radius: 6px; cursor: pointer; font-size: 0.9em;">Read the docs</button>
+    </div>
+</div>`;
+}
+
+function renderMathExampleVariant(currentIsMathExample) {
+    const switchCardOrChatCard = currentIsMathExample
+        ? `<div style="flex: 1 1 220px; min-width: 220px; padding: 14px; background: white; border: 1px solid #E0E0E0; border-radius: 6px;">
+    <div style="font-weight: 600; color: #333; margin-bottom: 6px;">💬 Chat with math-example</div>
+    <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">Try a question — the model answers using the staged-progression stack.</div>
+    <button onclick="focusChatInput('What is the derivative of x² + 3x?')" style="padding: 6px 12px; background: #CC785C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Suggest a question →</button>
+</div>`
+        : `<div style="flex: 1 1 220px; min-width: 220px; padding: 14px; background: white; border: 1px solid #E0E0E0; border-radius: 6px;">
+    <div style="font-weight: 600; color: #333; margin-bottom: 6px;">💬 Chat with math-example</div>
+    <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">Switch to the math-example agent and try a tutor question.</div>
+    <button onclick="switchToMathExample()" style="padding: 6px 12px; background: #CC785C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Switch agent →</button>
+</div>`;
+    return `
+<div style="margin-bottom: 20px; padding: 20px 24px; background: linear-gradient(135deg, rgba(204, 120, 92, 0.08) 0%, rgba(204, 120, 92, 0.02) 100%); border-left: 4px solid #CC785C; border-radius: 6px; position: relative;">
+    <button onclick="dismissWelcomeBanner()" title="Dismiss" aria-label="Dismiss welcome banner" style="position: absolute; top: 10px; right: 10px; background: none; border: 1px solid #E0E0E0; border-radius: 4px; padding: 2px 10px; cursor: pointer; font-size: 1.2em; line-height: 1; color: #555; font-weight: 600;">&#x2715;</button>
+    <h3 style="margin: 0 0 6px 0; color: #CC785C; font-size: 1.15em;">👋 Welcome to TrainingBench</h3>
+    <p style="margin: 0 0 14px 0; color: #555; font-size: 0.95em;">Explore the shipped <strong>math-example</strong> staged progression or create your own agent.</p>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div style="flex: 1 1 220px; min-width: 220px; padding: 14px; background: white; border: 1px solid #E0E0E0; border-radius: 6px;">
+            <div style="font-weight: 600; color: #333; margin-bottom: 6px;">📊 See the staged progression</div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">Stage 0 → 1 → 2 accuracy deltas on 200 math questions.</div>
+            <button onclick="viewMathExampleExperiments()" style="padding: 6px 12px; background: #CC785C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">View experiments →</button>
+        </div>
+        ${switchCardOrChatCard}
+        <div style="flex: 1 1 220px; min-width: 220px; padding: 14px; background: white; border: 1px solid #E0E0E0; border-radius: 6px;">
+            <div style="font-weight: 600; color: #333; margin-bottom: 6px;">🤖 Start your own agent</div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">Create an agent and build it up with your own content.</div>
+            <button onclick="window.openAgentManagement && window.openAgentManagement()" style="padding: 6px 12px; background: #CC785C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Create agent →</button>
+        </div>
+    </div>
+</div>`;
+}
+
+async function dismissWelcomeBanner() {
+    const token = sessionStorage.getItem('session_token');
+    try {
+        await fetch(`${API_BASE}/auth/dismiss-welcome`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+    } catch (e) { /* best-effort */ }
+    currentUser.welcome_banner_dismissed = true;
+    renderWelcomeBanner();
+}
+
+async function resetWelcomeBanner() {
+    const token = sessionStorage.getItem('session_token');
+    try {
+        await fetch(`${API_BASE}/auth/reset-welcome`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+    } catch (e) { /* best-effort */ }
+    currentUser.welcome_banner_dismissed = false;
+    renderWelcomeBanner();
+    // If user is not on the Chat tab, switch so they can see the banner.
+    if (typeof window.switchTab === 'function') {
+        try { window.switchTab('chat'); } catch (e) {}
+    }
+}
+
+function focusChatInput(suggestion) {
+    const input = document.getElementById('question-input') || document.querySelector('input[placeholder*="question" i], textarea[placeholder*="question" i]');
+    if (input) {
+        if (suggestion) input.value = suggestion;
+        input.focus();
+    }
+}
+
+function switchToMathExample() {
+    sessionStorage.setItem('tb_current_agent', 'math-example');
+    document.dispatchEvent(new CustomEvent('tb:agent-changed', { detail: { name: 'math-example' } }));
+    if (window.__tbRefreshAgentSelector) window.__tbRefreshAgentSelector();
+}
+
+function viewMathExampleExperiments() {
+    // Experiments UI (R1 card) ships with a future story; for now, link to a placeholder.
+    alert('Experiment viewer ships with the next release. For now, use the API: GET /experiments?agent_id={math-example-id}');
+}
+
+function escapeHtmlLite(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
 // Database Management Functions
 async function loadDatabaseSelector() {
     const selector = document.getElementById('database-selector');
@@ -1157,7 +1327,7 @@ async function loadDatabases() {
             data.databases.forEach(db => {
                 const dbCard = document.createElement('div');
                 dbCard.className = 'document-item';
-                dbCard.style.borderLeft = db.is_active ? '4px solid #4CAF50' : '4px solid #667eea';
+                dbCard.style.borderLeft = db.is_active ? '4px solid #4CAF50' : '4px solid #CC785C';
 
                 dbCard.innerHTML = `
                     <div style="width: 100%;">
@@ -1165,7 +1335,7 @@ async function loadDatabases() {
                             <div class="document-info">
                                 <strong>${escapeHtml(db.name)}</strong>
                                 ${db.is_active ? ' <span style="color: #4CAF50; font-weight: bold;">● ACTIVE</span>' : ''}
-                                ${db.is_default ? ' <span style="color: #667eea;">[Default]</span>' : ''}
+                                ${db.is_default ? ' <span style="color: #CC785C;">[Default]</span>' : ''}
                                 <small>
                                     ID: ${escapeHtml(db.id)} |
                                     Web Pages: ${db.webpage_count || 0} |
@@ -1175,9 +1345,9 @@ async function loadDatabases() {
                                 </small>
                             </div>
                             <div class="document-actions" style="flex-shrink: 0;">
-                                <button onclick="toggleDbStats('${escapeHtml(db.id)}')" style="background: #667eea;">Statistics</button>
+                                <button onclick="toggleDbStats('${escapeHtml(db.id)}')" style="background: #CC785C;">Statistics</button>
                                 ${!db.is_active ? `<button onclick="switchToDatabaseFromList('${escapeHtml(db.id)}')" style="background: #4CAF50;">Switch To</button>` : ''}
-                                <button onclick="duplicateDatabase('${escapeHtml(db.id)}', '${escapeHtml(db.name)}')" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">Duplicate</button>
+                                <button onclick="duplicateDatabase('${escapeHtml(db.id)}', '${escapeHtml(db.name)}')" style="background: #43A047;">Duplicate</button>
                                 <button onclick="clearDatabaseById('${escapeHtml(db.id)}', '${escapeHtml(db.name)}')" class="danger-btn">Clear</button>
                                 ${!db.is_default ? `<button class="delete-btn" onclick="deleteDatabase('${escapeHtml(db.id)}')">Delete</button>` : ''}
                             </div>
@@ -1620,14 +1790,14 @@ function displayComparisonResults() {
             if (isWebUrl) {
                 sourcesHTML += `
                     <div style="margin: 5px 0;">
-                        ${index + 1}. <a href="${escapeHtml(source.url)}" target="_blank" style="color: #667eea;">${escapeHtml(displayTitle)}</a>
+                        ${index + 1}. <a href="${escapeHtml(source.url)}" target="_blank" style="color: #CC785C;">${escapeHtml(displayTitle)}</a>
                         ${source.relevance_score ? ` <span style="color: #666; font-size: 0.9em;">(${(source.relevance_score * 100).toFixed(1)}%)</span>` : ''}
                     </div>
                 `;
             } else {
                 sourcesHTML += `
                     <div style="margin: 5px 0;">
-                        ${index + 1}. <span style="color: #667eea;">${escapeHtml(displayTitle)}</span>
+                        ${index + 1}. <span style="color: #CC785C;">${escapeHtml(displayTitle)}</span>
                         ${source.relevance_score ? ` <span style="color: #666; font-size: 0.9em;">(${(source.relevance_score * 100).toFixed(1)}%)</span>` : ''}
                     </div>
                 `;
@@ -1650,14 +1820,14 @@ function displayComparisonResults() {
             if (isWebUrl) {
                 sourcesHTML += `
                     <div style="margin: 5px 0;">
-                        ${index + 1}. <a href="${escapeHtml(source.url)}" target="_blank" style="color: #764ba2;">${escapeHtml(displayTitle)}</a>
+                        ${index + 1}. <a href="${escapeHtml(source.url)}" target="_blank" style="color: #CC785C;">${escapeHtml(displayTitle)}</a>
                         ${source.relevance_score ? ` <span style="color: #666; font-size: 0.9em;">(${(source.relevance_score * 100).toFixed(1)}%)</span>` : ''}
                     </div>
                 `;
             } else {
                 sourcesHTML += `
                     <div style="margin: 5px 0;">
-                        ${index + 1}. <span style="color: #764ba2;">${escapeHtml(displayTitle)}</span>
+                        ${index + 1}. <span style="color: #CC785C;">${escapeHtml(displayTitle)}</span>
                         ${source.relevance_score ? ` <span style="color: #666; font-size: 0.9em;">(${(source.relevance_score * 100).toFixed(1)}%)</span>` : ''}
                     </div>
                 `;
@@ -2295,7 +2465,7 @@ async function loadTrainingSessions() {
 
     // Header section
     const headerDiv = document.createElement('div');
-    headerDiv.style.cssText = 'margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px;';
+    headerDiv.style.cssText = 'margin-bottom: 20px; padding: 15px; background: #CC785C; color: white; border-radius: 8px;';
     headerDiv.innerHTML = `
         <h3 style="margin: 0 0 5px 0; font-size: 1.2em;">📚 My Training Sessions</h3>
         <p style="margin: 0; font-size: 0.9em; opacity: 0.9;">Track your training progress and review completed sessions</p>
@@ -2370,7 +2540,7 @@ async function loadTrainingSessions() {
         completedSessions.reverse().forEach((session, index) => {
             const sessionCard = document.createElement('div');
             sessionCard.className = 'history-item';
-            sessionCard.style.cssText = 'margin-bottom: 15px; padding: 15px; background: white; border-left: 4px solid #667eea; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+            sessionCard.style.cssText = 'margin-bottom: 15px; padding: 15px; background: white; border-left: 4px solid #CC785C; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
 
             const date = new Date(session.completed_at);
             const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
@@ -2382,7 +2552,7 @@ async function loadTrainingSessions() {
                 footerHtml = `
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9f9f9; border-radius: 5px; font-size: 0.9em; color: #666;">
                         <span>Training set saved (${entryCount} entries)</span>
-                        <button onclick="openTrainingSetViewer(${session.training_set_id})" style="padding: 6px 14px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">View Training Set</button>
+                        <button onclick="openTrainingSetViewer(${session.training_set_id})" style="padding: 6px 14px; background: #CC785C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">View Training Set</button>
                     </div>
                 `;
             } else if (session.training_set_error) {
@@ -2402,7 +2572,7 @@ async function loadTrainingSessions() {
             sessionCard.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                     <div style="flex: 1;">
-                        <div style="font-size: 1.1em; font-weight: bold; color: #667eea; margin-bottom: 5px;">
+                        <div style="font-size: 1.1em; font-weight: bold; color: #CC785C; margin-bottom: 5px;">
                             ${escapeHtml(displayName)}
                         </div>
                         <div style="font-size: 0.85em; color: #999;">
