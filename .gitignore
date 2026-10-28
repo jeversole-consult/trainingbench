@@ -1,3 +1,9 @@
+# TB-US-049: first-run admin credentials file
+logs/first-run-admin.txt
+
+# TB-US-050: auto-generated SECRET_KEY + PASSWORD_SALT
+backend/db/.secrets
+
 # Python
 venv/
 __pycache__/
@@ -72,7 +78,13 @@ venv/
 # Per-run training output
 training/data/
 training/datasets/data/
+training/datasets/
 training/runs/
+training/adapters/
+training/math/__pycache__/
+
+# TB-US-063: promoted adapters (large binaries; register via adapter_versions, not git)
+adapters/
 
 # Editor / OS scratch
 *.bak
@@ -81,3 +93,7 @@ training/runs/
 *.tmp
 .idea/
 .vscode/
+
+# Time tracking (local only — do not commit)
+scripts/report_time.py
+time_report*.xlsx
