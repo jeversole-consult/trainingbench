@@ -53,6 +53,28 @@ This section will be updated with concrete "verified on" entries as
 real installs are performed (see "What's verified, what isn't" at the
 bottom of this document).
 
+### Track A vs Track B — which path is yours?
+
+Not every TrainingBench install needs a GPU. Two paths:
+
+- **Track A — GPU-equipped install.** You can train adapters locally.
+  Full workflow available: ingest documents, train PEFT adapters, run
+  experiments comparing (prompt, RAG, LLM, adapter) combinations,
+  measure accuracy on your eval harness. **Required for TB-US-057
+  Phase B's Stage 2 (adapter) measurement and for any real
+  fine-tuning work.**
+- **Track B — CPU-only install.** Everything except adapter training
+  works. You can run inference against your base model (via Ollama
+  or an HTTP LLM provider), load content into RAG indices, create and
+  release component versions, run experiments against the harness
+  (minus adapter stages). Useful for operators who want to explore
+  the agent model and measurement workflow without GPU hardware.
+
+The rest of this doc covers Track A (GPU present). For Track B, skip
+the CUDA / NVIDIA sections and set `LLM_PROVIDER=ollama` in your
+`.env` after installing an Ollama server with the base model pulled.
+Everything else works identically.
+
 ---
 
 ## Step 1: Install system binaries
@@ -182,20 +204,27 @@ cp .env.example .env
 
 Open `.env` in an editor. At minimum, decide on the following:
 
-| Variable | What it controls | Sensible first value |
+| Variable | What it controls | Default behavior |
 |---|---|---|
 | `APP_PORT` | Port the backend listens on | `8000` |
 | `DEFAULT_ADMIN_USERNAME` | Username of the seeded super-admin | `admin` |
-| `DEFAULT_ADMIN_PASSWORD` | Password of the seeded super-admin | **choose your own** — do not leave as `changeme` |
-| `SECRET_KEY` | Cookie/token signing secret | **choose your own** — random 32+ byte string |
-| `PASSWORD_SALT` | Password hash salt | **choose your own** — random string per deployment |
+| `DEFAULT_ADMIN_PASSWORD` | Password of the seeded super-admin | **If unset: auto-generated random 24-char password on first boot, printed to stdout + written to `logs/first-run-admin.txt` (chmod 600). You'll be forced to change it on first login.** |
+| `SECRET_KEY` | Cookie/token signing secret | **If unset: auto-generated to `backend/db/.secrets` (chmod 600, gitignored) on first boot.** Only override if you need to pin the value for multi-replica or CI. |
+| `PASSWORD_SALT` | Password hash salt | **If unset: auto-generated to `backend/db/.secrets`.** Same note as SECRET_KEY. |
 | `DEFAULT_ADMIN_EMAIL` | Email recorded on the seeded admin user | **set to your own address** — the `.env.example` placeholder does not route anywhere |
 | `LLM_PROVIDER` | RAG generation backend | `peft` if you will train your own adapter; `ollama` for quick start |
 | `OLLAMA_MODEL` | Default Ollama model (if used) | `llama3.1:8b` |
 | `OLLAMA_BASE_URL` | Where to reach Ollama | `http://localhost:11434` |
+| `SITE_PASSPHRASE` | Optional pre-login gate passphrase | Unset = no gate; set to require passphrase before login page is reachable |
+| `TB_SKIP_FIRST_RUN_SEED` | Set to `1` to skip the math-example seeder | Unset = seeder runs on fresh installs |
 
 The full set of available env vars is documented in `.env.example`
 with comments explaining each.
+
+**TL;DR:** on a fresh install with just `DEFAULT_ADMIN_EMAIL` set, TB
+auto-generates everything cryptographic (admin password, SECRET_KEY,
+PASSWORD_SALT) on first boot. You don't have to set them unless you
+want to pin the values.
 
 ### About the LLM backend choice
 
@@ -228,27 +257,62 @@ python -m uvicorn backend.api.main:app --host 0.0.0.0 --port $APP_PORT
 ### First-boot side effects
 
 On the first boot, the server creates side-effect state that was not
-in the repo:
+in the repo. Watch stdout — several startup banners confirm each step:
 
-- **`users.db`** is created and seeded with a default admin user
-  (`DEFAULT_ADMIN_USERNAME` / `DEFAULT_ADMIN_PASSWORD` /
-  `DEFAULT_ADMIN_EMAIL` from your `.env`). A startup line is printed
-  reminding you to change the password.
-- **`sessions.db`** is created for login/logout session tracking.
-- **`app_settings.json`** is created, holding runtime-modifiable
-  configuration like `demo_mode` and `active_database`.
-- **`chroma_db/`** is created as an empty vector store.
-- **`logs/`** is created for query and audit logs.
+- **`backend/db/.secrets`** (chmod 600, gitignored) with auto-generated
+  SECRET_KEY and PASSWORD_SALT. Log line: `[secrets] generated and
+  wrote .../backend/db/.secrets`
+- **`backend/db/trainingbench.db`** with the agents + versioning
+  tables + seeded `default` agent. Log line: `[schema] {...
+  seeded_default_agent: True}`
+- **`users.db`** seeded with a super-admin. If you did NOT set
+  `DEFAULT_ADMIN_PASSWORD`, you'll see a prominent banner with the
+  auto-generated password + instructions. Credentials also written to
+  `logs/first-run-admin.txt` (chmod 600) — this file is auto-deleted
+  after you change your password.
+- **`sessions.db`** for login/logout session tracking
+- **`app_settings.json`** for runtime-modifiable configuration
+- **Legacy `chroma_db/`** created as an empty vector store (legacy
+  singleton; new agents get their own versioned collections)
+- **`logs/`** for query and audit logs
+- **math-example agent + 3 draft experiments** auto-seeded if the
+  `rag-seeds/`, `training-sets/`, and `backend/harnesses/data/`
+  artifacts are present. Log line: `[seeder] {... seeded: True,
+  agent_id: N, ...}`. Set `TB_SKIP_FIRST_RUN_SEED=1` to disable.
 
-All of these paths are env-overridable (see `.env.example`). The
-defaults put everything inside the project directory so multiple
-installs on one machine do not collide.
+All DB paths are env-overridable (see `.env.example`). The defaults
+put everything inside the project directory so multiple installs on
+one machine do not collide.
 
 ### Confirm the server is up
 
 Visit `http://localhost:<APP_PORT>` in a browser. You should see the
-TrainingBench login page. Log in with the admin credentials from your
-`.env`.
+TrainingBench login page.
+
+**If you set `DEFAULT_ADMIN_PASSWORD` in `.env`:** log in with those
+credentials. You're immediately in the Chat tab.
+
+**If you did NOT set it (auto-generated path):**
+
+1. Get the auto-generated password from either the stdout banner or
+   `cat logs/first-run-admin.txt`
+2. Log in with `DEFAULT_ADMIN_USERNAME` + that password
+3. You'll be forced to the password-change page — set a new password
+   (minimum 10 characters). The `logs/first-run-admin.txt` file is
+   deleted automatically on successful change.
+4. You land in the Chat tab with the welcome banner visible.
+
+### First-login tour
+
+What you should see once you're in:
+
+- **Top bar:** 🤖 Agent chip showing current agent (`default` by
+  default; switch to `math-example` via the drawer selector)
+- **Chat tab:** 👋 welcome banner with three cards (if math-example
+  seeded) or "Create an agent" (if not)
+- **Hamburger drawer:** nav for Chat / Upload / Documents / Databases
+  / Training Sets / Training Runs + agent selector at top + ADMIN
+  group at bottom (super-only; Users + API Keys inside)
 
 ---
 
@@ -339,10 +403,15 @@ under systemd.
 | `torch.cuda.is_available()` is False after install | Default cu130 torch wheel pulled, but driver only supports CUDA 12.x | See Step 3a — reinstall torch from the cu128 index |
 | `nvidia-smi` does not list a GPU | NVIDIA driver not installed correctly | Reinstall the driver; reboot |
 | Backend starts but training fails with "CUDA out of memory" | GPU has less than ~16 GB VRAM, or other processes are holding VRAM | Use a smaller `--max-length`, fewer `--max-train-samples`, pick a smaller base model via `--model`, or stop other GPU processes (`nvidia-smi --query-compute-apps=pid,used_memory --format=csv`) |
-| Trainer fails with "TensorBoardCallback requires tensorboard to be installed" | `tensorboard` was not installed in this venv | `pip install tensorboard` (it is in `requirements.txt`; this happens if you skipped Step 3b) |
+| Trainer fails with "TensorBoardCallback requires tensorboard to be installed" | HF Trainer default includes a TensorBoard callback | Already handled: `train.py` sets `report_to="none"`. If you hit this with a fresh branch, either upgrade or install `pip install tensorboard` |
 | Login page returns 404 in browser | Wrong host/port, or backend not running | Confirm `APP_PORT` matches the port you typed; check terminal for tracebacks |
-| Admin login fails | `.env` not loaded, or password mismatch | Confirm `DEFAULT_ADMIN_PASSWORD` in `.env` matches what you type. (`.env` must be in the project root and the backend must have been started from there.) |
+| Admin login fails + no `DEFAULT_ADMIN_PASSWORD` in .env | Auto-generated password: check for it | `cat logs/first-run-admin.txt` (file auto-deleted after first password change) OR scroll back on service stdout for the credentials banner |
+| Admin login fails + password set in .env | `.env` not loaded, or password mismatch | Confirm `DEFAULT_ADMIN_PASSWORD` in `.env` matches what you type. (`.env` must be in the project root and the backend must have been started from there.) |
+| Lost admin password entirely | `logs/first-run-admin.txt` deleted after first change; no recovery UI yet | Nuclear option: stop service, `rm users.db`, restart — new auto-generated admin, lose other user accounts. Future-proof: back up `users.db` after setting things up |
 | Smoke train hangs at "Loading base model" | First-time HuggingFace download | Wait — it is downloading approximately 16 GB |
+| Launch endpoint returns 409 Conflict | Another training run is still active | Visit Training Runs page, cancel the active run, retry. One run at a time by design (TB-US-064) |
+| Training run shows "failed" immediately with "TB restarted" | Service restarted while this run was active | Expected behavior — TB-US-065 startup reconciliation marks orphaned subprocesses as failed. Launch a new run |
+| math-example agent not visible in drawer selector | Seeder didn't run, or operator deleted it | Check startup log for `[seeder] {seeded: True...}`. If `seeded: False, reason: "missing artifacts"`, verify `rag-seeds/math-example-v1/`, `training-sets/math-example-v1.jsonl`, `backend/harnesses/data/math_eval_200.jsonl` all exist |
 
 ---
 

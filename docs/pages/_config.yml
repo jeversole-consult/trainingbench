@@ -1,0 +1,50 @@
+# TB-US-060: Jekyll site config for the TrainingBench documentation site.
+# Rendered by GitHub Pages' built-in Jekyll service when the repo
+# Settings → Pages source is set to this folder on the main branch.
+
+title: TrainingBench
+tagline: Measure what training does to your LLM.
+description: >-
+  Open-source workbench for building and measuring AI agents.
+  Versioned prompts, RAG, adapters, and experiments on your own
+  hardware.
+
+# GitHub Pages URL. baseurl is empty when the site is served at the
+# root of the GitHub Pages domain. If the repo is published under a
+# subpath (e.g. username.github.io/trainingbench), set
+# baseurl: "/trainingbench" instead.
+url: ""
+baseurl: ""
+
+# Operator / organization
+author:
+  name: Eversole Learning, LLC
+  email: operator@example.com
+
+# Minimal Jekyll — no bundled theme, custom _layouts handle rendering.
+theme: null
+
+# Markdown rendering
+markdown: kramdown
+kramdown:
+  input: GFM            # GitHub-flavored Markdown
+  hard_wrap: false
+  syntax_highlighter: rouge
+
+# Permalinks
+permalink: /:path.html
+
+# What NOT to publish
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+
+# Front-matter defaults for all pages
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

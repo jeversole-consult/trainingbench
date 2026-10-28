@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if page.title %}{{ page.title }} · {{ site.title }}{% else %}{{ site.title }} — {{ site.tagline }}{% endif %}</title>
+    <meta name="description" content="{% if page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}">
+
+    <!-- OpenGraph for social-share previews (TB-US-060 R7) -->
+    <meta property="og:title" content="{% if page.title %}{{ page.title }} · {{ site.title }}{% else %}{{ site.title }}{% endif %}">
+    <meta property="og:description" content="{% if page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}">
+    <meta property="og:type" content="website">
+
+    <style>
+        /* TB-US-060: amber accent + white theme consistent with TB-US-042 */
+        :root {
+            --amber: #CC785C;
+            --amber-tint: rgba(204, 120, 92, 0.08);
+            --amber-border: rgba(204, 120, 92, 0.3);
+            --text: #1A1A1A;
+            --text-muted: #666;
+            --bg: #ffffff;
+            --surface: #F5F5F5;
+            --border: #E0E0E0;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        header.site-header {
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            background: var(--bg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        header.site-header .inner {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        header.site-header .brand {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: var(--amber);
+            text-decoration: none;
+        }
+        header.site-header nav {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        header.site-header nav a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.95em;
+            padding: 4px 0;
+            border-bottom: 2px solid transparent;
+            transition: border-color 100ms;
+        }
+        header.site-header nav a:hover, header.site-header nav a.active {
+            border-bottom-color: var(--amber);
+        }
+        header.site-header .github-link {
+            padding: 6px 14px;
+            background: var(--amber);
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        main {
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 40px 24px 80px 24px;
+        }
+        h1 { font-size: 2em; margin: 0 0 16px 0; color: var(--text); }
+        h2 { font-size: 1.5em; margin: 32px 0 12px 0; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        h3 { font-size: 1.2em; margin: 24px 0 8px 0; color: var(--text); }
+        p { margin: 12px 0; }
+        a { color: var(--amber); }
+        a:hover { text-decoration: underline; }
+        code {
+            background: var(--surface);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-family: Menlo, Monaco, 'Courier New', monospace;
+        }
+        pre {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85em;
+        }
+        blockquote {
+            border-left: 4px solid var(--amber);
+            background: var(--amber-tint);
+            margin: 16px 0;
+            padding: 12px 20px;
+            color: var(--text);
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: var(--surface);
+            font-weight: 600;
+        }
+        .hero {
+            background: linear-gradient(135deg, var(--amber-tint) 0%, rgba(204, 120, 92, 0.02) 100%);
+            border: 1px solid var(--amber-border);
+            border-radius: 10px;
+            padding: 40px 32px;
+            margin-bottom: 32px;
+        }
+        .hero h1 {
+            color: var(--amber);
+            margin-bottom: 8px;
+        }
+        .hero .pitch {
+            font-size: 1.2em;
+            color: var(--text);
+        }
+        .cta-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .cta {
+            display: inline-block;
+            padding: 10px 22px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+        .cta.primary {
+            background: var(--amber);
+            color: white;
+        }
+        .cta.secondary {
+            background: white;
+            color: var(--amber);
+            border: 1px solid var(--amber);
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 24px 0;
+        }
+        .feature-card {
+            padding: 20px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .feature-card h3 {
+            margin-top: 0;
+            color: var(--amber);
+        }
+        footer.site-footer {
+            border-top: 1px solid var(--border);
+            padding: 24px;
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 0.85em;
+            text-align: center;
+        }
+        @media (max-width: 640px) {
+            header.site-header nav { font-size: 0.85em; gap: 12px; }
+            .hero { padding: 24px 20px; }
+            main { padding: 24px 16px 48px 16px; }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.25em; }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="inner">
+            <a href="{{ '/' | relative_url }}" class="brand">🤖 {{ site.title }}</a>
+            <nav>
+                <a href="{{ '/' | relative_url }}"{% if page.url == "/" or page.url == "/index.html" %} class="active"{% endif %}>Home</a>
+                <a href="{{ '/getting-started.html' | relative_url }}"{% if page.url contains "getting-started" %} class="active"{% endif %}>Getting Started</a>
+                <a href="{{ '/staged-progression.html' | relative_url }}"{% if page.url contains "staged-progression" %} class="active"{% endif %}>Staged Progression</a>
+                <a href="{{ '/concepts.html' | relative_url }}"{% if page.url contains "concepts" %} class="active"{% endif %}>Concepts</a>
+                <a href="{{ '/install.html' | relative_url }}"{% if page.url contains "install" %} class="active"{% endif %}>Install</a>
+            </nav>
+            <a href="https://github.com/eversole-learning/trainingbench" class="github-link">GitHub →</a>
+        </div>
+    </header>
+    <main>
+        {{ content }}
+    </main>
+    <footer class="site-footer">
+        <p>
+            {{ site.title }} — Open-source workbench for AI agents.
+            Apache 2.0 licensed.
+            © Eversole Learning, LLC.
+            <br>
+            <a href="https://github.com/eversole-learning/trainingbench">Source on GitHub</a> ·
+            <a href="https://github.com/eversole-learning/trainingbench/blob/main/BACKLOG.md">Backlog</a>
+        </p>
+    </footer>
+</body>
+</html>

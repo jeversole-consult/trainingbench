@@ -1,0 +1,64 @@
+# TB-US-060: CI check that the Jekyll Pages site builds cleanly.
+# Runs on any push / PR that touches docs/pages/ or this workflow
+# itself. GitHub Pages has its own build service that renders the
+# site when enabled in Settings → Pages, so this workflow is purely
+# a pre-merge safety net: catches broken Liquid templates / bad
+# front matter / missing _layouts references before they ship to
+# production.
+
+name: pages-build-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/pages/**"
+      - ".github/workflows/pages-build.yml"
+  pull_request:
+    paths:
+      - "docs/pages/**"
+      - ".github/workflows/pages-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/pages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Jekyll + plugins
+        run: |
+          gem install bundler
+          # No Gemfile shipped — install Jekyll + the plugins
+          # GitHub Pages' own build service uses, so our CI
+          # closely approximates the production build environment.
+          gem install jekyll -v 3.9.3
+          gem install jekyll-sass-converter -v 1.5.2
+          gem install kramdown -v 2.3.2
+          gem install kramdown-parser-gfm
+          gem install rouge
+
+      - name: Build site
+        run: jekyll build --strict_front_matter --destination _site
+
+      - name: Smoke-check output
+        run: |
+          test -f _site/index.html || (echo "ERROR: index.html missing from build" && exit 1)
+          test -f _site/getting-started.html || (echo "ERROR: getting-started.html missing" && exit 1)
+          test -f _site/staged-progression.html || (echo "ERROR: staged-progression.html missing" && exit 1)
+          test -f _site/concepts.html || (echo "ERROR: concepts.html missing" && exit 1)
+          test -f _site/install.html || (echo "ERROR: install.html missing" && exit 1)
+          echo "all 5 pages built successfully"
+          ls -la _site/
