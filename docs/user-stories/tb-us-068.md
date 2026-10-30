@@ -1,10 +1,11 @@
 # TB-US-068: Private v0.1 release-cut rehearsal
 
-**Status**: In Progress
+**Status**: Completed
 **Created**: 2026-10-24
 **Started**: 2026-10-25
+**Completed**: 2026-10-28
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: `049fc3f` through `89478e5`, tag `v0.1.0-rc1`
 
 ## Story
 
@@ -249,3 +250,87 @@ one small step at a time, before the public cut.
   - `docs/release/v0.1.0-rc1-rehearsal-review.md` (new, Phase F)
   - Possibly `.gitignore` tweaks (Phase A, if any sensitive files
     aren't ignored)
+
+## Completion Notes (2026-10-28)
+
+**Phases A, B, C, D executed end-to-end on the host dev tree with
+a secondary WSL fresh-install validation. Phases E, F, G scope-capped
+or deferred.**
+
+### What shipped
+
+- **Phase A** ✅ Audit, PII redaction across 14 files (`admin_41727`
+  → `admin`, personal email → `operator@example.com`), stray-doc
+  cleanup (`docs/ot-context-for-claude-code_1.md`, `docs/sync/`,
+  `openclaw/`), branch rename `master` → `main`, GitHub repo
+  `jeversole-consult/trainingbench` created, SSH key
+  `~/.ssh/github_tb_ed25519` generated + routed via `~/.ssh/config`
+- **Phase B** ✅ 5-commit arc + openclaw cleanup + TB-US-071 fix.
+  Final `main` HEAD: `89478e5` (TB-US-071 login.js fix).
+  Each commit maps to a logical arc, not a mega-snapshot.
+- **Phase C** ✅ Fresh-install rehearsal at
+  `~/tb-rehearsal/trainingbench/` on host (R7–R10 complete, 2
+  findings captured, cleanup done) + a second pass on operator's
+  WSL laptop that surfaced the 🔴 blocking F5 login.js bug. WSL
+  R10 cleanup pending but non-blocking.
+- **Phase D R11** ✅ `v0.1.0-rc1` tag created + pushed to origin.
+- **TB-US-071** spawned + walked + closed as a dual-purpose test:
+  (1) real bug fix for a 🔴 blocker, (2) demonstration of the full
+  maintenance-fix workflow (observe → draft → fire → fix → commit
+  → push → downstream verify → close).
+
+### Findings captured
+
+In `docs/release/v0.1.0-rc1-rehearsal-review.md`:
+- 🟢 Phase A: stale `docs/user/` pre-TB docs (operator decides later)
+- 🟢 ✅ Phase A: `openclaw/` stale (removed as `576c39e`)
+- 🟡 F1: INSTALL.md Step 5 shell-env gap — doc fix candidate
+- 🟡 F2: INSTALL.md Step 5 password-surfacing drift (banner buried
+  mid-stream, not file-only as originally thought)
+- 🟢 F3: Fresh-DB clean version numbering confirms AUTOINCREMENT
+  drift theory (no action)
+- 🟡 F4: Git metadata PII in commit/tag author field — operator
+  decides at TB-US-005 time
+- 🔴 ✅ F5: login.js unconditional gate redirect — fixed in
+  TB-US-071 (`89478e5`)
+
+### Explicitly deferred / rolled forward
+
+- **Phase D R12/R13** (browser visit to GitHub Releases + draft
+  release notes) → operator-only browser work; executed as part of
+  TB-US-005 public cut
+- **Phase E** (R14–R17, enable Pages privately) → TB-US-005
+- **Phase F** (R18–R21, stranger-eye review of README + INSTALL +
+  Pages site) → TB-US-072 (comprehensive UI testing pass)
+- **Phase G decision made now**: proceed to TB-US-005 for public
+  cut. Rationale: rehearsal mechanics proven, one blocker found +
+  fixed, maintenance-fix workflow validated. Not iterating as `rc2`
+  — fixes land in TB-US-005 scope.
+- **R10 WSL cleanup**: operator-run on their laptop, non-blocking
+- **Maintenance-fix workflow documentation** (`docs/training/
+  maintenance-fix-workflow.md` deferred from TB-US-071 R5) →
+  TB-US-073
+
+### What this story proved
+
+- Private repo setup + SSH key wiring works
+- Download + install on a completely separate OS (WSL) works
+- Bug surfaced during rehearsal → fixed in a single-story workflow →
+  verified downstream → merged in <30 min
+- Story-driven development scales to the release-cut flow
+
+### AC status
+
+- AC1 ✅ Phase A audit clean, `.gitignore` adjustments landed as C1
+- AC2 ✅ Phase B commits land cleanly; `git log` shows the arc
+- AC3 ✅ Fresh-install walkthrough reaches login page (host) + Chat
+  tab (WSL post-TB-US-071 fix)
+- AC4 ✅ `v0.1.0-rc1` tag on origin
+- AC5 ⏭️ deferred to TB-US-005 (Pages enablement)
+- AC6 ✅ Review doc exists at
+  `docs/release/v0.1.0-rc1-rehearsal-review.md` with Phases A/C/D
+  findings; Phase E/F sections rolled forward
+- AC7 ✅ Operator attests confidence in release-cut flow for v0.1
+- AC8 ✅ Issues found got their own stories: TB-US-071 (login fix,
+  closed) + TB-US-072 (UI testing, proposed) + TB-US-073
+  (maintenance docs, proposed)
