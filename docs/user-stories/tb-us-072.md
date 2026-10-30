@@ -1,10 +1,11 @@
 # TB-US-072: Comprehensive UI acceptance + lab-machine fresh-install sweep
 
-**Status**: In Progress
+**Status**: Completed
 **Created**: 2026-10-28
 **Started**: 2026-10-28
+**Completed**: 2026-10-28
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: multiple — `576c39e` (openclaw cleanup), `89478e5` (TB-US-071 fix), `f9366d5` (TB-US-074 fix), `8a664ff` (findings log), plus checklist template + closure landing
 
 ## Story
 
@@ -59,12 +60,12 @@ a checklist that this + future releases can reuse.
 
 ### 1. Lab-machine fresh install
 
-- [ ] R1: **Create a throwaway directory** on the lab machine (not
+- [x] R1: **Create a throwaway directory** on the lab machine (not
       the dev project dir). Suggested: `~/tb-acceptance-test/`.
-- [ ] R2: **Clone the repo into the throwaway dir.** From the
+- [x] R2: **Clone the repo into the throwaway dir.** From the
       private repo if TB-US-005 hasn't cut yet; from the public
       repo once it has.
-- [ ] R3: **Walk INSTALL.md literally end-to-end**, Steps 1–6:
+- [x] R3: **Walk INSTALL.md literally end-to-end**, Steps 1–6:
       - Step 1: system binaries (apt install for Ubuntu / equivalent)
       - Step 2: clone (already done in R2; confirm cwd)
       - Step 3: venv + torch (cu128 — since lab has GPU)
@@ -72,7 +73,7 @@ a checklist that this + future releases can reuse.
         — avoid live TB on 8002 + any residual from host dev)
       - Step 5: backend start + first-boot banner review
       - Step 6: smoke training pass (**the thing WSL couldn't do**)
-- [ ] R4: **Capture install-path findings** in a review doc at
+- [x] R4: **Capture install-path findings** in a review doc at
       `docs/release/v0.1.0-ui-acceptance-review.md`. Any
       INSTALL.md or code gap → finding; any 🔴 → fix-and-reclone
       cycle.
@@ -83,108 +84,108 @@ Checklist-driven. Each item either passes ✓, fails 🔴, or needs
 polish 🟡. All findings land in the review doc.
 
 #### Login + first-run flows
-- [ ] R5: Fresh install redirects root → login.html (not gate.html)
-- [ ] R6: Login with auto-gen admin password works
-- [ ] R7: Forced-password-change page appears + accepts a valid
+- [x] R5: Fresh install redirects root → login.html (not gate.html)
+- [x] R6: Login with auto-gen admin password works
+- [x] R7: Forced-password-change page appears + accepts a valid
       new password
-- [ ] R8: `logs/first-run-admin.txt` auto-deletes after change
-- [ ] R9: Welcome banner shows on first post-login landing (Chat
+- [x] R8: `logs/first-run-admin.txt` auto-deletes after change
+- [x] R9: Welcome banner shows on first post-login landing (Chat
       tab)
-- [ ] R10: Welcome banner dismissal persists across re-login
+- [x] R10: Welcome banner dismissal persists across re-login
 
 #### Top bar + drawer nav
-- [ ] R11: Top-bar agent chip renders + shows the correct agent
+- [x] R11: Top-bar agent chip renders + shows the correct agent
       (default or math-example)
-- [ ] R12: Hamburger drawer opens + closes (click outside, Esc,
+- [x] R12: Hamburger drawer opens + closes (click outside, Esc,
       close button)
-- [ ] R13: Agent selector widget at top of drawer lists both
+- [x] R13: Agent selector widget at top of drawer lists both
       `default` and `math-example`
-- [ ] R14: Switching agent via the selector persists across
+- [x] R14: Switching agent via the selector persists across
       navigation
-- [ ] R15: Drawer nav entries render: Chat / Upload / Documents /
+- [x] R15: Drawer nav entries render: Chat / Upload / Documents /
       Databases / Training Sets / Training Runs
-- [ ] R16: ADMIN group (super-only) renders: Users + API Keys
-- [ ] R17: Non-super user (if created) does NOT see ADMIN group
+- [x] R16: ADMIN group (super-only) renders: Users + API Keys
+- [x] R17: Non-super user (if created) does NOT see ADMIN group
 
 #### Each nav page
 Click into each; confirm renders without JS errors; capture any
 visual issues:
-- [ ] R18: **Chat tab** — welcome banner + input + math-example
+- [x] R18: **Chat tab** — welcome banner + input + math-example
       "View experiments →" button
-- [ ] R19: **Upload tab** — accepts file selection; shows upload
+- [x] R19: **Upload tab** — accepts file selection; shows upload
       state
-- [ ] R20: **Documents tab** — lists uploaded docs (if any);
+- [x] R20: **Documents tab** — lists uploaded docs (if any);
       empty state when none
-- [ ] R21: **Databases tab** — RAG manifest list + per-manifest
+- [x] R21: **Databases tab** — RAG manifest list + per-manifest
       detail
-- [ ] R22: **Training Sets tab** — lists seeded math-example-v1
+- [x] R22: **Training Sets tab** — lists seeded math-example-v1
       training set + metadata
-- [ ] R23: **Training Runs tab** — list view + "+ Start new run"
+- [x] R23: **Training Runs tab** — list view + "+ Start new run"
       button (super-only) + launch form
 
 #### Modals
-- [ ] R24: **Users modal** (Admin → Users) — list + actions
+- [x] R24: **Users modal** (Admin → Users) — list + actions
       dropdown + Edit modal + Audit tab
-- [ ] R25: **API Keys modal** (Admin → API Keys) — list +
+- [x] R25: **API Keys modal** (Admin → API Keys) — list +
       create + revoke + raw-key-once display
-- [ ] R26: **Agent management modal** (via drawer selector →
+- [x] R26: **Agent management modal** (via drawer selector →
       Manage) — create / rename / retire / reactivate
 
 #### Supervisory UI
-- [ ] R27: **Active-run strip** — hidden when no training run
+- [x] R27: **Active-run strip** — hidden when no training run
       active (test post-fresh-install state)
-- [ ] R28: Launching a training run (if GPU available) — strip
+- [x] R28: Launching a training run (if GPU available) — strip
       appears within 10s with live progress
-- [ ] R29: Run completion — strip shows "Completed" state for
+- [x] R29: Run completion — strip shows "Completed" state for
       ~60s then auto-hides
-- [ ] R30: Dismissing final-state strip via ✕ works
+- [x] R30: Dismissing final-state strip via ✕ works
 
 #### Experiment paths (Track A GPU only)
-- [ ] R31: **Math-example experiments** — three draft experiments
+- [x] R31: **Math-example experiments** — three draft experiments
       visible via API (`GET /experiments?agent_id=<math-example>`)
-- [ ] R32: Launch E1 (bare baseline) → runs to completion → results
+- [x] R32: Launch E1 (bare baseline) → runs to completion → results
       JSON contains metric + `_stack` summary
-- [ ] R33: Launch E2 (+ adapter) requires promoted adapter →
+- [x] R33: Launch E2 (+ adapter) requires promoted adapter →
       path exercises adapter version management
-- [ ] R34: Launch E3 (+ RAG) exercises full stack
+- [x] R34: Launch E3 (+ RAG) exercises full stack
 
 ### 3. Deliverables
 
-- [ ] R35: **Review doc** at
+- [x] R35: **Review doc** at
       `docs/release/v0.1.0-ui-acceptance-review.md` with:
       - Install-path findings (R4)
       - Click-through results (R5–R34) classified 🔴 / 🟡 / 🟢
       - Follow-up story candidates for each 🔴 and 🟡
-- [ ] R36: **Click-through checklist as reusable template** at
+- [x] R36: **Click-through checklist as reusable template** at
       `docs/release/ui-acceptance-checklist-template.md` — stripped
       of version-specific pins; usable for future releases
-- [ ] R37: **Each 🔴 finding** gets its own story draft (per
+- [x] R37: **Each 🔴 finding** gets its own story draft (per
       TB-US-068 AC8 pattern)
-- [ ] R38: **Each 🟡 finding** either lands as a reactive
+- [x] R38: **Each 🟡 finding** either lands as a reactive
       TB-US-045 tweak OR as a follow-up story if operator judges
       it structural
 
 ### 4. Cross-cutting
 
-- [ ] R39: Lab-machine throwaway install removed after sweep
+- [x] R39: Lab-machine throwaway install removed after sweep
       completes (`rm -rf ~/tb-acceptance-test/`)
-- [ ] R40: BACKLOG updated with any spawned stories
+- [x] R40: BACKLOG updated with any spawned stories
 
 ## Acceptance Criteria
 
-- [ ] AC1: Fresh install on lab machine reaches the Chat tab via
+- [x] AC1: Fresh install on lab machine reaches the Chat tab via
       literal INSTALL.md walk — all 6 steps executed with no
       operator-side improvisation beyond what the doc says
-- [ ] AC2: Each UI item R5–R34 has an outcome recorded (✓ / 🔴 /
+- [x] AC2: Each UI item R5–R34 has an outcome recorded (✓ / 🔴 /
       🟡) in the review doc — no "didn't check" entries
-- [ ] AC3: All 🔴 findings have corresponding story drafts in the
+- [x] AC3: All 🔴 findings have corresponding story drafts in the
       queue before TB-US-072 closes
-- [ ] AC4: INSTALL.md gaps surfaced (if any) land as fix commits
+- [x] AC4: INSTALL.md gaps surfaced (if any) land as fix commits
       against `main` before TB-US-072 closes
-- [ ] AC5: Reusable checklist template exists at the deliverable
+- [x] AC5: Reusable checklist template exists at the deliverable
       path (R36)
-- [ ] AC6: Lab-machine throwaway install removed (R39)
-- [ ] AC7: Operator attests confidence in UI shipping shape for
+- [x] AC6: Lab-machine throwaway install removed (R39)
+- [x] AC7: Operator attests confidence in UI shipping shape for
       v0.1 public cut (soft criterion)
 
 ## Design Notes
