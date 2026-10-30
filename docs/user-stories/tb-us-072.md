@@ -1,7 +1,8 @@
 # TB-US-072: Comprehensive UI acceptance + lab-machine fresh-install sweep
 
-**Status**: Proposed
+**Status**: In Progress
 **Created**: 2026-10-28
+**Started**: 2026-10-28
 **Author**: Jesse Eversole
 **Commit hash(es)**: <filled in on completion>
 
