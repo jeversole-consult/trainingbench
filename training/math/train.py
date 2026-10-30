@@ -349,7 +349,6 @@ def train(
         save_total_limit=3,
         fp16=True,
         optim="paged_adamw_8bit",
-        logging_dir=str(logs_dir / "gsm8k"),
         report_to="none",   # TB-US-066 fix: tensorboard not installed; our own TB-US-065 DB callback writes progress to training_runs* tables.
         gradient_checkpointing=True,
         max_grad_norm=0.3,
