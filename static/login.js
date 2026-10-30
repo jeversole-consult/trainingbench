@@ -1,38 +1,33 @@
 // API base URL - automatically detect and use current origin
 const API_BASE = window.location.origin;
 
-// Check gate token on page load
+// Check gate state on page load.
+// Server is the authority on whether SITE_PASSPHRASE is set; always
+// ask /auth/check-gate first and let its response decide. Server
+// returns 404 when the gate is disabled (TB-US-071).
 window.addEventListener('DOMContentLoaded', async function() {
     const gateToken = localStorage.getItem('gate_token');
-
-    // If no gate token, redirect to gate page immediately
-    if (!gateToken) {
-        window.location.href = '/static/gate.html';
-        return;
-    }
-
-    // Verify gate token with backend
     try {
         const response = await fetch(`${API_BASE}/auth/check-gate`, {
-            headers: { 'X-Gate-Token': gateToken }
+            headers: gateToken ? { 'X-Gate-Token': gateToken } : {}
         });
 
         if (response.status === 404) {
-            // Gate not enabled, proceed to login
+            // Gate not enabled server-side → proceed to login
             return;
         }
 
         if (!response.ok) {
-            // Gate is enabled but token is invalid - redirect to gate
+            // Gate is enabled but no / invalid token → redirect to gate
             localStorage.removeItem('gate_token');
             window.location.href = '/static/gate.html';
             return;
         }
 
-        // Gate token is valid, allow login
+        // Gate token is valid → allow login
     } catch (error) {
         console.error('Gate check failed:', error);
-        // On error, redirect to gate for safety
+        // On error, assume gate is required for safety
         localStorage.removeItem('gate_token');
         window.location.href = '/static/gate.html';
     }
