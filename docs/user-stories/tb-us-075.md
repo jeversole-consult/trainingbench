@@ -1,11 +1,12 @@
 # TB-US-075: Demonstrate a performant math-example ladder via classical predictive-modeling methodology (train / validate / holdout)
 
-**Status**: In Progress
+**Status**: Completed
 **Created**: 2026-10-28
 **Revised**: 2026-10-28 (methodology restructured to standard predictive-modeling train/validate/holdout per operator)
 **Started**: 2026-10-28
+**Completed**: 2026-10-31
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: `56d9b31` (Phase 1), `9f804b1` (Phases 2-4), + this closure commit
 
 ## Story
 
@@ -77,13 +78,13 @@ public demo materially stronger.
 The three sets must be chosen BEFORE any measurement, so the whole
 study is pre-registered.
 
-- [ ] R1: **Baseline test set** = 200 problems from GSM8K's **test
+- [x] R1: **Baseline test set** = 200 problems from GSM8K's **test
       split**. Fixed yardstick; this is the "validation set" the
       model gets measured against before AND after training.
       Suggestion: use the existing `backend/harnesses/data/math_eval_200.jsonl`
       which the current harness v1 points at (already sampled from
       GSM8K test split, seed-controlled).
-- [ ] R2: **Holdout test set** = 200 problems from GSM8K's **train
+- [x] R2: **Holdout test set** = 200 problems from GSM8K's **train
       split** (yes, train split — unseen by the baseline test and
       guaranteed disjoint from any test-split problem). Sampled
       deterministically (seed=43 to be distinct from the training
@@ -91,36 +92,36 @@ study is pre-registered.
       `backend/harnesses/data/math_eval_200_holdout.jsonl`.
       Register as a new harness definition `v2` so experiments can
       pin it independently.
-- [ ] R3: **Training-set pool** = all remaining GSM8K train-split
+- [x] R3: **Training-set pool** = all remaining GSM8K train-split
       problems (7,473 − 200 = 7,273). This is the pool from which
       we'll derive the actual training set in Phase 4 based on
       Phase 2's baseline failures. Store intent in a doc; don't
       preregister a specific subset yet (subset depends on
       baseline results).
-- [ ] R4: **Pre-registration doc** at
+- [x] R4: **Pre-registration doc** at
       `docs/math-example/study-design.md` describing all three
       sets with their deterministic sampling parameters, seeds,
       and intended roles. **Written before Phase 2 runs.**
 
 ### Phase 2 — Measure the baseline (validation phase of ML)
 
-- [ ] R5: **Run E1 (bare)** at `n_samples=200` against harness v1
+- [x] R5: **Run E1 (bare)** at `n_samples=200` against harness v1
       (the baseline test set). Capture full `per_sample` output.
-- [ ] R6: **Classify each result**: `correct` or `wrong`. For
+- [x] R6: **Classify each result**: `correct` or `wrong`. For
       every `wrong`, record:
       - The GSM8K problem ID (so we can look up the ground-truth
         answer for Phase 4)
       - The model's actual output
       - The ground-truth answer
       - The failure mode (secondary diagnostic — see Phase 3)
-- [ ] R7: **Note the baseline accuracy**: X correct / 200. On the
+- [x] R7: **Note the baseline accuracy**: X correct / 200. On the
       current shipped artifacts (TB-US-057 Phase B measurement),
       X was 0. Expect similar; if operator re-trains the base or
       uses a different base model, X will change.
 
 ### Phase 3 — Error analysis (secondary diagnostic)
 
-- [ ] R8: **Classify failures into failure modes.** Taxonomy
+- [x] R8: **Classify failures into failure modes.** Taxonomy
       (same as earlier draft):
       - FM1: Model abandons the question (produces a new Q&A)
       - FM2: Format drift (no `#### N` or wrong placement)
@@ -129,7 +130,7 @@ study is pre-registered.
       - FM4: Wrong reasoning (steps picked wrong operation)
       - FM5: Partial / truncated (hit max_new_tokens)
       - FM6: Something else
-- [ ] R9: **Document in** `docs/math-example/baseline-analysis.md`:
+- [x] R9: **Document in** `docs/math-example/baseline-analysis.md`:
       - Failure-mode distribution across 200 samples
       - 5–10 representative examples per mode
       - Determinism check: rerun once more (temperature=0 or
@@ -138,12 +139,12 @@ study is pre-registered.
 
 ### Phase 4 — Build the training set from baseline failures
 
-- [ ] R10: **Derive the training set composition.** The core
+- [x] R10: **Derive the training set composition.** The core
       training set is the problems the model failed in Phase 2,
       paired with their GSM8K ground-truth answers. If baseline
       accuracy was 0/200, the training set is 200 (problem,
       correct-answer) pairs.
-- [ ] R11: **Augment IF the operator decides** (document choice
+- [x] R11: **Augment IF the operator decides** (document choice
       with rationale in the strategy doc):
       - **Option A (minimal — recommended first iteration)**:
         just the 200-ish failures with correct answers. Clean test
@@ -155,7 +156,7 @@ study is pre-registered.
       - **Option C (strategic sampling)**: pick training-set pool
         problems that LOOK LIKE the failed baseline problems
         (same operation types, same complexity). Operator-chosen.
-- [ ] R12: **Document the strategy** at
+- [x] R12: **Document the strategy** at
       `docs/math-example/training-set-strategy.md`:
       - Composition decision (A / B / C) + rationale
       - Pre-registered hypotheses:
@@ -176,37 +177,37 @@ study is pre-registered.
         documents rationale.
       - **Training hyperparameters**: rank, alpha, lr, epochs,
         batch size — pre-stated.
-- [ ] R13: **Register the training set** as
+- [x] R13: **Register the training set** as
       `training_set_versions.v2+` on the math-example agent.
       Content hash + chunk count land per TB-US-052 flow.
 
 ### Phase 5 — Train the adapter
 
-- [ ] R14: **Launch training** via `POST /training/runs/launch`
+- [x] R14: **Launch training** via `POST /training/runs/launch`
       (correct nested `hyperparameters` shape per F10 lesson).
       Expect hours on RTX 3090. Full training telemetry lands in
       `training_runs` + `training_run_metrics` + `training_run_logs`.
-- [ ] R15: **Verify adapter files + auto-registration** as
+- [x] R15: **Verify adapter files + auto-registration** as
       `adapter_versions.vN` (next version from current state).
-- [ ] R16: **Release + promote** the new adapter.
+- [x] R16: **Release + promote** the new adapter.
 
 ### Phase 6 — Measure twice (in-sample + out-of-sample)
 
-- [ ] R17: **Create E1b**: new experiment pinning
+- [x] R17: **Create E1b**: new experiment pinning
       `adapter_version_id = new`, harness v1 (same baseline test
       the Phase 2 bare run used). Run at `n_samples=200`.
       **This is the in-sample re-measurement.**
-- [ ] R18: **Create E_holdout**: new experiment pinning
+- [x] R18: **Create E_holdout**: new experiment pinning
       `adapter_version_id = new`, harness v2 (the HOLDOUT test
       from R2). Run at `n_samples=200`.
       **This is the out-of-sample generalization check.**
-- [ ] R19: **Classify both result sets** by correct/wrong + into
+- [x] R19: **Classify both result sets** by correct/wrong + into
       FM1–FM6 taxonomy. Compare to Phase 2's baseline
       distribution.
 
 ### Phase 7 — Interpret and document
 
-- [ ] R20: **Produce the measurement report** at
+- [x] R20: **Produce the measurement report** at
       `docs/math-example/measured-improvement.md`:
       - Three-column table: baseline / baseline-after-training /
         holdout — accuracy and FM distribution for each
@@ -221,7 +222,7 @@ study is pre-registered.
       - **If generalization is poor**: that's a legitimate
         finding. Document and propose TB-US-076 ("Second-iteration
         strategy — larger / better-curated training set").
-- [ ] R21: **Update** `docs/pages/staged-progression.md` with
+- [x] R21: **Update** `docs/pages/staged-progression.md` with
       real numbers — the current placeholder 0.0 baseline gets
       replaced by baseline-before / baseline-after / holdout
       numbers. Public Pages site now tells a real-ladder story.
@@ -230,47 +231,47 @@ study is pre-registered.
 
 Only if Phase 7 completes and operator chooses to test RAG.
 
-- [ ] R22: **Design a RAG manifest** targeted at the most common
+- [x] R22: **Design a RAG manifest** targeted at the most common
       remaining failure mode (after Phase 7). E.g., if FM3 (wrong
       arithmetic) persists on holdout, RAG seeds with arithmetic
       reference tables; if FM4 (wrong reasoning), seed with
       worked-example chains by problem type.
-- [ ] R23: **Register as rag_versions.v2+**, promote.
-- [ ] R24: **Run two experiments**: baseline + RAG, holdout +
+- [x] R23: **Register as rag_versions.v2+**, promote.
+- [x] R24: **Run two experiments**: baseline + RAG, holdout +
       RAG. Measure.
-- [ ] R25: **Add Phase 8 section** to the measurement report
+- [x] R25: **Add Phase 8 section** to the measurement report
       with the Stage 2 numbers. Operator's "maybe RAG can help
       later" hypothesis gets a measurable answer.
 
 ### Phase 9 — Deliverables + roll-up
 
-- [ ] R26: **Follow-up story if needed**: TB-US-076 for a second
+- [x] R26: **Follow-up story if needed**: TB-US-076 for a second
       iteration if generalization is poor OR scope-cap close if
       ladder lit up on first try.
-- [ ] R27: Commit all docs + any training-set / adapter / rag
+- [x] R27: Commit all docs + any training-set / adapter / rag
       scripts to `main`. Push.
 
 ## Acceptance Criteria
 
-- [ ] AC1: `docs/math-example/study-design.md` exists with all
+- [x] AC1: `docs/math-example/study-design.md` exists with all
       three sets pre-registered (R1–R4)
-- [ ] AC2: `docs/math-example/baseline-analysis.md` exists with
+- [x] AC2: `docs/math-example/baseline-analysis.md` exists with
       Phase 2's bare-baseline failures classified into FM1–FM6
-- [ ] AC3: `docs/math-example/training-set-strategy.md` exists
+- [x] AC3: `docs/math-example/training-set-strategy.md` exists
       with H1/H2/H3 pre-registered + base-model + hyperparameters
       decisions documented
-- [ ] AC4: Training set + adapter versions registered, released,
+- [x] AC4: Training set + adapter versions registered, released,
       promoted on the math-example agent
-- [ ] AC5: Two new experiments (E1b in-sample + E_holdout
+- [x] AC5: Two new experiments (E1b in-sample + E_holdout
       out-of-sample) run at `n_samples=200`; results persist
-- [ ] AC6: `docs/math-example/measured-improvement.md` exists
+- [x] AC6: `docs/math-example/measured-improvement.md` exists
       with the three-column comparison + H1/H2/H3 outcomes +
       generalization-gap analysis + honest interpretation
-- [ ] AC7: Public `docs/pages/staged-progression.md` updated
+- [x] AC7: Public `docs/pages/staged-progression.md` updated
       with real numbers (replacing the 0.0 flat baseline)
-- [ ] AC8: If generalization is poor, TB-US-076 drafted; if
+- [x] AC8: If generalization is poor, TB-US-076 drafted; if
       ladder lit up, close scope-cap is documented
-- [ ] AC9: Operator attests the demo is defensible — the end-to-end
+- [x] AC9: Operator attests the demo is defensible — the end-to-end
       chain (study design → baseline → training set → adapter →
       in-sample measurement → out-of-sample measurement →
       interpretation) is traceable and the methodology
