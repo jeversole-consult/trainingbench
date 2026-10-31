@@ -1,8 +1,9 @@
 # TB-US-075: Demonstrate a performant math-example ladder via classical predictive-modeling methodology (train / validate / holdout)
 
-**Status**: Proposed
+**Status**: In Progress
 **Created**: 2026-10-28
 **Revised**: 2026-10-28 (methodology restructured to standard predictive-modeling train/validate/holdout per operator)
+**Started**: 2026-10-28
 **Author**: Jesse Eversole
 **Commit hash(es)**: <filled in on completion>
 
