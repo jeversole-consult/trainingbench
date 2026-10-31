@@ -1,7 +1,9 @@
 # TB-US-073: Maintenance + upgrade publishing workflow documentation
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-10-28
+**Started**: 2026-10-28
+**Completed**: 2026-10-28
 **Author**: Jesse Eversole
 **Commit hash(es)**: <filled in on completion>
 
@@ -50,10 +52,10 @@ differ in cadence and ceremony.
 
 ### 1. Maintenance-fix workflow doc
 
-- [ ] R1: **Deliverable**: `docs/training/maintenance-fix-workflow.md`
+- [x] R1: **Deliverable**: `docs/training/maintenance-fix-workflow.md`
       — the "when a bug is reported post-release, here is how to
       ship a fix" doc.
-- [ ] R2: **Structure**:
+- [x] R2: **Structure**:
       1. **When to use** — maintenance fix vs. feature work vs.
          upgrade
       2. **The 9-phase workflow** (observe → draft → fire → fix →
@@ -71,15 +73,15 @@ differ in cadence and ceremony.
          `git pull` + browser retest on throwaway install
       7. **When a fix needs to backport to a stable branch** —
          future consideration; v0.1 is single-branch
-- [ ] R3: **Worked example**: reference TB-US-071 as the canonical
+- [x] R3: **Worked example**: reference TB-US-071 as the canonical
       walked-through example. Include commit hash + story links.
 
 ### 2. Upgrade-publishing workflow doc
 
-- [ ] R4: **Deliverable**: `docs/training/upgrade-publishing-workflow.md`
+- [x] R4: **Deliverable**: `docs/training/upgrade-publishing-workflow.md`
       — the "when a feature arc completes, here is how to publish
       the upgrade" doc.
-- [ ] R5: **Structure**:
+- [x] R5: **Structure**:
       1. **When to use** — upgrade vs. maintenance fix vs. major
          release
       2. **Pre-release checklist**:
@@ -103,31 +105,31 @@ differ in cadence and ceremony.
       6. **Pages publishing** — if docs changed, how they refresh
       7. **Post-release**: update version strings in-repo if any,
          merge any late fixes
-- [ ] R6: **Worked example**: reference TB-US-068 as the canonical
+- [x] R6: **Worked example**: reference TB-US-068 as the canonical
       private-rehearsal example. Describe how TB-US-005 (public
       cut) extends it.
 
 ### 3. Cross-cutting
 
-- [ ] R7: Both docs cross-reference each other at the top so a
+- [x] R7: Both docs cross-reference each other at the top so a
       maintainer landing on one knows the other exists
-- [ ] R8: Both docs link to `CONTRIBUTING.md` for the broader
+- [x] R8: Both docs link to `CONTRIBUTING.md` for the broader
       story-driven development context
-- [ ] R9: Add index entries at `docs/README.md` pointing to both
+- [x] R9: Add index entries at `docs/README.md` pointing to both
       new docs
 
 ## Acceptance Criteria
 
-- [ ] AC1: `docs/training/maintenance-fix-workflow.md` exists with
+- [x] AC1: `docs/training/maintenance-fix-workflow.md` exists with
       the 9-phase workflow documented
-- [ ] AC2: `docs/training/upgrade-publishing-workflow.md` exists
+- [x] AC2: `docs/training/upgrade-publishing-workflow.md` exists
       with the release-cut flow documented
-- [ ] AC3: Each doc includes at least one worked example referencing
+- [x] AC3: Each doc includes at least one worked example referencing
       a real completed TB-US story (TB-US-071 and TB-US-068
       respectively)
-- [ ] AC4: Both docs link to CONTRIBUTING.md and to each other
-- [ ] AC5: `docs/README.md` has entries for both
-- [ ] AC6: A new contributor reading just these two docs could
+- [x] AC4: Both docs link to CONTRIBUTING.md and to each other
+- [x] AC5: `docs/README.md` has entries for both
+- [x] AC6: A new contributor reading just these two docs could
       execute a bug fix or a point release without needing to
       ask the maintainer "what's the process"
 

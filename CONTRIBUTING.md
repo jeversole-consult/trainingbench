@@ -31,6 +31,21 @@ replace them.
 See the memory files captured during development (in operator's
 `~/.claude/projects/.../memory/`) for the finer-grained conventions.
 
+### Operational workflow docs
+
+Two go-to docs capture the patterns for shipping work:
+
+- **[Maintenance Fix Workflow](docs/training/maintenance-fix-workflow.md)**
+  — how to ship a bug fix (9 phases: observe → draft → fire →
+  fix → commit → push → downstream verify → close → review-doc
+  update). Worked examples: TB-US-071, TB-US-074.
+- **[Upgrade Publishing Workflow](docs/training/upgrade-publishing-workflow.md)**
+  — how to cut a feature release (private rehearsal pattern,
+  tagging conventions, public cut sequence). Worked example:
+  TB-US-068.
+
+Read these before shipping a fix or cutting a release.
+
 ## For external contributors
 
 **TrainingBench is not accepting external PRs at v0.1.** The platform

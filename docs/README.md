@@ -1,8 +1,8 @@
 # TrainingBench Documentation
 
 Welcome. This is TB's internal documentation surface — design
-docs, user stories, operator notes, and sync audits — all in
-one navigable place.
+docs, user stories, operational workflows, release reviews, and
+the math-example demo companion — all in one navigable place.
 
 ## What's here
 
@@ -28,17 +28,51 @@ status (Proposed / In Progress / Completed / Deferred /
 Withdrawn) is updated in place rather than deleted. See
 `BACKLOG.md` (project root) for the authoritative index.
 
-### Sync audits — `docs/sync/`
+### Operational workflows — `docs/training/`
 
-Comparisons between TB master and downstream deployments
-(stalite3). These docs capture feature parity work and
-verification spikes.
+How to actually do things with TB — build an agent, fix a bug,
+cut a release.
 
-- **[Feature Parity Audit](sync/stalite3-tb-parity-audit.md)**
-  — the 2026-10-14 audit that drove the sync-forward arc
-- **[query_logger Parity Verification](sync/query-logger-parity-verification.md)**
-  — the TB-US-036 spike that confirmed byte-level
-  equivalence
+- **[Sweet Spot Workflow](training/sweet-spot-workflow.md)** —
+  generic how-to for applying the TB staged-progression
+  pattern to your own agent (TB-US-057 Phase C deliverable).
+- **[Maintenance Fix Workflow](training/maintenance-fix-workflow.md)**
+  — the 9-phase bug-fix pattern (observe → draft → fire → fix
+  → commit → push → downstream verify → close → review-doc
+  update). Worked examples: TB-US-071, TB-US-074
+  (TB-US-073 deliverable).
+- **[Upgrade Publishing Workflow](training/upgrade-publishing-workflow.md)**
+  — release-cut flow (pre-release checklist, private
+  rehearsal, tagging convention, public cut). Worked example:
+  TB-US-068 (TB-US-073 deliverable).
+
+### Release reviews — `docs/release/`
+
+Audit docs from release-cut rehearsals + a reusable UI
+acceptance checklist template.
+
+- **[v0.1.0-rc1 Rehearsal Review](release/v0.1.0-rc1-rehearsal-review.md)**
+  — findings from the private release-cut rehearsal
+  (TB-US-068) + the lab-machine UI acceptance sweep
+  (TB-US-072)
+- **[UI Acceptance Checklist Template](release/ui-acceptance-checklist-template.md)**
+  — reusable 10-phase template for future releases
+  (TB-US-072 deliverable)
+
+### Math-example demo — `docs/math-example/`
+
+Operator-facing companion docs for the shipped math-example
+agent (TB-US-057's pedagogical demo).
+
+- **[Sweet Spot Exploration](math-example/sweet-spot-exploration.md)**
+  — first-pass measurements + honest-baseline analysis +
+  path to performant numbers (TB-US-057 Phase C deliverable)
+
+### Public Pages scaffold — `docs/pages/`
+
+Jekyll Pages site content for TB's public-facing docs
+(TB-US-060 deliverable). Built via
+`.github/workflows/pages-build.yml`.
 
 ### Sprints — `docs/sprints/`
 
@@ -48,16 +82,10 @@ on sprint cadence; sprint files remain for reference.
 
 ### Operator docs — `docs/user/`
 
-End-user-facing documentation for operating TB.
-
-### OpenClaw skills — `openclaw/skills/trainingbench/`
-
-Claude Code skill definitions for operating TB from the CLI.
-
-### OT context — `docs/ot-context-for-claude-code_1.md`
-
-The Orthogonal Training architectural brief that governs
-the OT classifier arc (TB-US-022 through TB-US-030).
+Pre-TB-reshape end-user documentation. Flagged for review
+during TB-US-068 Phase A audit as potentially stale against
+the current agent-centric UI; operator decision pending on
+delete / review-update / move-to-legacy.
 
 ## How to navigate
 
@@ -70,19 +98,8 @@ the OT classifier arc (TB-US-022 through TB-US-030).
   operators see.
 - **Current page title** shows above (breadcrumb).
 
-## Current state (as of 2026-10-16)
-
-- **Latest shipped:** TB UI redesign (left-nav + white
-  theme); user management v2; sync-forward feature parity
-  with stalite3; dependency prune
-- **In design:** Agent architecture + Sweet Spot
-  methodology (both collaborative-draft)
-- **In flight (OT arc):** Four-category prompt classifier,
-  audit log, 4 handlers, verification example
-- **Deferred:** First-example Sweet Spot build (pending
-  the agent-architecture spike)
-
-See `BACKLOG.md` at the project root for the full list.
+See `BACKLOG.md` at the project root for the authoritative
+list of what's shipped, in flight, proposed, and deferred.
 
 ## Updating this landing page
 
