@@ -31,18 +31,27 @@ math-example result turned out to be **the simplest: just use the
 Instruct variant of the base model with no TB-specific training
 at all**.
 
-| Setup | Holdout GSM8K accuracy (strict `#### N`-aware harness) |
+| Setup | GSM8K accuracy (strict `#### N`-aware harness) |
 |---|---|
-| **Llama 3.1 8B Instruct, no adapter** | **86 / 200 (43%)** |
-| Llama 3.1 8B base + our best QLoRA adapter | 52 / 200 (26%) |
+| **Llama 3.1 8B Instruct, no adapter** | **86 / 200 (43%)** on baseline-test subset |
+| Llama 3.1 8B base + our best QLoRA adapter (v3) | 52 / 200 (26%) on holdout subset |
 
 **43% out-of-the-box** on an 8B model is a credible headline for a
 public-cut demo. We got there by discovering that our previous
 adapter-training approach actively regressed Instruct's performance
-(trained adapter v5 dropped Instruct from 43% to 23% on the same
-200 questions). The methodology surfaced this because we required
-a bare-base control measurement — see Trial #4 in the
+(trained adapter v5 scored 23% on 200 holdout problems — a
+20-point drop from bare Instruct's 43% baseline-test accuracy on
+a different 200-problem subset of the same test set). The
+methodology surfaced this because we required a bare-base control
+measurement — see Trial #4 in the
 [search log](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/sweet-spot-search-log.md).
+
+> **Dataset note**: "baseline-test" and "holdout" are two
+> disjoint 200-sample subsets of GSM8K (one from the test
+> split, one from the train split). Bare Instruct has seen
+> neither. The current demo's 43% is on baseline-test; Trial #5
+> ([TB-US-079](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-079.md))
+> measures bare-Instruct accuracy on holdout to fill the gap.
 
 ### How to reproduce
 
@@ -52,6 +61,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 model = AutoModelForCausalLM.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct")
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct")
 # ... load TB system prompt v3 and the 200-sample GSM8K harness
+# (baseline-test subset: backend/harnesses/data/math_eval_200.jsonl)
 # Measured: 86/200 = 43%
 ```
 

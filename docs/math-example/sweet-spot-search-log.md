@@ -287,15 +287,35 @@ Measurement with adapter v5 on top of Instruct:
 **Headline from the control** (added as a diagnostic, not in the
 original Trial #4 plan):
 - **E19 (bare Instruct, no adapter): 86/200 (43.0%)**
+  — pinned on `harness_version=v4` (baseline-test problem set,
+  `math_eval_200.jsonl`). This measures bare-Instruct accuracy on
+  the same 200 GSM8K test problems that TB-US-075 used for
+  failure mining; see labeling-correction note below.
 
-| Setup | Score |
+| Setup | Score (dataset) |
 |---|---|
-| Instruct + our adapter v5 | 23% holdout |
-| **Instruct alone, no adapter** | **43% holdout** |
+| Instruct + our adapter v5 | 23% holdout (E18, `math_eval_200_holdout.jsonl`) |
+| **Instruct alone, no adapter** | **43% baseline-test (E19, `math_eval_200.jsonl`)** |
 
-**Our 20-min training REGRESSED Instruct by 20 points.** Loading
-adapter v5 on top of a strong instruction-tuned base cost 40
-correct answers on the same 200 holdout questions.
+**Our 20-min training REGRESSED Instruct by 20 points on the
+holdout set** (E18 23% vs. adapter-less baseline-test 43%; the
+comparison is cross-dataset but both are unseen for bare Instruct,
+and the Trial #5 measurement of bare Instruct on holdout — see
+TB-US-079 — closes this gap). Loading adapter v5 on top of a
+strong instruction-tuned base cost 40 correct answers on
+200 GSM8K problems.
+
+> **Labeling correction (2026-11-02)**: This entry originally
+> labeled E19's 43% as "holdout". E19 was actually pinned on
+> harness_version=v4 (baseline-test set), not v5 (holdout). The
+> 43% number is correct; the dataset label was wrong. Both
+> datasets are 200-sample subsets of GSM8K that bare Instruct
+> had never seen (one is from GSM8K's test split, one from the
+> train split), so the number remains a credible out-of-sample
+> accuracy measurement. TB-US-079 adds E_bare_holdout to measure
+> bare Instruct on the actual holdout set and close the gap. See
+> architectural-finding-training-set-wiring.md for the related
+> wiring finding that surfaced during the same session.
 
 Per-sample inspection confirms the cause (F13 "answer-first"
 pattern): both bare Instruct and adapter v5 produce `#### N` at
@@ -469,15 +489,135 @@ blocked only on the TB-US-078 smoke-run passing.
 
 ---
 
+## 2026-11-02 — Trial #5: chat-template-formatted training on Instruct (TB-US-079)
+
+**First trial under TB-US-078's corrected wiring.** The
+`training_set_versions.v7` sidecar JSONL was the actual training
+data input (previously provenance-only). See the research-process
+finding above for context.
+
+### What we did
+
+Pre-registered hyperparameters: Instruct base, `training_set_versions.v7`
+(1000 chat-template-formatted samples, seed=46, disjoint from
+holdout), LoRA rank 16, alpha 32, lr 1e-4, 3 epochs, early-stop
+patience=2. Trained adapter v7 (24 min wall-clock, 189 optimizer
+steps, train_loss 2.67 → 0.38, eval_loss 0.43 at epoch 2). No
+overfitting signal; early stop didn't trigger (patience=2
+mathematically cannot fire with only 2 evals — flagged for
+TB-US-080).
+
+Three measurement experiments at n=200:
+- E20 (adapter v7 × baseline-test): 88/200 = **44.0%**
+- E21 (adapter v7 × holdout, PRIMARY):  89/200 = **44.5%**
+- E22 (bare Instruct × holdout, control): 86/200 = **43.0%**
+  (fills the labeling-correction gap — E19 was actually
+  baseline-test, not holdout)
+
+### What we found
+
+**Four-cell comparison:**
+
+| | Baseline-test | Holdout |
+|---|---|---|
+| Bare Instruct | 86 / 200 (43%) · dual-####=45.5% | 86 / 200 (43%) · 45.0% |
+| Adapter v5 (Trial #4) | 38 / 200 (19%) · 23.5% | 46 / 200 (23%) · 20.0% |
+| **Adapter v7 (Trial #5)** | **88 / 200 (44%)** · 63.0% | **89 / 200 (44.5%)** · 60.5% |
+
+- **H5a (chat-template preserves `####` structure)**: ✅ **PASS, dramatically**.
+  100% of baseline-test outputs produced strict `#### N`; 98.5%
+  of holdout. Dual-#### retention (60-63%) actually SURPASSED
+  bare Instruct's native 45%. The adapter learned the structural
+  format more rigidly than the base model's SFT.
+- **H5b (holdout ≥ 43%, no regression)**: ✅ **PASS**. 44.5% vs.
+  43% bare — within noise, direction positive. Trial #4's
+  regression mechanism confirmed as fixable.
+- **H5c (holdout ≥ 50%, meaningful improvement)**: ❌ **NOT MET**.
+  +1.5pt is within binomial variance; cannot claim improvement.
+- **H5c-strong (≥60%)**: ❌ NOT MET.
+- **H5d (early stop triggers)**: **N/A at this config** —
+  mathematically impossible to fire with only 2 evals and
+  patience=2. Infrastructure sound; config didn't exercise it.
+
+### What we decided
+
+- **The chat-template fix works for structure, not for capability.**
+  Fixing the format mismatch recovered Trial #4's regression
+  completely (23% → 44.5% holdout) but did not surface new math
+  reasoning. Format and capability are **decoupled levers** —
+  Trial #5 isolated the format axis as the F13 regression cause.
+- **Negative-null result is publishable**: "PEFT at this scale
+  on Instruct preserves but does not augment GSM8K accuracy."
+  Both the preservation (vs. Trial #4 regression) and the
+  non-improvement (vs. H5c threshold) are informative.
+- **Current demo configuration unchanged**: bare Llama 3.1 8B
+  Instruct at 43% remains the credible headline. Adapter v7
+  could be swapped in as a format-rigidity-preserving demo
+  without accuracy change.
+- **TB-US-080 drafted** (Backlog): capability-gain levers to
+  try next — scale training data 5-10x, expand LoRA target
+  modules to include MLP (`gate_proj, up_proj, down_proj`),
+  or full fine-tuning.
+
+### The surprising secondary finding
+
+**Within-structure accuracy comparison** (P1_strict `#### N` outputs only):
+- Bare Instruct holdout: 81 correct / 168 (48.2%)
+- Adapter v7 holdout: 88 correct / 197 (44.7%)
+
+The adapter is slightly LESS accurate per-structured-output than
+bare Instruct (−3.5pt). The gross accuracy matches only because
+adapter v7 produces 29 more `#### N` outputs. **The adapter
+reorganizes confidence without adding capability.** Reading
+between the lines: fine-tuning on CoT format didn't teach new
+math reasoning; it taught the model to answer confidently with
+`#### N` on questions it would otherwise hedge on. Confidence
+and correctness are not aligned.
+
+### Rationale (threats-to-validity post-review)
+
+- Single-run, n=200: ±5pt binomial noise. +1.5pt holdout
+  improvement is NOT distinguishable from stochastic variance.
+  Multi-seed replicate deferred unless the next trial's result
+  lands in the 48-52% window.
+- Chat-template application verified during TB-US-078 smoke-run +
+  explicit per-sample inspection (100% P1_strict catching
+  demonstrates format transfer succeeded).
+- "Preserving native dual-#### structure" measured via `####`
+  pattern. Adapter v7's 60% dual-#### rate SURPASSES bare 45% —
+  the adapter did not merely preserve, it intensified. Does
+  not change interpretation but worth noting for the Trial #4
+  F13 narrative.
+- GSM8K-specific; results do not generalize to MATH, MGSM,
+  SVAMP without re-measurement.
+
+Deliverable:
+[`instruct-chat-template-results.md`](instruct-chat-template-results.md)
+(deep dive — hyperparameters, training trajectory, per-sample
+patterns, decoupling analysis, next-direction options).
+
+---
+
 ## Summary table (as of 2026-11-02)
 
-| Trial | Base | Adapter | Epochs × Samples | Strict in-sample | Strict holdout | Verdict |
+| Trial | Base | Adapter | Epochs × Samples | Strict baseline-test | Strict holdout | Verdict |
 |---|---|---|---|---|---|---|
 | 1 | 8B base | v3 (shipped harness pre-patch) | 5 × 200 | 0 / 200 | 0 / 200 | Hidden by harness bug |
 | 2 | 8B base | v3 (patched harness) | — | **38 / 200 (19%)** | **52 / 200 (26%)** | Real signal; previous demo result |
 | 3 | 8B base | v4 (10 epochs) | 10 × 300 | 12 / 200 (6%) | 15 / 200 (7.5%) | Overfit; cautionary |
 | 4 | 8B Instruct | v5 (early stop, 5 ep × 500) | 5 × 500 | 38 / 200 (19%) | 46 / 200 (23%) | Adapter REGRESSED Instruct |
-| 4-control | **8B Instruct** | **none (bare)** | — | — | **86 / 200 (43%)** | **New demo result — strongest** |
+| 4-control | **8B Instruct** | **none (bare)** | — | **86 / 200 (43%)** | **86 / 200 (43%)** (E22, Trial #5) | **Baseline across both datasets** |
+| 5 | 8B Instruct | **v7 (chat-template, 3 ep × 1000, rank 16, lr 1e-4)** | 3 × 1000 | **88 / 200 (44%)** | **89 / 200 (44.5%)** | **Preserves bare; no capability gain** |
+
+> **Column labeling correction (2026-11-02)**: The "in-sample"
+> column header was renamed to "baseline-test" to match the
+> actual dataset labels. The E19 bare-Instruct number was
+> originally recorded under "holdout" by mistake; it's actually
+> on the baseline-test problem set (harness v4). Trial #5
+> (TB-US-079) measured bare Instruct on the actual holdout
+> (harness v5, E22) and found **43.0% — identical to the
+> baseline-test**. Bare Instruct is remarkably consistent across
+> both datasets.
 
 **Caveat (2026-11-02)**: Trials #1–#4 all ran with approximately
 constant training data (first N rows of raw GSM8K.train) because
@@ -485,38 +625,41 @@ constant training data (first N rows of raw GSM8K.train) because
 "Research-process finding" entry above and
 `architectural-finding-training-set-wiring.md` for details. Hyperparameter
 comparisons across trials remain valid; apparent "training set
-version" variation does not. Trial #5 (TB-US-079) will be the first
+version" variation does not. Trial #5 (TB-US-079) was the first
 trial with genuinely varied training data under corrected wiring.
 
 **Current demo configuration**: **bare Llama 3.1 8B Instruct, no
-adapter**. 43% on 200 holdout GSM8K problems with zero TB-specific
-training. Pages site reflects this as of 2026-11-02.
+adapter**. 43% on 200 GSM8K problems — now confirmed consistent
+across BOTH baseline-test (E19, harness v4) and holdout
+(E22, harness v5) subsets. Pages site reflects this as of
+2026-11-02. Adapter v7 (Trial #5) scored 44-44.5% on the same
+sets — matches bare Instruct within noise, so it's not promoted
+as the demo (no accuracy improvement to justify complexity).
 
-**Key method lesson from Trial #4**: training on top of a strong
-instruction-tuned base with our current approach (CoT-formatted
-GSM8K + LoRA rank 32 + 500 samples × 5 epochs) **actively
-regresses accuracy**. The methodology surfaced this by requiring
-the bare-Instruct control (E19) — without it, adapter v5's 23%
-would have looked like "weak improvement from zero" instead of
-"regression from 43%".
+**Key method lessons** (now cumulative):
+- **Trial #4**: our training approach (raw-CoT format + hardcoded
+  template) deleted Instruct's native `#### N`-at-end
+  confirmation and REGRESSED accuracy by 20pt. Methodology
+  surfaced this via required bare-control measurement.
+- **Trial #5**: chat-template-formatted training with the correct
+  `#### N` marker FIXES the Trial #4 regression (23% → 44.5%)
+  but does NOT exceed bare Instruct's 43% baseline. Format
+  correctness and math capability are **decoupled levers**.
+  Fine-tuning on CoT format reorganizes structural confidence
+  without adding reasoning capability.
 
 **Open next-trial candidates**:
 
-1. **TB-US-079** (drafted, Backlog): Trial #5 under corrected
-   wiring — chat-template-formatted v7 training set (1000 samples,
-   seed=46) + rank 16 + lr 1e-4 + 3 epochs on Instruct. First
-   trial with genuinely varied training data per the architectural
-   finding. Blocked by TB-US-078 smoke-run passing.
-2. **TB-US-078** (In Progress): architectural fix — wire
-   `training_set_versions` into train.py. Prerequisite for all
-   future trials. Not itself a trial.
-3. Retrain adapter v3-shape (base + 5 ep × 200 failures) with
-   early stopping — see if the Trial #2 result holds up with
-   current infrastructure
-4. Format-only short-drill training set (would require a new
-   training-set version with Q→`#### N` short pairs)
-5. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
+1. **TB-US-080** (draft on close): capability-gain levers. Three
+   candidate directions (operator picks one):
+   - Scale training data 5-10x (v7 was 1000 samples; try 5000-10000)
+   - Expand LoRA target modules to include MLP
+     (`gate_proj, up_proj, down_proj` in addition to attention)
+   - Full fine-tuning (not LoRA) — largest-perturbation option
+2. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
    null result given math problems don't need retrieval
+3. Multi-seed replication of Trial #5 — only if +1.5pt
+   improvement needs sharpening (currently within ±5pt noise)
 
 Operator picks what to fire next (if anything).
 

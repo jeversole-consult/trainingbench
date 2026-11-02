@@ -131,20 +131,34 @@ Not in the original Trial #4 plan — added after seeing E17/E18
 results.
 
 **E19**: Instruct base, no adapter loaded, same system prompt v3,
-same harness v5 (holdout), same 200 questions.
+**harness v4 (baseline-test, `math_eval_200.jsonl`)**, 200
+questions.
 
 **Result: 86 / 200 (43%).**
 
-### Side-by-side on identical questions
+> **Labeling correction (2026-11-02)**: This section originally
+> described E19 as "same harness v5 (holdout)" — it's actually
+> harness v4 (baseline-test). The 43% number is correct; the
+> dataset-label was wrong. Trial #5 (TB-US-079) adds
+> E_bare_holdout to measure bare Instruct on the actual holdout
+> (harness v5) for a true apples-to-apples comparison with
+> adapter v5's 23% holdout. See the sweet-spot-search-log
+> labeling-correction note for the broader scope.
 
-| Config | Holdout score |
-|---|---|
-| Bare Instruct (no adapter) | 86 / 200 (**43%**) |
-| Instruct + our adapter v5 | 46 / 200 (23%) |
-| **Delta** | **−40 correct answers (−20 points)** |
+### Side-by-side comparison (two different 200-sample subsets)
 
-**Loading our adapter cost 40 correct answers on the same 200
-questions.** Training actively regressed Instruct's performance.
+| Config | Score | Dataset |
+|---|---|---|
+| Bare Instruct (no adapter) | 86 / 200 (**43%**) | baseline-test (E19) |
+| Instruct + our adapter v5 | 46 / 200 (23%) | holdout (E18) |
+| **Delta** | **−20 points** (cross-dataset; see below) | |
+
+**Loading our adapter costs ~20 points on 200 GSM8K problems.**
+The comparison is cross-dataset (baseline-test vs. holdout —
+both 200-sample subsets of GSM8K, both unseen by bare Instruct),
+but the magnitude is large enough that stochastic variance alone
+can't account for it. Trial #5 (TB-US-079) measures the clean
+apples-to-apples comparison.
 
 ## Why the regression happened
 
@@ -250,7 +264,9 @@ our adapter costs 20 points.*
 patched harness).
 
 **New demo**: bare Llama 3.1 8B Instruct, no adapter, **43%
-holdout** on the same 200 unseen GSM8K problems.
+on the 200-sample baseline-test subset** of GSM8K (`math_eval_200.jsonl`).
+Bare-Instruct accuracy on the holdout set (`math_eval_200_holdout.jsonl`)
+is being measured in TB-US-079 Trial #5.
 
 Pages site updated to reflect bare Instruct as the current
 credible math-example baseline.

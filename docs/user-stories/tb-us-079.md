@@ -1,10 +1,12 @@
 # TB-US-079: Trial #5 — chat-template-formatted training on Instruct (first truly correct-wiring trial)
 
-**Status**: Backlog
+**Status**: Completed
 **Created**: 2026-11-02
+**Started**: 2026-11-02
+**Completed**: 2026-11-02
 **Author**: Jesse Eversole
-**Blocked by**: TB-US-078 (training_set_version JSONL wiring)
-**Commit hash(es)**: <filled in on completion>
+**Blocked by**: TB-US-078 (training_set_version JSONL wiring) — ✅ CLOSED 2026-11-02
+**Commit hash(es)**: <filled in on closure commit>
 
 ## Story
 
@@ -212,12 +214,111 @@ training; larger data = more signal.
 
 ## Related
 
-- [TB-US-078](tb-us-078.md) — architectural fix; blocks this story
+- [TB-US-078](tb-us-078.md) — architectural fix; unblocked this
+  story
 - [TB-US-077](tb-us-077.md) — Trial #4; produced the regression
-  finding that motivates Trial #5
+  finding that motivated Trial #5
+- [TB-US-080](tb-us-080.md) — Trial #6 (capability-gain levers);
+  drafted on close of this story
 - `docs/math-example/architectural-finding-training-set-wiring.md`
   — context for why Trial #5 is the first correct-wiring trial
 - `docs/math-example/instruct-scale-up-results.md` — Trial #4
   deep dive
+- `docs/math-example/instruct-chat-template-results.md` — Trial
+  #5 deep dive (**primary deliverable**)
 - `docs/math-example/methodology.md`, `study-design.md`,
   `sweet-spot-search-log.md`
+
+## Completion Notes (2026-11-02)
+
+### Training (Phase 2)
+
+- Run #13 completed in 24 min wall-clock, 189 optimizer steps
+  across 3 epochs. Train loss trajectory: 2.67 → 0.44 (epoch 1
+  end) → 0.38 (final). Eval loss at epoch 2: 0.427; at epoch 3
+  (end): not persisted but trajectory stable (no overfit).
+- Adapter v7 (`adapters/math-example/v7`,
+  `adapter_versions.v7`,
+  content_sha256 `0dcdbdeac53f…`) auto-registered with
+  `training_set_version_id=7` provenance linkage; released +
+  promoted via API.
+
+### Measurement (Phase 3) — three experiments at n=200
+
+| Experiment | Setup | Score |
+|---|---|---|
+| E20 | adapter v7 × baseline-test (harness v4) | 88 / 200 (**44.0%**) |
+| E21 | adapter v7 × holdout (harness v5) — primary | 89 / 200 (**44.5%**) |
+| E22 | bare Instruct × holdout — fills labeling-correction gap | 86 / 200 (**43.0%**) |
+
+### Analysis (Phase 4)
+
+**Four-cell comparison** (score; dual-#### retention):
+
+| | baseline-test | holdout |
+|---|---|---|
+| Bare Instruct | 86/200 (43%); 45.5% | 86/200 (43%); 45.0% |
+| Adapter v5 (Trial #4) | 38/200 (19%); 23.5% | 46/200 (23%); 20.0% |
+| **Adapter v7 (Trial #5)** | **88/200 (44%); 63.0%** | **89/200 (44.5%); 60.5%** |
+
+**Hypotheses**:
+- **H5a** (chat-template preserves `####`): ✅ **PASS, dramatically** —
+  100% baseline-test P1_strict; 98.5% holdout P1_strict; dual-####
+  retention 60-63% SURPASSED bare Instruct's 45%.
+- **H5b** (holdout ≥ 43%, no regression): ✅ **PASS** — 44.5% vs.
+  43% (within noise, direction positive).
+- **H5c** (holdout ≥ 50% improvement): ❌ **NOT MET** — only +1.5pt
+  (within binomial variance).
+- **H5c-strong** (≥ 60%): ❌ NOT MET.
+- **H5d** (early stop triggers): **N/A at this config** — only
+  2 eval computations occurred (end of epoch 2 and 3); patience=2
+  mathematically cannot fire. Flagged for TB-US-080 if ≥4
+  epochs are used.
+
+### Decoupling finding (surprising secondary)
+
+Within-structure accuracy (per P1_strict output):
+- Bare Instruct holdout: 81/168 (48.2%)
+- Adapter v7 holdout: 88/197 (44.7%)
+
+The adapter is slightly LESS accurate per-structured-output than
+bare Instruct (−3.5pt). The gross accuracy matches only because
+adapter v7 produces 29 more `#### N` outputs. **Fine-tuning on
+CoT format reorganized confidence without adding math reasoning.**
+Format and capability are decoupled levers.
+
+### Deliverables
+
+- `docs/math-example/instruct-chat-template-results.md` — deep
+  dive (hyperparameters, trajectory, per-sample patterns,
+  decoupling analysis, next-direction candidates)
+- `scripts/tb_us_079_run_experiments.py` — reusable experiment
+  runner
+- `scripts/tb_us_079_analysis.py` — per-sample pattern analysis
+  (harness-priority breakdown + dual-#### retention)
+- `training_set_versions.v7` + sidecar JSONL (1000
+  chat-template-formatted samples, seed=46)
+- `adapter_versions.v7` (released + promoted)
+- Experiments E20, E21, E22 (all `completed` state)
+- Labeling-correction across prior docs (methodology.md,
+  sweet-spot-search-log.md, sweet-spot-exploration.md,
+  instruct-scale-up-results.md, Pages site, BACKLOG.md)
+- `docs/math-example/sweet-spot-search-log.md` Trial #5 entry
+- TB-US-080 drafted (Trial #6 candidates: scale data, expand
+  LoRA target modules, full fine-tuning, multi-seed replicate)
+
+### Acceptance Criteria status
+
+- ✅ AC1: adapter v7 trained + auto-registered + correct
+  training_set_version_id=7 linkage
+- ✅ AC2: Both measurement experiments complete at n=200 (plus
+  the E_bare_holdout labeling-correction experiment)
+- ✅ AC3: H5a / H5b / H5c / H5c-strong / H5d all recorded
+- ✅ AC4: Trial #5 search log entry with 4 required fields
+- ✅ AC5: instruct-chat-template-results.md deep dive exists
+- ✅ AC6: Per-sample #### analysis documented
+- ✅ AC7: Pages site unchanged (adapter v7 ≈ bare Instruct;
+  no demo swap needed)
+- ✅ AC8: TB-US-080 drafted (H5b passed but H5c did not; followed
+  the pre-registered interpretation guide's "try capability-gain
+  levers" branch)

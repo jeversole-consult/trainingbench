@@ -323,16 +323,18 @@ Pre-registered expectation: holdout 55–75%.
 
 ### Headline Phase E results
 
-| Setup | Holdout score |
+| Setup | Score (dataset) |
 |---|---|
-| Instruct + our adapter v5 (5 ep × 500, early stop) | 46 / 200 (23%) |
-| **Instruct alone, no adapter (E19 control)** | **86 / 200 (43%)** |
+| Instruct + our adapter v5 (5 ep × 500, early stop) | 46 / 200 (23%) holdout (E18) |
+| **Instruct alone, no adapter (E19 control)** | **86 / 200 (43%)** baseline-test (E19) |
 
 **Trial #4 was a failed hypothesis + a valuable methodological
 finding**: our training approach, which HELPED the base variant
 (0% → 26% in Trial #2), **REGRESSED** the Instruct variant
-(43% → 23%). Loading adapter v5 cost 40 correct answers on the
-same 200 holdout questions.
+(cross-dataset 43% baseline-test vs. 23% holdout, ~20 points).
+Loading adapter v5 cost ~40 correct answers on 200 GSM8K
+problems. The clean apples-to-apples comparison (bare Instruct
+on holdout) is being measured in TB-US-079.
 
 ### Root cause (F13 — "answer-first" pattern mismatch)
 
@@ -351,10 +353,12 @@ competence.**
 
 ### Current demo configuration (updated)
 
-**Bare Llama 3.1 8B Instruct, no adapter** — 43% on 200 holdout
-GSM8K problems, zero TB-specific training. Pages site reflects
-this. Adapter v3, v4, v5 all remain in the DB as part of the
-search history; none is the current demo.
+**Bare Llama 3.1 8B Instruct, no adapter** — 43% on the
+200-sample baseline-test subset of GSM8K, zero TB-specific
+training. (Bare-Instruct holdout accuracy TBD in Trial #5
+TB-US-079.) Pages site reflects the 43% baseline-test number.
+Adapter v3, v4, v5 all remain in the DB as part of the search
+history; none is the current demo.
 
 ### Deep dive
 
