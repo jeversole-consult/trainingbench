@@ -265,3 +265,66 @@ defined.
 - [Baseline analysis (Phase 3)](baseline-analysis.md)
 - [Training-set strategy (Phase 4)](training-set-strategy.md)
 - [Measured improvement (Phase 6+7)](measured-improvement.md)
+
+## Phase D — Harness tolerance + retrain cautionary (TB-US-076)
+
+**Date**: 2026-11-01
+**Owned by**: TB-US-076 (sibling story to this one)
+
+TB-US-075 left Trial #1 with strict 0/0 and lenient 29%/23%.
+TB-US-076 fired as Option C — ran BOTH a harness tolerance patch
+(Option A) AND a retrain with more epochs + extra data
+(Option B) to see which fixed the strict/lenient divergence.
+
+### Headline Phase D results (strict scoring under the patched harness)
+
+| Trial | Adapter | In-sample | Holdout |
+|---|---|---|---|
+| #2 Option A — harness tolerance | v3 (unchanged, 5 ep × 200) | **38 / 200 (19%)** | **52 / 200 (26%)** |
+| #3 Option B — retrain | v4 (10 ep × 300) | 12 / 200 (6%) | 15 / 200 (7.5%) |
+
+**Option A was the real win.** The shipped harness
+(`backend/harnesses/math_qa_v1.py`) was doing full-string
+equality — ANY long CoT output couldn't match a short expected
+answer. A one-file patch adding real answer-extraction logic
+revealed the adapter's actual 19% / 26% performance.
+
+**Option B overfit.** 10 epochs on 300 small samples pushed the
+adapter past its generalization peak. Eval loss **rose** in the
+last 2 epochs (1.38 → 1.68) while train loss kept dropping — the
+pre-registered methodology's loss tracking caught the
+overfitting as it happened. Adapter v4 is retained as a
+cautionary data point.
+
+### The ongoing search log
+
+Each trial, finding, decision, and next-step candidate goes in a
+single chronological log at
+[`sweet-spot-search-log.md`](sweet-spot-search-log.md). That log
+is the methodology's roadmap artifact — any reader can trace
+what was tried, what signal came back, and what the next move
+was (with reasoning).
+
+Deep dives per trial:
+
+- [Trial #1 — measured-improvement.md](measured-improvement.md)
+- [Trial #2 — harness-tolerance-results.md](harness-tolerance-results.md)
+- [Trial #3 — format-retrain-results.md](format-retrain-results.md)
+
+### Current demo adapter
+
+**`adapter_versions.v3`** — 19% in-sample / 26% out-of-sample on
+the shipped harness (patched). The Pages site shows these
+numbers. Adapter v4 remains in the DB (released, not deprecated)
+for traceability but isn't the current promoted version.
+
+### Open next-trial candidates
+
+Captured in the search log. Includes:
+- Retrain at 5-7 epochs on the v5 training set (not v4's 10)
+- Add early-stopping callback to `train.py`
+- Swap base to Llama 3.1 8B Instruct (TB-US-057 Phase C's
+  "biggest lever")
+- Format-only short-drill training set
+
+None are drafted as stories yet; operator picks what fires next.

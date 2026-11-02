@@ -129,6 +129,73 @@ The current winner is the Sweet Spot. Record it. Future candidates
 experiments pinned against the winning base combination — if a
 challenger beats the Sweet Spot on the eval, it displaces.
 
+## Keep a search log
+
+The sweet-spot search is iterative. Every trial produces findings
+that inform the next trial, which may itself open new questions.
+Without a disciplined record, this exploration becomes
+reconstructible-only by replaying commits and story files — an
+expensive form of memory. A dedicated **search log** solves that.
+
+**What a search log is**: an append-only, chronological lab
+notebook at `docs/<agent-name>/sweet-spot-search-log.md`. Each
+entry captures ONE trial or ONE pre-trial decision in a tight
+4-field format:
+
+```
+## YYYY-MM-DD — Trial #N (or Decision #N): short label
+
+**What we did**:  action + hyperparameters/pins (link to deep dive)
+
+**What we found**:  concrete numbers; relate to pre-registered hypotheses
+
+**What we decided**:  outcome call — keep / reject / iterate
+
+**Rationale**:  WHY that call makes sense given the finding
+```
+
+Optional additional fields: `Open questions` (what the finding
+suggests to test next), `Operational findings` (infrastructure
+lessons that aren't about the measurement itself), `Artifacts`
+(DB IDs, commit hashes, deep-dive doc links).
+
+**Why append-only**: later editing erases the record. Even
+"wrong" trials (ones that fail their hypotheses) are permanent
+because the reasoning around them is the roadmap. A trial that
+disproved an attractive hypothesis is as valuable as one that
+confirmed it.
+
+**Why a summary table at the bottom**: fast at-a-glance scan of
+"what adapters exist, what are their numbers". New entries
+update the table alongside appending the detailed section.
+
+**Worked example**: `docs/math-example/sweet-spot-search-log.md`
+tracks three trials across TB-US-075 and TB-US-076:
+
+- Decision #1 (pre-registered methodology)
+- Trial #1 — adapter v3 training + measurement
+- Trial #2 — harness tolerance patch (Option A win)
+- Trial #3 — adapter v4 retrain (Option B overfit cautionary tale)
+
+Plus deep-dive docs:
+- `measured-improvement.md` (Trial 1 deep dive)
+- `harness-tolerance-results.md` (Trial 2 deep dive)
+- `format-retrain-results.md` (Trial 3 deep dive)
+
+The log acts as the index + narrative; the deep dives contain
+the full per-trial detail.
+
+**When to append**: at trial close. Resist the urge to
+backfill-rewrite earlier entries based on later findings — if a
+later trial changes the interpretation, open a new entry that
+says "revisiting Trial #N given Trial #M's result" rather than
+editing #N.
+
+**When to NOT keep a log**: never. Even for a one-shot agent,
+the first trial's reasoning will be lost without one. Start with
+Decision #1 (the methodology pre-registration) and let the log
+grow organically.
+
 ## Dials to turn
 
 If a stage doesn't improve, the most common fixes:

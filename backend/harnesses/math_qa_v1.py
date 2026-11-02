@@ -25,14 +25,63 @@ from typing import Any, Callable, Dict, List, Optional
 
 def _normalize_answer(s: str) -> str:
     """Case-fold, strip whitespace, collapse interior whitespace, strip
-    trailing punctuation. Numeric answers compare after normalization.
+    trailing punctuation + numeric decoration ($ , %). Numeric answers
+    compare after normalization.
     """
     if s is None:
         return ""
     s = str(s).strip().lower()
     s = re.sub(r"\s+", " ", s)
     s = s.rstrip(".!?,;:")
+    # Strip common numeric decoration before compare
+    s = re.sub(r"[\$\%,]", "", s)
     return s
+
+
+# TB-US-076 Option A: tolerant answer extraction.
+# Model outputs are long CoT prose; the previous harness compared the
+# ENTIRE output to the expected answer via _normalize_answer, which
+# meant any multi-line output could not match a short numeric expected
+# string. We now extract the model's final numeric answer via one of
+# three priority rules + compare that to expected.
+#
+# Priority 1: #### N (standard GSM8K final-answer marker)
+# Priority 2: "Final Answer: N" / "Answer: N" / "answer is N" patterns
+# Priority 3: the LAST standalone number in the output
+# Fallback: the entire output (previous behavior)
+_HARNESS_FINAL_RE = re.compile(r"####\s*([-+]?\d[\d,.]*)")
+_HARNESS_LABEL_RE = re.compile(
+    r"(?:final\s*answer|answer\s*is|^answer)[:=]?\s*\$?([-+]?\d[\d,.]*)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_HARNESS_TRAILING_NUM_RE = re.compile(r"(?<![\d.])([-+]?\d+(?:\.\d+)?)")
+
+
+def _extract_predicted_answer(output: str) -> str:
+    """Pull the model's final numeric answer from a potentially long CoT
+    output. Returns the extracted string (not normalized) or the original
+    output if nothing matched (fallback).
+
+    TB-US-076 Option A: added to make the harness tolerant of common
+    final-answer formats produced by instruction-tuned models (notably
+    "Final Answer: N") in addition to GSM8K's standard "#### N".
+    """
+    if not output:
+        return ""
+    # Priority 1: standard GSM8K marker
+    m = _HARNESS_FINAL_RE.findall(output)
+    if m:
+        return m[-1]
+    # Priority 2: common instruction-tuned labels
+    m = _HARNESS_LABEL_RE.findall(output)
+    if m:
+        return m[-1]
+    # Priority 3: last standalone number anywhere in the output
+    m = _HARNESS_TRAILING_NUM_RE.findall(output)
+    if m:
+        return m[-1]
+    # Fallback: original (previous behavior)
+    return output
 
 
 def _load_dataset(dataset_path: str) -> List[Dict]:
@@ -89,13 +138,16 @@ def run(
             actual = model_fn(question)
         except Exception as e:   # harness must not crash the runner
             actual = f"[model_fn error: {e}]"
-        correct = _normalize_answer(actual) == _normalize_answer(expected)
+        # TB-US-076 Option A: extract predicted answer from CoT output before compare
+        predicted = _extract_predicted_answer(actual)
+        correct = _normalize_answer(predicted) == _normalize_answer(expected)
         if correct:
             correct_count += 1
         per_sample.append({
             "question": question,
             "expected_answer": expected,
             "actual_answer": actual,
+            "predicted_answer": predicted,     # TB-US-076: extracted answer for debuggability
             "correct": correct,
             "domain": sample.get("domain"),
         })

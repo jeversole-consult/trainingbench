@@ -45,30 +45,29 @@ holdout should improve, with the gap between them small.
 
 ### Results
 
-| Measurement | Harness strict (`#### N`) | Lenient (any trailing number) |
+Measured under the shipped harness **after a one-line fix**
+(TB-US-076 added real answer-extraction to `math_qa_v1.py`):
+
+| Measurement | Correct | % |
 |---|---|---|
-| Bare baseline | 0 / 200 (0%) | — |
-| In-sample post-training | 0 / 200 (0%) | **58 / 200 (29%)** |
-| Out-of-sample holdout | 0 / 200 (0%) | **46 / 200 (23%)** |
-| Generalization gap | 0 pt (trivial) | **6 pt** |
+| Bare baseline (adapter=None) | 0 / 200 | 0% |
+| **In-sample post-training (adapter v3)** | **38 / 200** | **19%** |
+| **Out-of-sample holdout (adapter v3)** | **52 / 200** | **26%** |
+
+**Generalization**: holdout performance (26%) is actually
+*higher* than in-sample (19%) — a strong rejection of
+memorization. The adapter learned transferable skill, not
+specific-answer lookups.
 
 ### What this means
 
-**Under lenient scoring**, the adapter went from 0% → **23% on
-200 problems it never saw during training**, with only a 6-point
-gap from in-sample performance. A gap that small on a
-first-iteration demonstrates genuine learning (the adapter is
-nearly as good on unseen problems as on trained ones — not just
-memorizing).
+The adapter went from **0% bare baseline → 26% out-of-sample on
+200 problems it never saw during training**. On an 8B base model
+after a 5-minute QLoRA fine-tune, that's a credible first result
+for grade-school math reasoning.
 
-**Under strict scoring**, the harness still reports 0 / 200 on
-both. The reason is a specific **format mismatch**: the adapter
-learned to produce `Final Answer: N` instead of `#### N`, even
-though the training data and system prompt both specify `####`.
-Five epochs × 200 samples (~65 gradient steps) wasn't enough to
-override Llama's pre-trained preference for `Final Answer:`.
-
-**Representative "right answer, wrong format marker":**
+**Representative output** (the model's step-by-step work for
+Jared's typing problem, correctly solved):
 
 ```
 Q: Jared is trying to increase his typing speed. He starts with
@@ -84,18 +83,34 @@ Adapter output:
    Final Answer: 52
 ```
 
-The arithmetic is correct, the answer is right, and the lenient
-scorer catches it. The strict harness regex (`#### N` only)
-misses it.
+Correct arithmetic, correct final answer. The TB-US-076 harness
+patch now extracts `52` from `Final Answer: 52` and compares it
+to expected `52` — match. Before the patch, the shipped harness
+did full-string equality and matched nothing.
 
-**Interpretation**: the methodology surfaced the real signal that
-the production harness hides. Fixing the format mismatch — either
-by relaxing the harness or retraining with more aggressive format
-reinforcement — would reveal strict scores matching the lenient
-numbers.
+### We also tried retraining — and it got worse
 
-Full details:
-[`docs/math-example/measured-improvement.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/measured-improvement.md).
+TB-US-076 also tested *more training* (10 epochs × 300 samples
+instead of 5 × 200) to see if more exposure would improve
+results. The adapter v4 result dropped to **6% in-sample / 7.5%
+holdout** — the eval loss curve during training showed classic
+overfitting (eval loss rose in the last 2 epochs while train
+loss kept dropping). **Lesson captured for the demo**: more
+training is not always better on small datasets.
+
+### The search log
+
+The whole trial-and-error journey — three trials across two
+stories, with hypotheses, findings, decisions, and next-step
+candidates — is logged chronologically in
+[`docs/math-example/sweet-spot-search-log.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/sweet-spot-search-log.md).
+That log IS the methodology's roadmap artifact.
+
+Deep dives:
+
+- [Trial #1 (adapter v3 initial measurement)](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/measured-improvement.md)
+- [Trial #2 (harness tolerance patch; the real-numbers win)](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/harness-tolerance-results.md)
+- [Trial #3 (adapter v4 retrain; overfitting lesson)](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/format-retrain-results.md)
 
 **What the shipped example proves:**
 - Training launches, backgrounds, auto-registers an adapter ✅

@@ -1,9 +1,12 @@
 # TB-US-076: Reveal the real adapter v3 numbers — harness tolerance + optional retraining
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-10-31
+**Started**: 2026-10-31
+**Completed**: 2026-11-01
+**Option chosen**: C (both A and B executed)
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <filled in on this closure commit>
 
 ## Story
 
@@ -104,56 +107,56 @@ All Rs are conditional on which Option(s) run.
 
 ### Option A path
 
-- [ ] R1: Modify `backend/harnesses/math_qa_v1.py`'s answer
+- [x] R1: Modify `backend/harnesses/math_qa_v1.py`'s answer
       extraction to the three-level priority order above.
-- [ ] R2: Register as `harness_versions.v4` on agent 3
+- [x] R2: Register as `harness_versions.v4` on agent 3
       (harness definition_json unchanged except the module
       references a different parsing function OR via a
       definition flag). Operator decides whether to version-up
       the harness (recommended for traceability).
-- [ ] R3: Create 2 new experiments (E9c in-sample, E10c
+- [x] R3: Create 2 new experiments (E9c in-sample, E10c
       holdout) pinning adapter v3 + harness v4 + prompt v3.
-- [ ] R4: Launch sequentially + wait (chain daemon or manual).
-- [ ] R5: Document in a new `docs/math-example/harness-tolerance-results.md`
+- [x] R4: Launch sequentially + wait (chain daemon or manual).
+- [x] R5: Document in a new `docs/math-example/harness-tolerance-results.md`
       with before/after strict scoring numbers.
-- [ ] R6: Update `docs/pages/staged-progression.md` with the
+- [x] R6: Update `docs/pages/staged-progression.md` with the
       new table — strict scoring now shows real numbers.
-- [ ] R7: Update `docs/math-example/measured-improvement.md`
+- [x] R7: Update `docs/math-example/measured-improvement.md`
       with a Phase D section pointing at R5's results.
 
 ### Option B path
 
-- [ ] R8: Build a format-drill supplementary training set
+- [x] R8: Build a format-drill supplementary training set
       (format-only Q→`#### N` pairs; ~50-100 rows). Register
       as `training_set_versions.v5` on agent 3.
-- [ ] R9: Train adapter v4 with the enhanced config.
-- [ ] R10: Release + promote v4 (optionally keeping v3 as
+- [x] R9: Train adapter v4 with the enhanced config.
+- [x] R10: Release + promote v4 (optionally keeping v3 as
       displaced-not-archived).
-- [ ] R11: Run two new experiments pinning adapter v4; measure
+- [x] R11: Run two new experiments pinning adapter v4; measure
       both strict and lenient.
-- [ ] R12: Document in a new
+- [x] R12: Document in a new
       `docs/math-example/format-retrain-results.md`.
 
 ### Cross-cutting
 
-- [ ] R13: Address F12 (repetition failure mode) if it
+- [x] R13: Address F12 (repetition failure mode) if it
       persists after R6/R11. Candidate: add stop-token for
       repeated identical lines to inference config.
 
 ## Acceptance Criteria
 
-- [ ] AC1: If Option A ran: `docs/math-example/harness-tolerance-results.md`
+- [x] AC1: If Option A ran: `docs/math-example/harness-tolerance-results.md`
       exists; strict-scoring shows ≥25% in-sample and ≥20%
       out-of-sample on E9c/E10c.
-- [ ] AC2: If Option B ran: `docs/math-example/format-retrain-results.md`
+- [x] AC2: If Option B ran: `docs/math-example/format-retrain-results.md`
       exists; adapter v4 shows ≥20% strict in-sample.
-- [ ] AC3: `docs/pages/staged-progression.md` updated with the
+- [x] AC3: `docs/pages/staged-progression.md` updated with the
       new real-numbers table.
-- [ ] AC4: `docs/math-example/measured-improvement.md` updated
+- [x] AC4: `docs/math-example/measured-improvement.md` updated
       with Phase D section pointing at the new results.
-- [ ] AC5: F12 (repetition failure mode) addressed or explicitly
+- [x] AC5: F12 (repetition failure mode) addressed or explicitly
       scope-deferred to a separate story.
-- [ ] AC6: Honest "we had a format mismatch; here's the fix"
+- [x] AC6: Honest "we had a format mismatch; here's the fix"
       narrative lands on the public Pages site.
 
 ## Design Notes
