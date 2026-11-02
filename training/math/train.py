@@ -13,6 +13,7 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 import torch
 from transformers import (
@@ -29,8 +30,18 @@ from peft import (
     get_peft_model,
     prepare_model_for_kbit_training,
 )
-from datasets import load_from_disk
+from datasets import load_from_disk, Dataset
 from tqdm import tqdm
+
+
+# TB-US-078: default eval system prompt (used for formatting the GSM8K
+# test split so eval-loss is on sequences comparable to the training-set
+# version's `text` field). If future agents need different eval framing,
+# add a CLI arg + launch-config key here.
+DEFAULT_EVAL_SYSTEM_PROMPT_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "rag-seeds" / "math-example-v1" / "system-prompt.txt"
+)
 
 # Add scripts directory to path for training tracker
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
@@ -44,91 +55,143 @@ except ImportError:
     print("⚠️  Training tracker not available, training will proceed without tracking")
 
 
-def format_training_example(example):
+def _load_training_set_jsonl(path: Path) -> Dataset:
+    """Load a training_set_version JSONL file into a HuggingFace Dataset.
+
+    Each line must be a sample dict with at minimum a 'text' field — the
+    fully-formed training string produced by the prep script (chat
+    template already applied, system prompt baked in, assistant turn
+    terminated). This function does NOT re-format; it tokenizes 'text'
+    verbatim. Metadata fields (sample_id, question, answer) are carried
+    through as columns but ignored by tokenization.
     """
-    Format GSM8K example as instruction-following training example.
-
-    Returns a formatted prompt with the question and step-by-step solution.
-    """
-    question = example['question']
-    answer = example['answer']
-
-    # Extract step-by-step reasoning and final answer
-    # GSM8K answers are in format: "step 1\nstep 2\n...#### final_answer"
-    if "####" in answer:
-        reasoning, final_answer = answer.split("####")
-        reasoning = reasoning.strip()
-        final_answer = final_answer.strip()
-    else:
-        reasoning = answer
-        final_answer = ""
-
-    # Format as Llama 3.1 chat format
-    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-You are a helpful math tutor. Solve the following math problem step by step. Show your work and provide the final numerical answer clearly.
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-{question}
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-{reasoning}
-
-Final Answer: {final_answer}<|eot_id|>"""
-
-    return {"text": prompt}
-
-
-def prepare_dataset(tokenizer, dataset_path, max_length=512, use_full_dataset=True, max_train_samples=None, max_eval_samples=None):
-    """Load and prepare GSM8K dataset for training and evaluation."""
-    print("Loading dataset...")
-
-    if not dataset_path.exists():
-        print(f"Error: Dataset not found at {dataset_path}")
-        print("Please run: python scripts/download_gsm8k.py")
+    if not path.exists():
+        print(f"Error: training-set JSONL not found at {path}")
         sys.exit(1)
+    rows: list[dict] = []
+    with path.open("r", encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as e:
+                sys.exit(f"Error: malformed JSON at line {i+1} of {path}: {e}")
+            if "text" not in obj:
+                sys.exit(
+                    f"Error: line {i+1} of {path} missing required 'text' "
+                    f"field. Training-set-version JSONLs must contain a "
+                    f"pre-formatted 'text' column (TB-US-078). Got keys: "
+                    f"{sorted(obj.keys())}"
+                )
+            rows.append(obj)
+    if not rows:
+        sys.exit(f"Error: training-set JSONL at {path} is empty")
+    return Dataset.from_list(rows)
 
-    dataset = load_from_disk(str(dataset_path))
 
-    # Use training split
-    train_data = dataset['train']
-
-    # Use test split for evaluation if available
-    eval_data = dataset.get('test', None)
-
-    # Limit training samples
-    if not use_full_dataset or max_train_samples:
-        num_samples = max_train_samples if max_train_samples else 1000
-        print(f"Using subset of {num_samples} training examples...")
-        train_data = train_data.select(range(min(num_samples, len(train_data))))
-
-    # Limit eval samples
-    if eval_data and max_eval_samples:
-        print(f"Using subset of {max_eval_samples} eval examples...")
-        eval_data = eval_data.select(range(min(max_eval_samples, len(eval_data))))
-
-    print(f"Training examples: {len(train_data)}")
-    if eval_data:
-        print(f"Evaluation examples: {len(eval_data)}")
-
-    # Format examples
-    print("Formatting examples...")
-    train_data = train_data.map(
-        format_training_example,
-        remove_columns=train_data.column_names,
-        desc="Formatting training examples",
-    )
-
-    if eval_data:
-        eval_data = eval_data.map(
-            format_training_example,
-            remove_columns=eval_data.column_names,
-            desc="Formatting eval examples",
+def _format_eval_example_factory(tokenizer, system_prompt: str):
+    """Return a map-fn that applies the Instruct chat template to one
+    GSM8K eval example so eval-loss sequences are shaped like training.
+    """
+    def _fmt(example):
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": example["question"]},
+            {"role": "assistant", "content": example["answer"]},
+        ]
+        text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=False
         )
+        return {"text": text}
+    return _fmt
 
-    # Tokenize
-    print("Tokenizing examples...")
 
+def prepare_dataset(
+    tokenizer,
+    training_set_jsonl: Path,
+    eval_dataset_hf_dir: Optional[Path],
+    max_length: int = 512,
+    max_train_samples: Optional[int] = None,
+    max_eval_samples: Optional[int] = None,
+):
+    """Load training data from a training_set_version JSONL file + eval
+    data from the GSM8K test split (HF Datasets dir).
+
+    TB-US-078 wiring:
+    - Training examples come from a registered training_set_version's
+      sidecar JSONL. Each line's 'text' field is used verbatim.
+    - Eval examples come from the GSM8K test split, chat-template-formatted
+      inline with DEFAULT_EVAL_SYSTEM_PROMPT so eval-loss is comparable
+      to training-loss. Eval is a reference measurement; it is NOT a
+      training_set_version itself.
+    - If `eval_dataset_hf_dir` is None, no eval dataset is returned (and
+      early-stopping / load_best_model_at_end must be disabled upstream).
+    """
+    print("=" * 80)
+    print("Loading dataset (TB-US-078 wiring)")
+    print("=" * 80)
+    print(f"Training JSONL: {training_set_jsonl}")
+    print(f"Eval GSM8K dir: {eval_dataset_hf_dir}")
+    print()
+
+    # ---- Training set (JSONL from training_set_versions sidecar) ----
+    train_data = _load_training_set_jsonl(Path(training_set_jsonl))
+    print(f"Loaded {len(train_data)} training rows from JSONL")
+
+    if max_train_samples and max_train_samples < len(train_data):
+        print(f"Capping training set at max_train_samples={max_train_samples}")
+        train_data = train_data.select(range(max_train_samples))
+
+    # Log a sample so operators can confirm the 'text' field is what they
+    # expect (chat-template-formatted, system prompt baked in, etc.).
+    sample_text = train_data[0]["text"]
+    print()
+    print("--- training sample #0 (first 400 + last 200 chars) ---")
+    print(sample_text[:400])
+    print("...")
+    print(sample_text[-200:])
+    print("--- end sample ---")
+    print()
+
+    # ---- Eval set (GSM8K test, chat-template-formatted inline) ----
+    eval_data: Optional[Dataset] = None
+    if eval_dataset_hf_dir is not None:
+        if not Path(eval_dataset_hf_dir).exists():
+            print(f"Warning: eval dataset not found at {eval_dataset_hf_dir}; "
+                  f"continuing WITHOUT eval (early stopping will be disabled)")
+        else:
+            hf_ds = load_from_disk(str(eval_dataset_hf_dir))
+            eval_split = hf_ds.get("test")
+            if eval_split is None:
+                print(f"Warning: eval dataset at {eval_dataset_hf_dir} has no "
+                      f"'test' split; continuing WITHOUT eval")
+            else:
+                if max_eval_samples and max_eval_samples < len(eval_split):
+                    eval_split = eval_split.select(range(max_eval_samples))
+                print(f"Loaded {len(eval_split)} eval rows from GSM8K test")
+                # Load the system prompt that gets baked into each eval record
+                if DEFAULT_EVAL_SYSTEM_PROMPT_PATH.exists():
+                    eval_system_prompt = DEFAULT_EVAL_SYSTEM_PROMPT_PATH.read_text(
+                        encoding="utf-8"
+                    ).strip()
+                    print(f"Eval system prompt loaded from "
+                          f"{DEFAULT_EVAL_SYSTEM_PROMPT_PATH} "
+                          f"({len(eval_system_prompt)} chars)")
+                else:
+                    eval_system_prompt = (
+                        "You are a helpful math tutor. Solve the problem "
+                        "step by step and end with #### <answer>."
+                    )
+                    print(f"Eval system prompt file missing; using built-in fallback")
+                eval_data = eval_split.map(
+                    _format_eval_example_factory(tokenizer, eval_system_prompt),
+                    remove_columns=eval_split.column_names,
+                    desc="Formatting eval examples",
+                )
+
+    # ---- Tokenize ----
     def tokenize_function(examples):
         return tokenizer(
             examples["text"],
@@ -140,11 +203,11 @@ def prepare_dataset(tokenizer, dataset_path, max_length=512, use_full_dataset=Tr
     train_data = train_data.map(
         tokenize_function,
         batched=True,
-        remove_columns=["text"],
+        remove_columns=train_data.column_names,  # drops text + metadata
         desc="Tokenizing training data",
     )
 
-    if eval_data:
+    if eval_data is not None:
         eval_data = eval_data.map(
             tokenize_function,
             batched=True,
@@ -221,7 +284,8 @@ def create_qlora_model(model_name, lora_r=16, lora_alpha=32, lora_dropout=0.05, 
 
 def train(
     model_name="meta-llama/Meta-Llama-3.1-8B-Instruct",
-    dataset_path=None,
+    training_set_jsonl=None,
+    eval_dataset_path=None,
     output_dir=None,
     num_epochs=3,
     batch_size=4,
@@ -236,47 +300,44 @@ def train(
     save_steps=500,
     logging_steps=50,
     eval_steps=None,
-    use_full_dataset=True,
     max_train_samples=None,
     max_eval_samples=None,
     use_tracking=True,
     run_name=None,
     extra_callbacks=None,   # TB-US-065: inject the DB-writing callback
 ):
-    """
-    Run QLoRA training on GSM8K.
+    """TB-US-078: QLoRA training on a registered training_set_version.
 
     Args:
-        model_name: Base model to fine-tune
-        dataset_path: Path to dataset directory
-        output_dir: Output directory for model and checkpoints
-        num_epochs: Number of training epochs
-        batch_size: Training batch size
-        gradient_accumulation_steps: Gradient accumulation steps
-        learning_rate: Learning rate
-        lora_r: LoRA rank
-        lora_alpha: LoRA alpha scaling factor
-        lora_dropout: LoRA dropout rate
-        max_length: Maximum sequence length
-        warmup_steps: Warmup steps
-        save_steps: Save checkpoint every N steps
-        logging_steps: Log every N steps
-        eval_steps: Evaluate every N steps. When None: falls back to
-            per-epoch evaluation if the dataset provides an eval split,
-            or skips evaluation entirely if it does not.
-        use_full_dataset: Use full dataset or subset
-        max_train_samples: Maximum training samples (None = all)
-        max_eval_samples: Maximum eval samples (None = all)
-        use_tracking: Enable training tracking
-        run_name: Name for training run (for tracking)
+        training_set_jsonl: Required. Path to a training_set_version's
+            sidecar JSONL (`training/datasets/training_set_versions/v{N}.jsonl`).
+            Each row's 'text' field is used verbatim.
+        eval_dataset_path: Optional. HF Datasets dir providing a 'test'
+            split for eval-loss (early stopping, load_best_model_at_end).
+            Defaults to the GSM8K local dir. Set to None to disable eval.
+        output_dir: Where to save adapter artifacts.
+        eval_steps: When None, falls back to per-epoch evaluation if
+            eval_dataset_path is set, or skips eval entirely if not.
+        max_train_samples / max_eval_samples: cap sample counts (None = all).
     """
-    # Set default paths if not provided
-    if dataset_path is None:
-        dataset_path = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
+    # Required: training-set JSONL path
+    if training_set_jsonl is None:
+        print("Error: training_set_jsonl is required (TB-US-078). "
+              "Pass --training-set-jsonl or launch via TB with a "
+              "training_set_version_id.")
+        sys.exit(1)
+    training_set_jsonl = Path(training_set_jsonl)
+
+    # Eval dataset defaults to the local GSM8K dir; None disables eval
+    if eval_dataset_path is None:
+        eval_dataset_path = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
+    elif eval_dataset_path == "none":
+        eval_dataset_path = None
+    else:
+        eval_dataset_path = Path(eval_dataset_path)
     if output_dir is None:
         output_dir = Path(__file__).parent.parent.parent / "models" / "fine-tuned" / "gsm8k_qlora"
 
-    dataset_path = Path(dataset_path)
     output_dir = Path(output_dir)
     logs_dir = Path(__file__).parent.parent.parent / "experiments" / "logs"
 
@@ -310,10 +371,14 @@ def train(
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
-    # Prepare dataset
+    # Prepare dataset — TB-US-078: JSONL training + GSM8K eval
     train_dataset, eval_dataset = prepare_dataset(
-        tokenizer, dataset_path, max_length,
-        use_full_dataset, max_train_samples, max_eval_samples
+        tokenizer=tokenizer,
+        training_set_jsonl=training_set_jsonl,
+        eval_dataset_hf_dir=eval_dataset_path,
+        max_length=max_length,
+        max_train_samples=max_train_samples,
+        max_eval_samples=max_eval_samples,
     )
 
     # Create model
@@ -491,7 +556,7 @@ def main():
     import argparse
 
     # Set default paths relative to script location
-    default_dataset = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
+    default_eval_dataset = Path(__file__).parent.parent.parent / "datasets" / "math" / "data"
     default_output = Path(__file__).parent.parent.parent / "models" / "fine-tuned" / "gsm8k_qlora"
 
     parser = argparse.ArgumentParser(description="Train QLoRA adapter for GSM8K")
@@ -499,8 +564,13 @@ def main():
     # Model configuration
     parser.add_argument("--model", default="meta-llama/Meta-Llama-3.1-8B-Instruct",
                         help="Base model name (default: Meta-Llama-3.1-8B-Instruct)")
-    parser.add_argument("--dataset-path", type=str, default=str(default_dataset),
-                        help="Path to dataset directory")
+    parser.add_argument("--training-set-jsonl", type=str, default=None,
+                        help="TB-US-078: path to a training_set_version sidecar "
+                             "JSONL. Required unless --run-id supplies it via the "
+                             "TB launch config (as _training_set_jsonl).")
+    parser.add_argument("--eval-dataset-path", type=str, default=str(default_eval_dataset),
+                        help="HF Datasets dir with a 'test' split for eval-loss. "
+                             "Pass 'none' to disable eval entirely.")
     parser.add_argument("--output-dir", type=str, default=str(default_output),
                         help="Output directory for model and checkpoints")
 
@@ -533,8 +603,6 @@ def main():
                         help="Evaluate every N steps (default: None = no evaluation)")
 
     # Dataset options
-    parser.add_argument("--subset", action="store_true",
-                        help="Use subset of 1000 examples for quick testing")
     parser.add_argument("--max-train-samples", type=int, default=None,
                         help="Maximum number of training samples to use")
     parser.add_argument("--max-eval-samples", type=int, default=None,
@@ -614,6 +682,12 @@ def main():
             args.output_dir = hp["_adapter_output_path"]
         if hp.get("_run_name"):
             args.run_name = hp["_run_name"]
+        # TB-US-078: training-set-version sidecar JSONL path, resolved
+        # by the launch endpoint from training_set_version_id
+        if hp.get("_training_set_jsonl"):
+            args.training_set_jsonl = hp["_training_set_jsonl"]
+        if hp.get("_eval_dataset_path"):
+            args.eval_dataset_path = hp["_eval_dataset_path"]
         tb_db_callback = TBDBTrainerCallback(run_id=args.run_id)
         print(f"[TB-US-065] Launched by TB; run_id={args.run_id}, "
               f"run_name={args.run_name}, output={args.output_dir}")
@@ -624,7 +698,8 @@ def main():
         extra_callbacks = [tb_db_callback] if tb_db_callback else None
         success = train(
             model_name=args.model,
-            dataset_path=args.dataset_path,
+            training_set_jsonl=args.training_set_jsonl,
+            eval_dataset_path=args.eval_dataset_path,
             output_dir=args.output_dir,
             num_epochs=args.epochs,
             batch_size=args.batch_size,
@@ -639,7 +714,6 @@ def main():
             save_steps=args.save_steps,
             logging_steps=args.logging_steps,
             eval_steps=args.eval_steps,
-            use_full_dataset=not args.subset,
             max_train_samples=args.max_train_samples,
             max_eval_samples=args.max_eval_samples,
             use_tracking=not args.no_tracking,

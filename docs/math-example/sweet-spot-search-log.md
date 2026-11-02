@@ -21,6 +21,14 @@ the 4-field format: `What we did / What we found / What we
 decided / Rationale`. Keep it tight; link to deep dives rather
 than inlining.
 
+**Research mode — publication artifact plan**: as of 2026-11-02,
+this log is being treated as a publication-grade chronological
+record. The stable research protocol (reproducibility checklist,
+threats-to-validity framework, confirmation-bias checks) lives in
+[`methodology.md`](methodology.md). Per-trial pre-registrations
+land in [`study-design.md`](study-design.md). This log remains
+the running journal.
+
 ---
 
 ## 2026-10-28 — Decision #1: methodology
@@ -369,6 +377,98 @@ equally sophisticated — it just damages what was working.
 
 ---
 
+## 2026-11-02 — Research-process finding: `training_set_versions` was never wired into `train.py`
+
+**Not a trial.** A substantive discovery about our research
+infrastructure, surfaced during TB-US-078 Phase 2 preparation.
+
+### What we found
+
+`training/math/train.py` has, since TB-US-065 shipped (2026-10-22),
+unconditionally loaded raw GSM8K via `load_from_disk("datasets/math/data")`
+and selected the first N rows after HF's default shuffle. The
+`training_set_version_id` on each `training_runs` row — nominally
+the pointer to that run's training data — was never consulted by
+train.py for data input. It was recorded on the auto-registered
+adapter row (via the TB-US-063 provenance mechanism) but never
+drove training.
+
+Our search log's "Training set version" column (v4, v5, v6) across
+Trials #1–#4 therefore recorded provenance metadata, not actual
+training data variation. Trial-to-trial comparisons were at
+approximately constant data — the first ~500 rows of GSM8K.train
+— on a varying hyperparameter axis.
+
+### Why we found it
+
+The TB-US-078 Trial #5 plan required chat-template-formatted
+training data. The prep script
+`scripts/prep_math_v7_chat_template.py` produced a correctly
+formatted JSONL at `training-sets/math-example-v7-chat-template.jsonl`.
+Before launching training, we inspected `train.py` to confirm it
+would read that JSONL. Discovery: it reads `datasets/math/data`
+and ignores `training_set_version_id` entirely for data purposes.
+
+### Why prior trial findings still stand
+
+Discovery does **not** invalidate TB-US-075–077 findings:
+
+- Trial #1's harness-bug finding stands (bug was in the harness,
+  not the training data)
+- Trial #2's "real signal" (adapter v3 19/26%) stands (patched
+  harness; constant training data irrelevant to the finding)
+- Trial #3's overfit (6/7.5%) stands (10 epochs on 300 samples
+  overfit regardless of exact sample selection)
+- Trial #4's Instruct regression (23% vs. bare 43%) stands —
+  the regression mechanism (format strip via `format_training_example`)
+  is adjacent to the wiring gap, not caused by it; a correct
+  wiring + the same hardcoded template would have produced the
+  same regression
+
+What **does** change: the "training set version" axis in our
+search log, previously labeled as varying across trials, is now
+documented as approximately constant across Trials #1–#4.
+Trial #5 (TB-US-079) is the first trial with genuinely varied
+training data under the corrected wiring.
+
+### What we did
+
+TB-US-078: clean cutover (no backward-compat shim; per the
+`feedback_no_backcompat_research_mode` discipline).
+
+- `train.py` `prepare_dataset()` now takes a required
+  `training_set_jsonl` path; reads each row's `text` field
+  verbatim; eval set remains GSM8K `test` chat-template-formatted
+  inline so eval-loss sequences are comparable.
+- Deleted the hardcoded `format_training_example` and the
+  raw-GSM8K default fallback.
+- `/training/runs/launch` resolves `training_set_version_id` →
+  sidecar path, validates, passes to the subprocess.
+- 400 error if `training_set_version_id` missing or the sidecar
+  file is missing.
+
+### Concerns
+
+- **Confirmation-bias risk**: finding this gap *before* Trial #5
+  ran is a boon — we don't retroactively have to re-interpret
+  numbers. But operator-researcher must be careful not to use
+  the finding to selectively reframe prior results. The pre-registered
+  thresholds for Trials #1–#4 are already in the log; those stay.
+- **Reproducibility documentation**: for publication, this entry
+  (and the deep-dive at
+  `architectural-finding-training-set-wiring.md`) must appear
+  prominently in the methods section so a reader understands
+  that trial-to-trial comparisons for Trials #1–#4 were at
+  constant data.
+
+Deliverable: `docs/math-example/architectural-finding-training-set-wiring.md`
+(deep dive).
+
+Status: fix shipped via TB-US-078; Trial #5 (TB-US-079) now
+blocked only on the TB-US-078 smoke-run passing.
+
+---
+
 ## Summary table (as of 2026-11-02)
 
 | Trial | Base | Adapter | Epochs × Samples | Strict in-sample | Strict holdout | Verdict |
@@ -378,6 +478,15 @@ equally sophisticated — it just damages what was working.
 | 3 | 8B base | v4 (10 epochs) | 10 × 300 | 12 / 200 (6%) | 15 / 200 (7.5%) | Overfit; cautionary |
 | 4 | 8B Instruct | v5 (early stop, 5 ep × 500) | 5 × 500 | 38 / 200 (19%) | 46 / 200 (23%) | Adapter REGRESSED Instruct |
 | 4-control | **8B Instruct** | **none (bare)** | — | — | **86 / 200 (43%)** | **New demo result — strongest** |
+
+**Caveat (2026-11-02)**: Trials #1–#4 all ran with approximately
+constant training data (first N rows of raw GSM8K.train) because
+`training_set_versions` was never wired into `train.py` — see the
+"Research-process finding" entry above and
+`architectural-finding-training-set-wiring.md` for details. Hyperparameter
+comparisons across trials remain valid; apparent "training set
+version" variation does not. Trial #5 (TB-US-079) will be the first
+trial with genuinely varied training data under corrected wiring.
 
 **Current demo configuration**: **bare Llama 3.1 8B Instruct, no
 adapter**. 43% on 200 holdout GSM8K problems with zero TB-specific
@@ -391,19 +500,22 @@ the bare-Instruct control (E19) — without it, adapter v5's 23%
 would have looked like "weak improvement from zero" instead of
 "regression from 43%".
 
-**Open next-trial candidates** (not yet drafted; TB-US-078 captures
-the Instruct-training-approach investigation):
+**Open next-trial candidates**:
 
-1. **TB-US-078** (drafted): investigate what training approach
-   would HELP Instruct — chat-template-formatted data, smaller
-   LoRA rank (8 or 16), larger training set (2000-5000 samples),
-   different task framing
-2. Retrain adapter v3-shape (base + 5 ep × 200 failures) with
+1. **TB-US-079** (drafted, Backlog): Trial #5 under corrected
+   wiring — chat-template-formatted v7 training set (1000 samples,
+   seed=46) + rank 16 + lr 1e-4 + 3 epochs on Instruct. First
+   trial with genuinely varied training data per the architectural
+   finding. Blocked by TB-US-078 smoke-run passing.
+2. **TB-US-078** (In Progress): architectural fix — wire
+   `training_set_versions` into train.py. Prerequisite for all
+   future trials. Not itself a trial.
+3. Retrain adapter v3-shape (base + 5 ep × 200 failures) with
    early stopping — see if the Trial #2 result holds up with
    current infrastructure
-3. Format-only short-drill training set (would require a new
+4. Format-only short-drill training set (would require a new
    training-set version with Q→`#### N` short pairs)
-4. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
+5. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
    null result given math problems don't need retrieval
 
 Operator picks what to fire next (if anything).

@@ -1,266 +1,342 @@
-# TB-US-078: Investigate training approaches that would HELP (not regress) the Instruct base
+# TB-US-078: Wire `training_set_versions` JSONL into `train.py` — prerequisite for correct Trial #5
 
-**Status**: Proposed
-**Created**: 2026-11-02
+**Status**: Completed
+**Created**: 2026-11-02 (originally as Trial #5 story)
+**Rescoped**: 2026-11-02 — original Trial #5 scope moved to TB-US-079 after architectural discovery
+**Completed**: 2026-11-02
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <filled in on closure commit>
 
 ## Story
 
-As a TB maintainer who just discovered that LoRA on Llama 3.1 8B
-Instruct **actively regressed** accuracy (43% bare → 23% with our
-adapter v5), I want **a methodical investigation of what training
-approach WOULD help Instruct** — chat-template-formatted data,
-smaller LoRA rank, larger training set, different task framing —
-so that we can establish whether a trained adapter can beat the
-bare 43% ceiling or whether bare Instruct is in fact the
-sweet-spot for this task.
+As a TB maintainer executing the Instruct-PEFT research arc, I
+want **`train.py` to actually read its training examples from
+the registered `training_set_version.file_path` JSONL** — the
+provenance record the registry claims to be — so that Trial #5
+(and every future trial) tests the hypothesis we think it's
+testing, not a surrogate.
 
-Trial #5 in the sweet-spot search log. First attempt at
-constructive-not-destructive training on Instruct.
+Prerequisite for TB-US-079 (Trial #5 — chat-template-formatted
+training on Instruct). Captured as its own story because the
+discovery is substantive enough to publish, and the fix needs
+clean validation independent of Trial #5's research hypothesis.
 
-## Background
+## Background — the discovery
 
-TB-US-077 Trial #4 was pre-registered to deliver 55–75% holdout
-accuracy. Actual result: adapter v5 landed at **23%** —
-substantially WORSE than bare Instruct (43%). The methodology
-caught the regression because we required the bare-Instruct
-control measurement (E19).
+During TB-US-078 Phase 2 preparation (which was originally
+Trial #5 under the old scope), inspection of `train.py` revealed
+a **training-pipeline wiring gap** that had been in place since
+TB-US-065 shipped (2026-10-22):
 
-Deep-dive in
-[`instruct-scale-up-results.md`](../math-example/instruct-scale-up-results.md).
-Per-sample inspection revealed the regression's root cause: F13
-"answer-first" pattern mismatch between Instruct's native
-response structure (`#### <guess>` + reasoning + `#### <corrected>`
-at end) and our training-data format (reasoning + `#### <answer>`
-once at the end). Our 500-sample × 5-epoch LoRA at rank 32
-**deleted** Instruct's end-of-reasoning answer-confirmation
-behavior without replacing it with equivalent competence.
+**Design intent (per TB-US-052/063/065):**
+- `training_set_versions` registry owns a JSONL file per
+  version (`training-sets/*.jsonl`)
+- `/training/runs/launch` records `training_set_version_id` on
+  the run; `train.py` reads that version's data as training input
+- `adapter_versions.training_set_version_id` closes the
+  provenance loop
 
-Trial #5's job: test variations that preserve or replace that
-behavior.
+**Actual implementation (train.py `prepare_dataset`, lines 82–160):**
+- Unconditionally calls `load_from_disk("datasets/math/data")`
+  — the raw full-size GSM8K HuggingFace Datasets directory
+- Takes `train_data.select(range(max_train_samples))` — the first
+  N rows after HF's default-seeded shuffle
+- Ignores the launch request's `training_set_version_id` for
+  data-input purposes; the ID is **stored on the adapter row
+  (`register_existing_adapter` call at train.py:680) as pure
+  provenance decoration**, never consulted for the actual training
+  data bytes
 
-**Depends on**:
-- TB-US-077 (closed) — provides the bare-Instruct baseline + the
-  regression finding
-- Lab machine with ≥24 GB VRAM
+**Consequence for prior trials TB-US-075/076/077:** every trial
+nominally used a different `training_set_version` (v4, v5, v6
+with distinct seeds), but all three trials actually trained on
+essentially the same slice (`GSM8K.train[0:N]`) of raw GSM8K.
+Scientifically, this means prior trials still produced valid
+comparisons on hyperparameters (rank, epochs, lr, base model) at
+constant data, but the "data" axis in our search was never
+being varied as advertised.
 
-**Blocks**:
-- Nothing hard. Bare Instruct (43%) is a defensible public demo
-  without a successful adapter.
+**Related format bug (fixed as part of this story's cutover):**
+`format_training_example` at train.py:47-79 splits GSM8K answers
+on `####` and emits `...reasoning... Final Answer: {final_answer}`.
+GSM8K's native `#### N` marker is deleted. On the Instruct base,
+this overwrote Instruct's native `####`-at-end answer-confirmation
+behavior and contributed to Trial #4's regression (TB-US-077 F13
+analysis). The JSONL path lets each training set version carry its
+own fully-formed `text` field, bypassing the hardcoded template
+entirely.
 
-## Scope (one iteration, same pattern as TB-US-075-77)
+## Scope
 
-Trial #5 tests ONE combination of variations at a time, not all
-of them at once. Pre-registering the specific combination before
-running maintains the methodology's discipline.
+Clean cutover (no backward-compat dispatch — per the
+`feedback_no_backcompat_research_mode` memory, the old codepath
+wasn't driving behavior as designed, so nothing is lost by
+deleting it).
 
-**Suggested first combination** (operator decides at fire time):
+- **`training/math/train.py`** — rewrite `prepare_dataset()`:
+  - Takes a `training_set_jsonl` path (required)
+  - Reads JSONL via `datasets.load_dataset("json", data_files=...)`
+    OR plain `json.loads` loop
+  - Uses the `text` field verbatim for tokenization — no
+    reformatting, no `####`-stripping, no system-prompt
+    hardcoding
+  - Metadata columns (`question`, `answer`, `sample_id`) are
+    carried through for traceability but not used in tokenization
+  - Delete `format_training_example`
+  - Delete the `datasets/math/data` default fallback
 
-- **Base**: Llama 3.1 8B Instruct (unchanged)
-- **Training data format**: chat-template-formatted via
-  `tokenizer.apply_chat_template()` — `<|system|>` + `<|user|>`
-  + `<|assistant|>` turns rather than raw CoT prose. Preserves
-  Instruct's native response structure.
-- **LoRA rank**: 8 (down from 32). Smaller perturbation; less
-  likely to delete Instruct's native behavior.
-- **Training set size**: 500 samples (same as Trial #4 for
-  cross-trial comparability)
-- **Epochs**: 3 (down from 5). Light touch; early stopping
-  may trigger sooner.
-- **Learning rate**: 1e-4 (down from 2e-4). Slower perturbation.
+- **Eval dataset** — eval uses the GSM8K `test` split (unchanged),
+  but each eval record is formatted via the same
+  `tokenizer.apply_chat_template()` call so the eval-loss metric
+  is comparable to training loss. This handling lives inside
+  `prepare_dataset` and is distinct from the training set's
+  `text` field (training-set-version JSONL is for training only;
+  eval is a fixed reference set).
 
-**Alternative combinations** (if the first doesn't land):
+- **`backend/api/main.py` `/training/runs/launch`** — resolve
+  `training_set_version.file_path` from the registry at launch
+  time, validate the file exists, pass the absolute path to
+  `train.py` as `--training-set-jsonl`.
 
-| Variant | Hypothesis |
-|---|---|
-| Rank 16 instead of 8 | Finer control over the perturbation magnitude |
-| 2000 samples instead of 500 | Enough signal to REPLACE Instruct's behavior |
-| Add `apply_chat_template` even to v6 unchanged | Format alone fixes it; rank/data don't matter |
-| Prompt variations (ask for `#### N` at END only) | System prompt alone may suffice |
+- **`training/math/train.py` CLI** — new required arg
+  `--training-set-jsonl`. If not provided and `--run-id` is set,
+  the TB launch config carries it via `_training_set_jsonl` key.
 
 ## Pre-registered hypotheses
 
-### H5a — Chat-template beats raw CoT
+Infrastructure story, not a research trial, but the smoke-run
+validates:
 
-**Claim**: training on chat-template-formatted data will produce
-an adapter whose output structure PRESERVES Instruct's native
-"guess + reason + confirm at end" pattern.
+### H78a — JSONL path works end-to-end
 
-**Measurable signal**: per-sample inspection shows most outputs
-have 2+ `####` markers (initial + corrected-at-end), like bare
-Instruct does. Current adapter v5 outputs have exactly 1.
+**Claim**: a training run launched via `/training/runs/launch`
+with `training_set_version_id=<v7>` successfully reads from the
+JSONL file, trains an adapter, and auto-registers it with the
+correct `training_set_version_id` linkage.
 
-### H5b — Does NOT regress bare Instruct
+**Measurable signal**: smoke-run (10 samples, 1 epoch, Instruct
+base) completes without error; `adapter_versions` row's
+`training_set_version_id = 7`; adapter files written to disk;
+training logs confirm "loaded N rows from <jsonl path>".
 
-**Claim**: holdout accuracy with the new adapter ≥ 43% (bare
-Instruct's result). Threshold: **do not fall below the bare
-baseline**.
+### H78b — `text` field is used verbatim (no re-formatting)
 
-**If H5b fails** (adapter v6 < 43%), the hypothesis "LoRA at
-scale can help Instruct" is weakened and TB-US-079 would try a
-different direction (e.g., much larger training set or
-full-fine-tuning instead of LoRA).
+**Claim**: the tokenized training input exactly matches the
+`text` field of the JSONL row, with no stripping or substitution.
 
-### H5c — Beats bare Instruct meaningfully
+**Measurable signal**: a tokenize-and-detokenize round-trip of
+sample #0 reproduces the original `text` field (modulo known BPE
+unicode edge cases). Logged by train.py at startup for the first
+training example.
 
-**Claim**: holdout accuracy ≥ 50% (bare + 7 points). This is
-the "we actually improved on an already-good base" signal.
+### H78c — Smoke adapter output has native `#### N` structure
 
-**Below 50% but above 43%**: methodology works + we're close but
-need more iteration.
-**Above 50%**: Trial #5 ships as the new demo adapter.
+**Claim**: an adapter trained from a chat-template-formatted
+training set (v7) produces outputs that end with `#### N`, not
+`Final Answer: N` as adapter v5 did.
 
-### H5d — Early stopping handles overfitting gracefully
-
-**Claim**: `load_best_model_at_end=True` + `EarlyStoppingCallback(patience=2)`
-(both from TB-US-077's infrastructure) catches and saves the
-min-eval-loss checkpoint without manual intervention.
+**Measurable signal**: run a tiny inference check (3 holdout
+questions) after smoke-run completes; count outputs ending with
+`#### N`. ≥2/3 passes H78c.
 
 ## Requirements
 
-### Phase 1 — Pre-registration
+### Phase 1 — Code changes
 
-- [ ] R1: Update `study-design.md` with Trial #5 hypotheses + the
-      specific variant combination being tested
-- [ ] R2: Append Trial #5 planning entry to
-      `sweet-spot-search-log.md` with status "launching"
+- [ ] R1: `train.py prepare_dataset` rewrite — JSONL input + `text`
+      field verbatim; eval still GSM8K `test` with chat template
+- [ ] R2: `train.py` CLI — new `--training-set-jsonl` arg; validate
+      file exists at parse time
+- [ ] R3: Delete `format_training_example` and the
+      `datasets/math/data` default fallback (clean cutover)
+- [ ] R4: `main.py /training/runs/launch` — resolve
+      `training_set_version.file_path`, pass as CLI arg; 400 if
+      the file is missing
 
-### Phase 2 — Build training data
+### Phase 2 — Documentation (written alongside code, not after)
 
-- [ ] R3: `scripts/prep_math_v7_chat_template.py` — new script.
-      Takes GSM8K train-split samples + applies the Instruct
-      chat template so each training example looks like:
-      ```
-      <|system|>You are a math tutor...<|end_of_system|>
-      <|user|>{question}<|end_of_user|>
-      <|assistant|>{full CoT answer with #### N at end}<|end_of_assistant|>
-      ```
-      500 samples with seed=46 (distinct from all prior sampling
-      seeds), strictly disjoint from holdout
-- [ ] R4: Register as `training_set_versions.v7` on agent 3,
-      release + promote
+- [ ] R5: `docs/math-example/architectural-finding-training-set-wiring.md`
+      (new) — the deep dive on what was found, how, why prior
+      trials still produced interpretable results, what changed
+- [ ] R6: `docs/math-example/sweet-spot-search-log.md` — new
+      "Research-process finding (2026-11-02)" entry inserted
+      between Trial #4 and the planning entry for Trial #5
+- [ ] R7: `docs/math-example/methodology.md` — new "Known
+      research-process limitations discovered during execution"
+      section referencing the architectural finding
+- [ ] R8: `docs/math-example/study-design.md` — correct Trial #5
+      pre-registration to reflect that prior trials used
+      first-N-of-GSM8K (not the registered training set)
 
-### Phase 3 — Train adapter v6
+### Phase 3 — Validation smoke-run
 
-- [ ] R5: Launch training via `POST /training/runs/launch` with:
-      - base_model: `meta-llama/Meta-Llama-3.1-8B-Instruct`
-      - training_set_version_id: 7
-      - lora_rank: 8 (vs. 32)
-      - lora_alpha: 16 (2× rank, as before)
-      - lora_dropout: 0.05
-      - learning_rate: 1e-4
-      - epochs: 3
-      - batch_size: 4
-      - gradient_accumulation_steps: 4
-      - max_train_samples: 500
-      - max_eval_samples: 100
-- [ ] R6: Service restart before training to free VRAM
-- [ ] R7: Monitor loss trajectory; verify early stopping saves
-      the min-eval-loss checkpoint
-- [ ] R8: Auto-registered adapter → release + promote
+- [ ] R9: Register `training_set_versions.v7` via API (file:
+      `training-sets/math-example-v7-chat-template.jsonl`,
+      already built by `scripts/prep_math_v7_chat_template.py`)
+- [ ] R10: Release + promote v7
+- [ ] R11: Launch training run: Instruct base, v7 training set,
+      `max_train_samples=10`, `epochs=1`, `lora_r=16` — only
+      goal is to prove end-to-end pipeline, not research
+- [ ] R12: Verify H78a, H78b, H78c
+- [ ] R13: If smoke-run fails: iterate on train.py until it passes
+      before closing TB-US-078
 
-### Phase 4 — Measurement
+### Phase 4 — Close
 
-- [ ] R9: Create E_in + E_holdout experiments pinning the new
-      adapter + harness v4 (baseline test) + harness v5 (holdout)
-- [ ] R10: Launch sequentially; measure both strict (via
-      patched harness) and lenient (post-hoc)
-
-### Phase 5 — Interpretation
-
-- [ ] R11: Compare 4 columns:
-      - Bare Instruct (E19, 43%)
-      - Adapter v5 (E18, 23%)
-      - Adapter v6 (E_holdout, new result)
-      - Lenient re-score of adapter v6 (sanity check vs. strict)
-- [ ] R12: Per-sample inspection: do adapter v6 outputs have
-      the dual-`####` structure like bare Instruct?
-- [ ] R13: Mark H5a-H5d met / partial / not-met with concrete
-      numeric values
-
-### Phase 6 — Documentation
-
-- [ ] R14: Trial #5 entry in search log (4-field format: what-did
-      / what-found / what-decided / rationale)
-- [ ] R15: Deep dive at `docs/math-example/instruct-chat-template-results.md`
-- [ ] R16: Update summary table in search log
-- [ ] R17: If H5c met (≥50% holdout): update Pages +
-      sweet-spot-exploration with the new adapter as the demo
-- [ ] R18: If H5b failed (< 43%): draft TB-US-079 with the next
-      direction to try
-
-### Phase 7 — Close
-
-- [ ] R19: Commit + push + close TB-US-078 + fire notification
+- [ ] R14: Commit + push + flip TB-US-078 → Completed in
+      BACKLOG.md + fire closure notification
+- [ ] R15: Flip TB-US-079 (Trial #5) → unblocked / ready-to-fire
 
 ## Acceptance Criteria
 
-- [ ] AC1: Training-data script v7 produces chat-template-formatted
-      output; disjoint from holdout
-- [ ] AC2: Training set v7 registered + promoted
-- [ ] AC3: Adapter v6 trained + auto-registered + released +
-      promoted
-- [ ] AC4: Both measurement experiments complete at n=200 strict
-- [ ] AC5: Trial #5 entry in search log with 4 required fields
-      populated
-- [ ] AC6: `instruct-chat-template-results.md` deep dive exists
-- [ ] AC7: H5a-H5d all have outcomes recorded
-- [ ] AC8: Pages site reflects whichever is the current best
-      demo (bare Instruct if H5c failed; adapter v6 if H5c met)
-- [ ] AC9: If H5b failed, TB-US-079 drafted
-- [ ] AC10: If multiple sub-hypotheses need separate trials,
-      each gets its own TB-US-NNN
+- [ ] AC1: `train.py` reads training data from the JSONL path,
+      not `load_from_disk`
+- [ ] AC2: `format_training_example` and the `datasets/math/data`
+      default fallback are deleted
+- [ ] AC3: `/training/runs/launch` validates the training set's
+      file exists and passes it to train.py
+- [ ] AC4: Smoke-run completes end-to-end
+- [ ] AC5: H78a (pipeline works), H78b (text verbatim), H78c
+      (native `####`) all have recorded outcomes
+- [ ] AC6: Architectural finding deep dive exists
+- [ ] AC7: methodology / study-design / search-log all updated
+      with the finding
+- [ ] AC8: TB-US-079 unblocked and ready to fire as Trial #5
 
 ## Design Notes
 
-- **Why chat-template format is the primary hypothesis.** The
-  F13 analysis in `instruct-scale-up-results.md` shows our raw
-  CoT training format deleted Instruct's `####-at-end` summary
-  behavior. Instruct is trained on chat-template-formatted
-  conversations; aligning our training format with that should
-  preserve the native structure.
-- **Why rank 8 (smallest reasonable).** Rank 32 (Trial #4)
-  evidently perturbed too much. Rank 8 is the minimum "credibly
-  non-trivial" rank for an 8B model. If rank 8 + chat template
-  doesn't help, the issue isn't rank; it's training data or
-  framing.
-- **Why only 500 samples (same as Trial #4).** Keeps the sample
-  count cross-trial-comparable so we can isolate the effect of
-  format + rank changes. If this trial fails, TB-US-079 can
-  scale up data.
-- **Why 3 epochs instead of 5.** Instruct is already good at
-  this task. Less training = less perturbation = less chance
-  of damaging native behavior. Early stopping will trim further
-  if eval loss plateaus early.
-- **One iteration per story**: same scope-cap as TB-US-075-077.
-  Prevents open-ended research loops.
+- **Why not keep the old codepath as a fallback.** No current
+  training run needs it; keeping it introduces a hidden mode
+  switch that complicates reproducibility documentation. If a
+  future story genuinely needs raw-GSM8K-via-HF, it can be
+  re-introduced then with explicit framing.
+- **Why the eval dataset stays raw GSM8K `test`.** Eval is a
+  reference measurement, not a research variable. Chat-template
+  formatting is applied so eval-loss and train-loss are
+  computed on comparable sequences, but the eval dataset itself
+  doesn't become a `training_set_version` row.
+- **Why smoke-run uses 10 samples / 1 epoch.** The point is
+  pipeline validation (H78a-c), not performance measurement.
+  Trial #5 is the performance measurement, and TB-US-079 owns it.
+- **"text field verbatim" discipline.** The JSONL prep script
+  (`scripts/prep_math_v7_chat_template.py`) is where format
+  decisions live. train.py's job is to tokenize what it's given,
+  not to re-format. This separation lets future trials try
+  different formatting approaches by changing only the prep
+  script.
 
 ## Out of Scope
 
-- Non-Llama base models (DeepSeek-math, Mistral, Qwen) — stay
-  Llama 3.1 family for continuity
-- Full fine-tuning (not LoRA) — too expensive on 8B
-- Multi-run averaging (one run; stochastic noise accepted)
-- RAG augmentation (TB-US-075 Phase 8, still skippable)
-- Hyperparameter grid search
+- Trial #5 itself (TB-US-079)
+- Retroactive re-training of v4/v5/v6 adapters under correct
+  wiring (not valuable — those trials' key findings don't change
+  under the correct wiring; documented in the architectural
+  finding doc)
+- Migration of existing `training-sets/*.jsonl` files from v4/v5/v6
+  to be "trainable" under the new wiring (not needed — v4/v5/v6
+  wasn't actually training on those files; they're historical
+  provenance artifacts only)
+- Retraining the GSM8K eval set as a separate `training_set_version`
+  — eval is a reference, not a variable
 
 ## Related
 
-- [TB-US-077](tb-us-077.md) — Trial #4 (base scale-up); produced
-  the regression finding this story investigates
-- [`instruct-scale-up-results.md`](../math-example/instruct-scale-up-results.md)
-  — Trial #4 deep dive; F13 analysis motivates H5a
-- [TB-US-075](tb-us-075.md), [TB-US-076](tb-us-076.md) —
-  prior trials in the search
-- Files touched (during execution):
-  - `scripts/prep_math_v7_chat_template.py` (new, R3)
-  - `training-sets/math-example-v7-chat-template.jsonl` (new, R3)
-  - `training_set_versions.v7` (R4)
-  - `adapter_versions.v6` (R8)
-  - `training_runs.id` ≈ 12 (R5)
-  - 2 new experiments (E_in, E_holdout)
-  - `docs/math-example/study-design.md` (R1, append Trial #5)
-  - `docs/math-example/sweet-spot-search-log.md` (R2, R14, R16)
-  - `docs/math-example/instruct-chat-template-results.md` (R15, new)
-  - `docs/pages/staged-progression.md` (R17, conditional)
+- [TB-US-077](tb-us-077.md) — Trial #4; produced the F13 analysis
+  that led to Trial #5 preparation + the architectural discovery
+- [TB-US-065](tb-us-065.md) — the training-run API that introduced
+  the wiring gap being fixed here
+- [TB-US-052](tb-us-052.md), [TB-US-063](tb-us-063.md) — the
+  versioning primitives whose wiring this story completes
+- [TB-US-079](tb-us-079.md) — Trial #5 proper (unblocked by this)
+- `docs/math-example/architectural-finding-training-set-wiring.md`
+  (new, R5)
+- Files touched:
+  - `training/math/train.py` (R1, R2, R3)
+  - `backend/api/main.py` (R4)
+  - `backend/api/training_set_version_manager.py` (public
+    `sidecar_path` accessor for R4)
+  - `docs/math-example/architectural-finding-training-set-wiring.md` (R5, new)
+  - `docs/math-example/sweet-spot-search-log.md` (R6)
+  - `docs/math-example/methodology.md` (R7)
+  - `docs/math-example/study-design.md` (R8)
+  - `BACKLOG.md` (R14)
+
+## Completion Notes (2026-11-02)
+
+### Smoke-run (R9–R12) results
+
+- **R9**: `training_set_versions.v7` registered via API from
+  `training-sets/math-example-v7-chat-template.jsonl` (1000
+  samples, seed=46, chat-template-formatted, disjoint from
+  holdout). `content_sha256 = 13adefc8…` Sidecar JSONL written
+  at `training/datasets/training_set_versions/v7.jsonl` (2.1 MB).
+- **R10**: v7 released + promoted (both API calls returned 200).
+- **R11**: smoke training run #12 launched via
+  `/training/runs/launch` with `training_set_version_id=7`,
+  `max_train_samples=10`, `epochs=1`, Instruct base, rank 16.
+  Launch endpoint resolved sidecar path and stored
+  `_training_set_jsonl` in the run config.
+- Training completed in 12.6 seconds (model load + 3 optimizer
+  steps + save). Train losses: 2.36 → 2.87 → 2.44. Eval loss:
+  2.25. Adapter auto-registered as `adapter_versions.v6` with
+  `training_set_version_id = 7` provenance linkage (correct).
+
+### Hypothesis outcomes
+
+- **H78a — pipeline works end-to-end**: ✅ PASS
+  - `_training_set_jsonl` in run #12 config:
+    `/home/jeversole/trainingbench/training/datasets/training_set_versions/v7.jsonl`
+  - Run status: `completed`
+  - 3 training steps logged in `training_run_metrics`
+  - Adapter v6 auto-registered with `training_set_version_id=7`
+  - Files written: `adapter_config.json`,
+    `adapter_model.safetensors`, `tokenizer.json`,
+    `training_args.bin`, `README.md`
+
+- **H78b — `text` field used verbatim**: ✅ PASS (by code
+  inspection)
+  - `prepare_dataset()` has one tokenization path:
+    `tokenizer(examples["text"], …)`. The `_load_training_set_jsonl`
+    loader requires every row carry a `text` field (sys.exit if
+    missing). No re-formatting codepath exists after
+    `format_training_example` was deleted.
+
+- **H78c — adapter LOADS + GENERATES + has native `####`**: ✅
+  PASS by inspection (with smoke-scale caveat)
+  - 3 holdout questions generated through PeftModel-loaded
+    smoke adapter + bare Instruct base
+  - Q0 output ended with `#### $43` (native structure, unit
+    prefix) — see interpretation note below
+  - Q1 output ended with `#### 28` (native structure, bare)
+  - Q2 output truncated at max_new_tokens=256 before reaching
+    marker
+  - **Zero** outputs contained `Final Answer:` (the adapter v5
+    regression pattern)
+  - Caveat: smoke-scale training (10 samples × 1 epoch) is
+    insufficient to meaningfully shift output distribution; the
+    `####-at-end` observations likely reflect bare Instruct's
+    native behavior more than training signal. Trial #5
+    (TB-US-079) is where the training-signal effect becomes
+    measurable.
+
+### Observed quirk — `#### $N` unit-prefixed outputs
+
+Instruct sometimes emits `#### $43` (or `#### 42%`) rather than
+bare `#### 43` for money/percentage answers. The strict harness
+regex `####\s*([-+]?\d[\d,.]*)` MISSES these matches, but the
+patched harness's priority-3 trailing-number fallback catches
+them, so accuracy scoring is correct. H5a interpretation for
+Trial #5 updated to pre-register that `#### $N` counts as
+native-structure-preserved. See TB-US-079's H5a notes.
+
+### Acceptance criteria status
+
+- ✅ AC1: `train.py` reads training data from JSONL
+- ✅ AC2: `format_training_example` + `datasets/math/data`
+  default fallback deleted
+- ✅ AC3: `/training/runs/launch` validates + passes JSONL path
+- ✅ AC4: Smoke-run completed end-to-end
+- ✅ AC5: H78a / H78b / H78c outcomes recorded
+- ✅ AC6: Architectural finding deep dive exists
+- ✅ AC7: methodology / study-design / search-log all updated
+- ✅ AC8: TB-US-079 unblocked (ready to fire at operator's call)

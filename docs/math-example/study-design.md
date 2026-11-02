@@ -273,3 +273,153 @@ appropriate skepticism.
 - **RAG hypothesis test is conditional.** Phase 8 only runs if
   Phase 7 completes AND operator chooses to extend. A null result
   on RAG is itself a useful finding.
+
+---
+
+## Methodological framework
+
+**On 2026-11-02, operator shifted the project focus from
+"ship a demo" to "produce a publishable study on when PEFT helps
+vs. harms strong instruction-tuned bases".** The stable research
+protocol lives at [`methodology.md`](methodology.md). Every trial
+pre-registered below follows that protocol (reproducibility
+checklist, threats to validity, confirmation-bias checks,
+pre-registered thresholds locked before result inspection).
+
+Trials below append in chronological order. Earlier trial sections
+(above this line) remain as originally registered; interpretation
+notes are added via the search log, not via retroactive editing.
+
+### Trials #1–#4 wiring note (added 2026-11-02 retrospectively)
+
+The sections above describing Set 3 (training set) presumed that
+`training_set_versions` drove training-data input. **This was
+not true for Trials #1 through #4** — see
+[`architectural-finding-training-set-wiring.md`](architectural-finding-training-set-wiring.md).
+`train.py` unconditionally read raw GSM8K via `load_from_disk`
+and selected the first N rows after HF's default shuffle;
+`training_set_version_id` was pure provenance decoration until
+TB-US-078 fixed the wiring. Hyperparameter comparisons across
+Trials #1–#4 remain valid; apparent training-set variation does
+not. Trial #5 (TB-US-079) is the first trial under corrected
+wiring where the registered `training_set_version` is the actual
+training data source.
+
+---
+
+## Trial #5 pre-registration — chat-template PEFT on Instruct (TB-US-079)
+
+**Registered**: 2026-11-02 (updated TB-US-078 → TB-US-079 after
+TB-US-078 was rescoped to the architectural fix on the same day)
+**Status at registration**: hypothesis-only; no runs yet
+**Rationale documents**:
+- [`instruct-scale-up-results.md`](instruct-scale-up-results.md)
+  (Trial #4 finding — training approach regressed Instruct from
+  43% to 23%; F13 format mismatch)
+- [`architectural-finding-training-set-wiring.md`](architectural-finding-training-set-wiring.md)
+  (why Trial #5 is the first trial where
+  `training_set_versions.v7` is the actual training data —
+  fixed by TB-US-078)
+
+**Prerequisite**: TB-US-078 smoke-run must pass before Trial #5
+launches (confirms the JSONL training path works end-to-end).
+
+### Research question (Trial #5)
+
+Does training on **chat-template-formatted data** (matching
+Instruct's native response format) with a **smaller LoRA
+perturbation** (rank 16 vs. Trial #4's rank 32) **preserve or
+improve** on bare Instruct's 43% holdout accuracy?
+
+### Primary hypothesis (H5-primary)
+
+**Alternative**: a QLoRA adapter trained with these dial changes
+will achieve holdout accuracy ≥ **43% ± 5pt** (does not regress
+bare Instruct within noise bounds).
+
+**Null**: holdout accuracy < 38% (reproduces Trial #4's
+regression signal; approach-change doesn't help).
+
+**Primary decision threshold**: holdout ≥ 43% at `n_samples=200`
+= alternative accepted. Below 38% = null supported. 38–43%
+inconclusive, treated as null until replicated.
+
+### Secondary hypotheses
+
+| ID | Claim | Measurable |
+|---|---|---|
+| H5a | Chat-template-formatted outputs preserve dual-`####` structure | per-sample inspection: ≥50% of outputs have 2+ `####` matches (bare Instruct: ~75%; adapter v5 Trial #4: ~15%) |
+| H5c | Meaningful improvement over bare | holdout ≥ 50% (bare + 7pt) |
+| H5c-strong | Published-range improvement | holdout ≥ 60% |
+| H5d | Early stopping triggers before epoch 3 | validated by training 11 pattern — eval loss plateau |
+
+### Training configuration (locked)
+
+| Hyperparameter | Trial #4 | **Trial #5** | Rationale |
+|---|---|---|---|
+| Base | Instruct | Instruct (same) | isolates data+rank effect |
+| **Training data format** | Raw CoT prose | **Chat template** (`apply_chat_template()`) | matches Instruct's SFT format |
+| **LoRA rank** | 32 | **16** | smaller perturbation |
+| LoRA alpha | 64 | 32 (2× rank) | standard ratio |
+| LoRA dropout | 0.05 | 0.05 | unchanged |
+| Learning rate | 2e-4 | **1e-4** | slower perturbation |
+| Epochs | 5 | 3 | less risk of overfitting |
+| Batch size | 4 | 4 | unchanged |
+| Gradient accumulation | 4 | 4 | unchanged |
+| **Training samples** | 500 | **1000** | more signal to replace, not just damage |
+| Max eval samples | 100 | 100 | unchanged |
+| Early stopping | enabled | enabled (inherited from Trial #4 infrastructure) | |
+
+### Training set composition (new: v7)
+
+- Source: GSM8K train split
+- Count: 1000 problems
+- Sampling seed: 46 (distinct from prior sampling seeds)
+- Format: each training example formatted via
+  `tokenizer.apply_chat_template([{"role":"system","content":"<prompt v3>"}, {"role":"user","content":"<question>"}, {"role":"assistant","content":"<full CoT answer>"}])`
+- Disjointness invariant: `v7 ∩ holdout = ∅` (enforced by script)
+- Overlap with v4 (failures) and v6 tolerated but reported
+
+### Pre-registered interpretation guide
+
+Decision mapping, locked before results seen:
+
+| Holdout result | Interpretation | Next step |
+|---|---|---|
+| < 38% | Null; regression confirmed with new approach | TB-US-080: try different lever (larger data, different PEFT method, chat-template format but keeps rank 32) |
+| 38–43% | Inconclusive; within noise of bare | Multi-seed replicate OR adjust one dial and rerun |
+| 43–50% | Alternative accepted (no regression) | Document; try to push higher in TB-US-080 |
+| 50–60% | Meaningful improvement; secondary H5c met | Document as positive result; publication candidate |
+| 60–75% | Strong result; close to published range | Headline finding; multi-seed replicate for publication |
+| > 75% | Suspect — too good; check for test-set leakage | Audit disjointness, check seeds, re-run with fresh samples |
+
+### Reproducibility declaration
+
+Per [`methodology.md`](methodology.md) reproducibility checklist.
+Specific values for Trial #5 locked at run time + captured in
+`instruct-chat-template-results.md`.
+
+### Threats to validity flagged (pre-run)
+
+- **Internal**: chat template implementation may vary across HF
+  Transformers versions — pin the exact `transformers` version
+  used. Verify chat template produces expected format by
+  inspecting 1-2 formatted samples before training launches.
+- **External**: result applies to Llama 3.1 8B Instruct
+  specifically; generalization to other Instruct bases requires
+  separate study.
+- **Construct**: "no regression" is a weak alternative; a result
+  of exactly 43% could be either "didn't help" or "would help
+  with more data" — ambiguity acknowledged.
+- **Statistical**: single-run; result within ±5pt of 43%
+  interpreted as inconclusive, not confirmatory. Multi-seed
+  replicate if we land in 38–48% zone.
+
+### Confirmation-bias checklist (apply at close)
+
+- [ ] Did we interpret per pre-registered thresholds, not
+      narrative preference?
+- [ ] Did we review ≥10 right + ≥10 wrong samples by hand?
+- [ ] Is a reasonable alternative explanation ruled out?
+- [ ] Would the follow-up be different if the result had been
+      the opposite?

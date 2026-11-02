@@ -3649,6 +3649,39 @@ async def launch_training_run(
         f"training/adapters/{req.run_name}",
     )
 
+    # TB-US-078: resolve training_set_version → sidecar JSONL path so
+    # train.py reads from the registered training set (not raw GSM8K).
+    # Required for all launches; the training_set_version_id arrived
+    # via the request body.
+    if req.training_set_version_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="training_set_version_id is required (TB-US-078: train.py "
+                   "now reads training data from the version's sidecar JSONL).",
+        )
+    ts_version_row = training_set_version_manager.get_by_id(req.training_set_version_id)
+    if ts_version_row is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"training_set_version_id={req.training_set_version_id} not found",
+        )
+    ts_jsonl_path = training_set_version_manager.sidecar_path(req.training_set_version_id)
+    if not ts_jsonl_path.exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"training-set sidecar JSONL missing at {ts_jsonl_path} "
+                   f"(version_id={req.training_set_version_id}). Re-register "
+                   f"the training set or restore the sidecar.",
+        )
+
+    # Launch config: carry the resolved JSONL path so train.py's TB-US-065
+    # override block can set args.training_set_jsonl from it.
+    launch_config = {
+        **req.hyperparameters,
+        "base_model": req.base_model,
+        "_training_set_jsonl": str(ts_jsonl_path),
+    }
+
     # R3: create DB row BEFORE spawn
     try:
         row = training_run_tracker.create_launched_run(
@@ -3656,7 +3689,7 @@ async def launch_training_run(
             description=req.description,
             base_model=req.base_model,
             adapter_output_path=adapter_output_path,
-            config={**req.hyperparameters, "base_model": req.base_model},
+            config=launch_config,
             created_by=user_info["username"],
             agent_id=req.agent_id,
             training_set_version_id=req.training_set_version_id,

@@ -97,6 +97,12 @@ class TrainingSetVersionManager(VersionedComponentManager):
                 samples.append(json.loads(line))
         return samples
 
+    def sidecar_path(self, version_id: int) -> Path:
+        """TB-US-078: public accessor for the sidecar JSONL path. Used by
+        `/training/runs/launch` to pass the training-set file to train.py.
+        """
+        return self._sidecar_path(version_id)
+
     # ------------------------------------------------------------------ #
     # Internals
     # ------------------------------------------------------------------ #
