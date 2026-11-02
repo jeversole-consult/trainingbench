@@ -311,20 +311,66 @@ Deep dives per trial:
 - [Trial #2 — harness-tolerance-results.md](harness-tolerance-results.md)
 - [Trial #3 — format-retrain-results.md](format-retrain-results.md)
 
-### Current demo adapter
+## Phase E — Instruct scale-up (TB-US-077, Trial #4)
 
-**`adapter_versions.v3`** — 19% in-sample / 26% out-of-sample on
-the shipped harness (patched). The Pages site shows these
-numbers. Adapter v4 remains in the DB (released, not deprecated)
-for traceability but isn't the current promoted version.
+**Date**: 2026-11-02
+**Owned by**: TB-US-077 (sibling story)
 
-### Open next-trial candidates
+TB-US-057 Phase C's "biggest lever" (swap to Instruct variant)
+was executed in Trial #4. Also included: 500 random GSM8K samples
+(up from 200) + an early-stopping callback added to `train.py`.
+Pre-registered expectation: holdout 55–75%.
 
-Captured in the search log. Includes:
-- Retrain at 5-7 epochs on the v5 training set (not v4's 10)
-- Add early-stopping callback to `train.py`
-- Swap base to Llama 3.1 8B Instruct (TB-US-057 Phase C's
-  "biggest lever")
-- Format-only short-drill training set
+### Headline Phase E results
 
-None are drafted as stories yet; operator picks what fires next.
+| Setup | Holdout score |
+|---|---|
+| Instruct + our adapter v5 (5 ep × 500, early stop) | 46 / 200 (23%) |
+| **Instruct alone, no adapter (E19 control)** | **86 / 200 (43%)** |
+
+**Trial #4 was a failed hypothesis + a valuable methodological
+finding**: our training approach, which HELPED the base variant
+(0% → 26% in Trial #2), **REGRESSED** the Instruct variant
+(43% → 23%). Loading adapter v5 cost 40 correct answers on the
+same 200 holdout questions.
+
+### Root cause (F13 — "answer-first" pattern mismatch)
+
+Bare Instruct's natural response: `#### <guess> + reasoning +
+"The final answer is: #### <corrected>"`. The LAST `####` is
+usually the right answer; harness regex picks it up.
+
+Our training data: pure GSM8K format with `#### N` once at the
+end. 500 samples × 5 epochs taught the adapter to produce ONE
+`####` at the top and drop the end-of-reasoning summary. Harness
+then catches the initial wrong guess.
+
+**Our LoRA perturbation deleted Instruct's end-of-reasoning
+answer-confirmation behavior without replacing it with equivalent
+competence.**
+
+### Current demo configuration (updated)
+
+**Bare Llama 3.1 8B Instruct, no adapter** — 43% on 200 holdout
+GSM8K problems, zero TB-specific training. Pages site reflects
+this. Adapter v3, v4, v5 all remain in the DB as part of the
+search history; none is the current demo.
+
+### Deep dive
+
+- [Trial #4 — instruct-scale-up-results.md](instruct-scale-up-results.md)
+
+### Open next-trial directions (TB-US-078 captures)
+
+Trial #4's finding motivates a Trial #5 that tests training
+approaches which PRESERVE Instruct's native response structure
+instead of damaging it:
+
+- Chat-template-formatted training data (`<|system|>` + `<|user|>`
+  + `<|assistant|>` turns via `tokenizer.apply_chat_template`)
+- Lower LoRA rank (8 or 16 vs. our 32) — smaller perturbation
+- More training data (2000-5000 samples) with early stopping
+- Different task framing in the system prompt
+
+Pre-registered expectation range for Trial #5: 43% (no regression)
+to 60% (modest improvement). TB-US-078 is drafted but not yet fired.

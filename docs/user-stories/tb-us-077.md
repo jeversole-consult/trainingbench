@@ -1,9 +1,11 @@
 # TB-US-077: Scale up to credible demo numbers — Instruct base + larger training + early stopping
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-11-01
+**Started**: 2026-11-01
+**Completed**: 2026-11-02
 **Author**: Jesse Eversole
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <filled in on closure commit>
 
 ## Story
 
@@ -76,40 +78,40 @@ Three changes vs. Trial #3's config:
 
 ### Phase 1 — Pre-registration
 
-- [ ] R1: **Update** `docs/math-example/study-design.md` with
+- [x] R1: **Update** `docs/math-example/study-design.md` with
       Trial #4 pre-registered hypotheses (see Hypotheses
       below). Append-only addition, not editing existing text.
-- [ ] R2: **Append Trial #4 planning entry** to
+- [x] R2: **Append Trial #4 planning entry** to
       `sweet-spot-search-log.md` with status "launching"
       (what-we-did section fills in after measurement).
 
 ### Phase 2 — Infrastructure (train.py early stopping)
 
-- [ ] R3: Edit `training/math/train.py` to add
+- [x] R3: Edit `training/math/train.py` to add
       `transformers.EarlyStoppingCallback(early_stopping_patience=2)`
       to the Trainer's `callbacks` list.
-- [ ] R4: Update the `TrainingArguments` call to include
+- [x] R4: Update the `TrainingArguments` call to include
       `load_best_model_at_end=True`,
       `metric_for_best_model="eval_loss"`,
       `greater_is_better=False`.
-- [ ] R5: Preserve the `report_to="none"` fix from TB-US-066.
-- [ ] R6: Confirm no regression on existing TB-US-065 integration
+- [x] R5: Preserve the `report_to="none"` fix from TB-US-066.
+- [x] R6: Confirm no regression on existing TB-US-065 integration
       (the callback is additive).
 
 ### Phase 3 — Training set v6
 
-- [ ] R7: `scripts/prep_math_v6_random_scale.py` — new script.
+- [x] R7: `scripts/prep_math_v6_random_scale.py` — new script.
       500 problems sampled from GSM8K train split with seed=45,
       written to
       `training-sets/math-example-v6-random-scale.jsonl`.
-- [ ] R8: Disjointness check: `v6 ∩ holdout = ∅`. Fail-fast if
+- [x] R8: Disjointness check: `v6 ∩ holdout = ∅`. Fail-fast if
       overlap detected.
-- [ ] R9: Register as `training_set_versions.v6` on agent 3 via
+- [x] R9: Register as `training_set_versions.v6` on agent 3 via
       API; release + promote.
 
 ### Phase 4 — Training (adapter v5)
 
-- [ ] R10: Launch training via `POST /training/runs/launch` with
+- [x] R10: Launch training via `POST /training/runs/launch` with
       pre-registered hyperparameters:
       - base_model: `meta-llama/Meta-Llama-3.1-8B-Instruct`
       - training_set_version_id: 6 (v6)
@@ -118,40 +120,40 @@ Three changes vs. Trial #3's config:
       - **epochs: 5** (early stopping will trim if applicable)
       - batch_size: 4, gradient_accumulation_steps: 4
       - max_train_samples: 500, max_eval_samples: 100
-- [ ] R11: Confirm service restart freed VRAM before training
+- [x] R11: Confirm service restart freed VRAM before training
       (per TB-US-076 operational lesson)
-- [ ] R12: Monitor training; capture full loss trajectory in
+- [x] R12: Monitor training; capture full loss trajectory in
       metrics table
-- [ ] R13: Adapter auto-registered as `adapter_versions.v5`;
+- [x] R13: Adapter auto-registered as `adapter_versions.v5`;
       release + promote
 
 ### Phase 5 — Measurement
 
-- [ ] R14: Create E_in (in-sample baseline test; adapter v5 +
+- [x] R14: Create E_in (in-sample baseline test; adapter v5 +
       harness v4 + prompt v3) and E_holdout (adapter v5 +
       harness v5 + prompt v3)
-- [ ] R15: Serial-run both at `n_samples=200`
-- [ ] R16: Capture results in both strict (harness
+- [x] R15: Serial-run both at `n_samples=200`
+- [x] R16: Capture results in both strict (harness
       answer-extraction) scoring
 
 ### Phase 6 — Documentation
 
-- [ ] R17: Trial #4 entry in `sweet-spot-search-log.md` filled
+- [x] R17: Trial #4 entry in `sweet-spot-search-log.md` filled
       in with what-we-did / what-we-found / what-we-decided /
       rationale
-- [ ] R18: Deep dive at
+- [x] R18: Deep dive at
       `docs/math-example/instruct-scale-up-results.md`
-- [ ] R19: Update `docs/pages/staged-progression.md` with
+- [x] R19: Update `docs/pages/staged-progression.md` with
       Trial #4's numbers (replaces or supplements Trial #2's
       19%/26%)
-- [ ] R20: Update `docs/math-example/sweet-spot-exploration.md`
+- [x] R20: Update `docs/math-example/sweet-spot-exploration.md`
       with Phase E section + pointer to Trial #4
-- [ ] R21: Update summary table in `sweet-spot-search-log.md`
+- [x] R21: Update summary table in `sweet-spot-search-log.md`
 
 ### Phase 7 — Close
 
-- [ ] R22: Commit + push + close TB-US-077 + fire notification
-- [ ] R23: Candidate follow-up stories drafted (if any
+- [x] R22: Commit + push + close TB-US-077 + fire notification
+- [x] R23: Candidate follow-up stories drafted (if any
       pre-registered hypothesis didn't land)
 
 ## Pre-registered hypotheses (Trial #4)
@@ -213,26 +215,26 @@ already-strong base).
 
 ## Acceptance Criteria
 
-- [ ] AC1: Early-stopping callback integrated in `train.py` + no
+- [x] AC1: Early-stopping callback integrated in `train.py` + no
       regression on TB-US-065's launch flow
-- [ ] AC2: Training set v6 (500 random GSM8K train-split
+- [x] AC2: Training set v6 (500 random GSM8K train-split
       problems) registered on agent 3, released + promoted,
       strictly disjoint from holdout
-- [ ] AC3: Adapter v5 trained successfully with Instruct base;
+- [x] AC3: Adapter v5 trained successfully with Instruct base;
       full loss trajectory captured
-- [ ] AC4: In-sample experiment at `n_samples=200` completes
+- [x] AC4: In-sample experiment at `n_samples=200` completes
       with results
-- [ ] AC5: Holdout experiment at `n_samples=200` completes
+- [x] AC5: Holdout experiment at `n_samples=200` completes
       with results
-- [ ] AC6: Trial #4 entry in `sweet-spot-search-log.md`
+- [x] AC6: Trial #4 entry in `sweet-spot-search-log.md`
       populated with findings + decision + rationale
-- [ ] AC7: `instruct-scale-up-results.md` deep dive exists
-- [ ] AC8: Public `staged-progression.md` reflects Trial #4
+- [x] AC7: `instruct-scale-up-results.md` deep dive exists
+- [x] AC8: Public `staged-progression.md` reflects Trial #4
       results
-- [ ] AC9: If H4b (≥55% holdout) is NOT met, follow-up story
+- [x] AC9: If H4b (≥55% holdout) is NOT met, follow-up story
       drafted with the next-trial-candidate scope (per
       TB-US-068 AC8 pattern)
-- [ ] AC10: Operator attests the Trial #4 result is credible
+- [x] AC10: Operator attests the Trial #4 result is credible
       enough for public demo (soft criterion)
 
 ## Design Notes

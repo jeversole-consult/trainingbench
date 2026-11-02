@@ -24,7 +24,52 @@ and measured.
 pedagogical artifacts. The workflow is what the first-install example
 demonstrates — not performance.
 
-## Targeted retraining — the predictive-modeling demo (2026-10-31)
+## The current credible demo: bare Llama 3.1 8B Instruct (2026-11-02)
+
+After four trials of training LoRA adapters, the strongest
+math-example result turned out to be **the simplest: just use the
+Instruct variant of the base model with no TB-specific training
+at all**.
+
+| Setup | Holdout GSM8K accuracy (strict `#### N`-aware harness) |
+|---|---|
+| **Llama 3.1 8B Instruct, no adapter** | **86 / 200 (43%)** |
+| Llama 3.1 8B base + our best QLoRA adapter | 52 / 200 (26%) |
+
+**43% out-of-the-box** on an 8B model is a credible headline for a
+public-cut demo. We got there by discovering that our previous
+adapter-training approach actively regressed Instruct's performance
+(trained adapter v5 dropped Instruct from 43% to 23% on the same
+200 questions). The methodology surfaced this because we required
+a bare-base control measurement — see Trial #4 in the
+[search log](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/sweet-spot-search-log.md).
+
+### How to reproduce
+
+```python
+# Zero-training path (what the public demo currently uses)
+from transformers import AutoTokenizer, AutoModelForCausalLM
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct")
+# ... load TB system prompt v3 and the 200-sample GSM8K harness
+# Measured: 86/200 = 43%
+```
+
+Full detail:
+[`instruct-scale-up-results.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/instruct-scale-up-results.md).
+
+### Can we do better than 43%?
+
+Published Llama 3.1 8B Instruct + math-LoRA numbers land in the
+70–85% range, so there's clearly headroom. But our first attempt
+(TB-US-077) regressed. [TB-US-078](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-078.md)
+drafts the next investigation: training on chat-template-formatted
+data at lower LoRA rank, which should preserve Instruct's native
+response structure instead of damaging it.
+
+---
+
+## Historical: Targeted retraining on the base variant (2026-10-31)
 
 To prove the workflow does more than "ships at zero",
 [TB-US-075](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-075.md)

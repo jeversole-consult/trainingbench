@@ -22,6 +22,7 @@ from transformers import (
     Trainer,
     DataCollatorForLanguageModeling,
     BitsAndBytesConfig,
+    EarlyStoppingCallback,
 )
 from peft import (
     LoraConfig,
@@ -346,6 +347,13 @@ def train(
         save_steps=save_steps,
         eval_strategy=eval_strategy,
         eval_steps=eval_steps,
+        # TB-US-077: when eval runs, make save_strategy match eval_strategy.
+        # Required by HF Trainer when load_best_model_at_end=True — the
+        # eval + save intervals must align so there's a saved checkpoint
+        # at each eval step to pick from. For eval_strategy="no" we
+        # retain the default steps-based save (checkpointing is
+        # independent of best-model selection in that case).
+        save_strategy=eval_strategy if eval_strategy != "no" else "steps",
         save_total_limit=3,
         fp16=True,
         optim="paged_adamw_8bit",
@@ -354,7 +362,15 @@ def train(
         max_grad_norm=0.3,
         weight_decay=0.001,
         lr_scheduler_type="cosine",
-        load_best_model_at_end=(eval_strategy == "steps"),
+        # TB-US-077: load the best-eval-loss checkpoint at the end
+        # (previously only when eval_strategy=="steps"). Combined with
+        # EarlyStoppingCallback below, this means the saved adapter
+        # is from the step with minimum eval_loss, not the final step.
+        # Prevents Trial #3-style overfitting from shipping the last
+        # (worst) checkpoint.
+        load_best_model_at_end=(eval_strategy != "no"),
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
     )
 
     # Data collator
@@ -377,6 +393,15 @@ def train(
     # --run-id was passed.
     if extra_callbacks:
         callbacks.extend(extra_callbacks)
+
+    # TB-US-077: Early stopping. Watches eval_loss; stops training if it
+    # doesn't improve for `early_stopping_patience` evaluations.
+    # Combined with load_best_model_at_end=True + metric_for_best_model=
+    # "eval_loss", this means we SAVE the min-eval-loss checkpoint even
+    # if training continues a bit past it.
+    # Only applied when eval runs (eval_strategy != "no").
+    if eval_strategy != "no":
+        callbacks.append(EarlyStoppingCallback(early_stopping_patience=2))
 
     # Create trainer
     trainer = Trainer(

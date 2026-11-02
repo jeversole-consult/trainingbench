@@ -252,30 +252,158 @@ step** (added to the daemon in the Phase B rerun).
 
 ---
 
-## Summary table (as of 2026-11-01)
+## 2026-11-02 — Trial #4: Instruct variant + 500 random + early stopping (TB-US-077)
 
-| Trial | Adapter | Epochs × Samples | Strict in-sample | Strict holdout | Verdict |
-|---|---|---|---|---|---|
-| 1 | v3 (shipped harness pre-patch) | 5 × 200 | 0 / 200 | 0 / 200 | Hidden by harness bug |
-| 2 | v3 (patched harness) | — | **38 / 200 (19%)** | **52 / 200 (26%)** | **Real signal — demo result** |
-| 3 | v4 (10 epochs) | 10 × 300 | 12 / 200 (6%) | 15 / 200 (7.5%) | Overfit; cautionary |
+**What we did**: swapped the base to Llama 3.1 8B **Instruct**
+(previously `-8B` base variant). Trained `adapter_versions.v5`
+on `training_set_versions.v6` (500 random GSM8K train-split
+problems, seed=45, disjoint from holdout). Hyperparameters:
+LoRA rank 32, alpha 64, dropout 0.05, lr 2e-4, 5 epochs, batch 4,
+grad_accum 4. **New infrastructure**: added `EarlyStoppingCallback(patience=2)`
++ `load_best_model_at_end=True` + `metric_for_best_model="eval_loss"`
+to `training/math/train.py`. Measured in-sample (E17 against
+harness v4) and holdout (E18 against harness v5). After seeing
+unexpectedly low numbers, added a bare-Instruct control (E19,
+no adapter, same prompt + harness).
 
-**Current demo adapter**: v3 (released + promoted → displaced by
-v4 → may need re-promote-of-v3 if operator wants v3 as the
-active). Pages site reflects the Trial 2 numbers under strict
-scoring.
+**What we found**: training 11 completed in 797s (~13 min).
+Loss trajectory showed early-stopping-worthy behavior: eval_loss
+dropped 0.918 → 0.780 by epoch 3, then rose 0.780 → 0.874 by
+epoch 5. `load_best_model_at_end` correctly saved the step-96
+(epoch 3) checkpoint — H4d verified.
 
-**Open next-trial candidates** (not yet drafted as stories):
+Measurement with adapter v5 on top of Instruct:
+- E17 (in-sample): 38/200 (19.0%)
+- E18 (holdout):   46/200 (23.0%)
 
-1. Train adapter v5 at 5-7 epochs on the v5 training set (300
-   samples), see if more data at the right epoch count beats v3
-2. Add early-stopping callback to `train.py` to catch rising
-   eval_loss (code change, blocks TB-US-077+ if we go that route)
-3. Test format-only short-drill training set (would require a
-   new training-set version with Q→`#### N` short pairs)
-4. Swap base to Llama 3.1 8B **Instruct** (TB-US-057 Phase C's
-   "biggest lever"); would radically change the format story
-5. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
+**Headline from the control** (added as a diagnostic, not in the
+original Trial #4 plan):
+- **E19 (bare Instruct, no adapter): 86/200 (43.0%)**
+
+| Setup | Score |
+|---|---|
+| Instruct + our adapter v5 | 23% holdout |
+| **Instruct alone, no adapter** | **43% holdout** |
+
+**Our 20-min training REGRESSED Instruct by 20 points.** Loading
+adapter v5 on top of a strong instruction-tuned base cost 40
+correct answers on the same 200 holdout questions.
+
+Per-sample inspection confirms the cause (F13 "answer-first"
+pattern): both bare Instruct and adapter v5 produce `#### N` at
+the TOP of the output. But bare Instruct **also writes a second
+`#### N` at the end** inside a "The final answer is: #### N"
+sentence that corrects its initial guess. Our harness regex picks
+the last `####` → gets the correct final answer. Adapter v5 learned
+to produce ONE `####` early (matching our GSM8K training-answer
+format) + drops the end-of-reasoning summary → the regex catches
+the wrong initial guess.
+
+**Pre-registered hypotheses outcome**:
+
+| H | Threshold | Result | Verdict |
+|---|---|---|---|
+| H4a | in-sample ≥60% | 19% | not met |
+| H4b | holdout ≥55% (credibility) | 23% | **NOT MET** |
+| H4c | gap ≤5pt | 4pt | met |
+| H4d | early stop triggers | yes (step 96 checkpoint saved) | met |
+
+**But the real finding supersedes H1-H4**: training on top of a
+strong instruct-tuned base with our current approach **actively
+regresses performance**. The methodology correctly surfaced this
+by requiring the bare-Instruct control.
+
+**What we decided**:
+- Trial #4 is a **failed-hypothesis** result — but a **valuable
+  methodological finding**. "LoRA on Instruct with GSM8K-formatted
+  training data at 5 epochs regressed accuracy from 43% to 23%."
+- The current best math-example demo is **bare Instruct (43%)**
+  with zero TB-specific training.
+- Public Pages site now ships the 43% number as the credible demo
+  headline instead of adapter v3's 26%.
+- Followup drafted (TB-US-078) for investigating what training
+  approach would HELP Instruct — chat-template-formatted data,
+  smaller LoRA rank, larger training set, different task framing.
+
+**Rationale**: Instruct is already instruction-tuned by Meta via
+expensive SFT + RLHF. A 500-sample × 5-epoch QLoRA on top of
+that is a small perturbation that disrupts the sophisticated
+"guess + reason + confirm" response structure. The LoRA doesn't
+train hard enough to replace the native pattern with something
+equally sophisticated — it just damages what was working.
+
+**Open questions**:
+- Would training on **chat-template-formatted** data (`<|system|>`,
+  `<|user|>`, `<|assistant|>` turns) rather than raw CoT help
+  preserve Instruct's native response structure?
+- Would a **lower LoRA rank** (8 or 16 vs. our 32) create less
+  perturbation and leave Instruct's natural reasoning intact?
+- Is there a **minimum training-set size** below which LoRA on
+  Instruct is net-negative? (Our 500 samples wasn't enough.)
+- Would **task-prompting changes** (e.g., ask the model to think
+  before answering, use the proper Instruct chat template)
+  recover the lost accuracy?
+
+**Operational findings**:
+- First training attempt (run 10) failed in 7s with
+  `ValueError: --load_best_model_at_end requires the save and eval
+  strategy to match`. HF Trainer requires `save_strategy="epoch"`
+  when `eval_strategy="epoch"` + `load_best_model_at_end=True`.
+  Fixed by adding `save_strategy=eval_strategy if eval_strategy
+  != "no" else "steps"` to TrainingArguments. Lesson: when adding
+  `load_best_model_at_end`, also pin save strategy to match.
+- `EarlyStoppingCallback` is additive — no regression on
+  TB-US-065's existing launch flow.
+
+**Artifacts**:
+- [`instruct-scale-up-results.md`](instruct-scale-up-results.md) —
+  Trial 4 deep dive
+- Training run 11 in `runs_tracker.db`
+- Experiments 17 + 18 + 19 in `backend/db/trainingbench.db`
+- `adapter_versions.v5` on agent 3 (released + promoted;
+  **retained but not current demo** — bare Instruct wins)
+- `training_set_versions.v6` on agent 3 (released + promoted)
+- `scripts/prep_math_v6_random_scale.py` — reproducer
+- `train.py` patch: `EarlyStoppingCallback` + `load_best_model_at_end` +
+  `save_strategy` fix
+
+---
+
+## Summary table (as of 2026-11-02)
+
+| Trial | Base | Adapter | Epochs × Samples | Strict in-sample | Strict holdout | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | 8B base | v3 (shipped harness pre-patch) | 5 × 200 | 0 / 200 | 0 / 200 | Hidden by harness bug |
+| 2 | 8B base | v3 (patched harness) | — | **38 / 200 (19%)** | **52 / 200 (26%)** | Real signal; previous demo result |
+| 3 | 8B base | v4 (10 epochs) | 10 × 300 | 12 / 200 (6%) | 15 / 200 (7.5%) | Overfit; cautionary |
+| 4 | 8B Instruct | v5 (early stop, 5 ep × 500) | 5 × 500 | 38 / 200 (19%) | 46 / 200 (23%) | Adapter REGRESSED Instruct |
+| 4-control | **8B Instruct** | **none (bare)** | — | — | **86 / 200 (43%)** | **New demo result — strongest** |
+
+**Current demo configuration**: **bare Llama 3.1 8B Instruct, no
+adapter**. 43% on 200 holdout GSM8K problems with zero TB-specific
+training. Pages site reflects this as of 2026-11-02.
+
+**Key method lesson from Trial #4**: training on top of a strong
+instruction-tuned base with our current approach (CoT-formatted
+GSM8K + LoRA rank 32 + 500 samples × 5 epochs) **actively
+regresses accuracy**. The methodology surfaced this by requiring
+the bare-Instruct control (E19) — without it, adapter v5's 23%
+would have looked like "weak improvement from zero" instead of
+"regression from 43%".
+
+**Open next-trial candidates** (not yet drafted; TB-US-078 captures
+the Instruct-training-approach investigation):
+
+1. **TB-US-078** (drafted): investigate what training approach
+   would HELP Instruct — chat-template-formatted data, smaller
+   LoRA rank (8 or 16), larger training set (2000-5000 samples),
+   different task framing
+2. Retrain adapter v3-shape (base + 5 ep × 200 failures) with
+   early stopping — see if the Trial #2 result holds up with
+   current infrastructure
+3. Format-only short-drill training set (would require a new
+   training-set version with Q→`#### N` short pairs)
+4. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
    null result given math problems don't need retrieval
 
 Operator picks what to fire next (if anything).
