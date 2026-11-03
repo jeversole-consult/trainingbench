@@ -747,6 +747,170 @@ next-direction options).
 
 ---
 
+## 2026-11-03 — Trial #7 planning entry (TB-US-081, Candidate D locked)
+
+**Candidate**: D — Multi-seed replicate
+
+### Pre-run observation (discovered pre-fire)
+
+TB's harness runner (`backend/api/harness_runner.py`) already
+uses `do_sample=True, temperature=0.7, top_p, top_k` with NO
+explicit RNG seed. **All prior single-run measurements across
+Trials #1-#6 are each one stochastic draw.** The ±5pt binomial
+noise band we've been using is a lower bound — true measurement
+noise includes generation stochasticity on top.
+
+For Candidate D, this is actually convenient: creating fresh
+experiment runs naturally produces different draws (implicit
+RNG via process timing). No code change needed to vary the seed
+within this trial. Note for publication: implicit multi-seed is
+weaker than explicit-seed replication; if real signal is found
+here, TB-US-082 will add `--generation-seed` to harness_runner
+for exact reproducibility.
+
+### Pre-registered experimental matrix
+
+4 datapoints per adapter (3 new + 1 existing):
+
+| Adapter | Experiment IDs | Source |
+|---|---|---|
+| adapter v7 (Trial #5 lineage) | E21, E25, E26, E27 | 1 original + 3 new |
+| adapter v8 (Trial #6 lineage) | E24, E28, E29, E30 | 1 original + 3 new |
+
+All experiments: n=200, Instruct base, system_prompt v3, harness
+v5 (holdout). ~45 min each × 6 new = ~4.5h sequential.
+
+### Pre-registered decision mapping
+
+- |mean_v7 − mean_v8| < 1× pooled SD → **"indistinguishable"**:
+  Trials #5 and #6 are statistically equivalent at holdout.
+  Series conclusion firms up: "data scale alone doesn't help OR
+  hurt at this corpus and config." TB-US-082 Candidate B
+  (expand LoRA to MLP) and/or C (full fine-tune) become higher
+  priority.
+- 1× SD ≤ |mean_v7 − mean_v8| < 2× pooled SD → **"marginal
+  signal"**: Trial #6's drop may be partly real but magnitude
+  uncertain. Direction informative; multi-seed with explicit
+  seeds in TB-US-082 would strengthen.
+- |mean_v7 − mean_v8| ≥ 2× pooled SD → **"real signal"**:
+  Trial #6 regression confirmed. TB-US-082 Candidate B/C tested
+  against solid "scale data hurt" baseline. Format-overfitting
+  cascade mechanism (not stochastic artifact) confirmed.
+
+**Note**: 2× SD is a moderate threshold (~95% confidence under
+Gaussian). More rigorous: 3× SD. Chose 2× to balance Type-I vs.
+Type-II error given small-n (4 draws per adapter).
+
+### Secondary signals
+
+- If any single draw of adapter v7 OR v8 lands ≥ 50%, that's a
+  hint TB-US-082 Candidate B (expand LoRA) might unlock
+  capability — operator read-off, no formal threshold.
+- Spread across all 8 draws tells us GSM8K's measurement noise
+  envelope. If spread < 3pt, central tendency is pinnable; if
+  spread > 10pt, GSM8K at n=200 is too noisy for ±1pt
+  conclusions.
+
+Deliverable (post-run): `multi-seed-replicate-results.md` deep
+dive.
+
+---
+
+## 2026-11-03 — Trial #7 complete (TB-US-081 Candidate D: multi-seed replicate)
+
+### What we did
+
+Discovered pre-fire that TB's harness runner uses `do_sample=True,
+temperature=0.7` with NO explicit RNG seed — **all prior
+single-run measurements across Trials #1-#6 are each one
+stochastic draw, not deterministic**. The ±5pt binomial noise
+band is a lower bound; true noise includes generation
+stochasticity on top.
+
+Created 3 new E_holdout experiments per adapter, combined with
+the existing E21/E24 for 4 holdout draws per adapter.
+Experiments ran sequentially (~45 min each × 6 new = ~4.5h).
+Mid-run, the 24-hour session-token expiry hit the orchestrator
+script at the E29/E30 boundary; the TB service kept running
+E29 correctly and E30 was launched manually after re-minting
+the token (zero data loss, ~15 min operator intervention).
+
+### What we found
+
+**4 holdout draws per adapter:**
+
+| Adapter | Draws | Mean | SD | Range |
+|---|---|---|---|---|
+| v7 (Trial #5, 1000 samples) | 44.5, 41.5, 43.5, 38.5 | **42.00%** | 2.65pt | 38.5–44.5 (6pt spread) |
+| v8 (Trial #6, 5000 samples) | 42.5, 44.0, 42.0, 38.0 | **41.62%** | 2.56pt | 38.0–44.0 (6pt spread) |
+
+- **Difference in means**: +0.38pt (v7 vs. v8)
+- **Pooled SD**: 2.60pt
+- **|diff| / pooled SD**: 0.14× — well below the pre-registered
+  1× threshold for "marginal signal"
+- **Pre-registered verdict: INDISTINGUISHABLE**
+
+**Trial #6's apparent 2pt regression was stochastic noise.** The
+single-draw comparison (E21 44.5% vs. E24 42.5%) picked two
+random points from essentially the same distribution.
+
+### What we decided
+
+**Revised narrative for Trial #6**: scaling 1000 → 5000
+samples **did not change holdout accuracy in either direction**.
+The format-overfitting cascade is real as a per-sample
+structural signal (dual-#### retention 60% → 74%, a deterministic
+count per output), but it is **accuracy-neutral**, not accuracy-
+negative. "Confidence without correctness" revised: confidence
+IS learned at scale, but that confidence is neither more nor
+less correct than bare Instruct's hedged pattern.
+
+**New methodology constant: GSM8K at n=200 has ~6pt noise
+envelope.** Single-draw comparisons < 6pt should not be
+interpreted as signal. Retroactively applicable to all
+trial-to-trial comparisons:
+- Trial #4 regression (−20pt): clearly outside envelope, real
+- Trial #2 vs. Trial #5 (26% vs. 42% on holdout for base vs.
+  Instruct): clearly outside envelope, real
+- Trial #5 vs. bare Instruct (+1.5pt): within envelope, now
+  revised to "no real difference"
+- Trial #5 vs. Trial #6: within envelope, now explicitly
+  "no real difference"
+
+**Combined finding across Trials #5-#7**: Chat-template-formatted
+PEFT on Instruct at rank 16 (attention-only) preserves bare
+Instruct's accuracy across 1000–5000 training samples. **Does
+not add capability. Does not regress capability.** The lever is
+an accuracy no-op within this corpus and configuration.
+
+**TB-US-082 queued** with 2 remaining capability-gain candidates:
+- **B (recommended first)** — Expand LoRA target modules to
+  include MLP (`gate_proj, up_proj, down_proj`). Tests
+  "LoRA capacity trap at rank 16 is specifically about which
+  parameters it touches, not how many."
+- **C** — Full fine-tuning (not LoRA). Expensive. Tests "the
+  low-rank constraint itself is the ceiling."
+
+### Rationale (threats-to-validity post-review)
+
+- Multi-seed count is small (n=4 each); SD estimate has ~30%
+  own error. Conservative 1×/2× thresholds suit small-n.
+- Implicit multi-seed (process-timing RNG) is weaker than
+  explicit-seed replication. If publication demands exact
+  reproducibility, add `generation-seed` to the harness runner.
+- Both adapters span the same 6pt range; no outlier in either
+  arm driving the equivalence conclusion.
+- Harness scoring stable across all 8 draws (priority-1 catches
+  98-100%); variance is in model generation, not extraction.
+
+Deliverable:
+[`multi-seed-replicate-results.md`](multi-seed-replicate-results.md)
+(deep dive — full 8-draw analysis, noise envelope
+characterization, revised Trial #6 narrative, 3-mechanism
+re-assessment).
+
+---
+
 ## Summary table (as of 2026-11-03)
 
 | Trial | Base | Adapter | Epochs × Samples | Strict baseline-test | Strict holdout | Verdict |
@@ -757,7 +921,8 @@ next-direction options).
 | 4 | 8B Instruct | v5 (early stop, 5 ep × 500) | 5 × 500 | 38 / 200 (19%) | 46 / 200 (23%) | Adapter REGRESSED Instruct |
 | 4-control | **8B Instruct** | **none (bare)** | — | **86 / 200 (43%)** | **86 / 200 (43%)** (E22, Trial #5) | **Baseline across both datasets** |
 | 5 | 8B Instruct | **v7 (chat-template, 3 ep × 1000, rank 16, lr 1e-4)** | 3 × 1000 | **88 / 200 (44%)** | **89 / 200 (44.5%)** | **Preserves bare; no capability gain** |
-| 6 | 8B Instruct | **v8 (chat-template, 3 ep × 5000, rank 16, lr 1e-4)** | 3 × 5000 | **75 / 200 (37.5%)** | **85 / 200 (42.5%)** | **Scale data 5x hurt; format decoupling intensified** |
+| 6 | 8B Instruct | **v8 (chat-template, 3 ep × 5000, rank 16, lr 1e-4)** | 3 × 5000 | **75 / 200 (37.5%)** | **85 / 200 (42.5%)** → revised to **41.62% mean (4 draws)** | Trial #6 single-draw suggested regression; **Trial #7 multi-seed revised to "no change vs. Trial #5"** |
+| 7 | — | multi-seed replicate of v7 + v8 | 4 draws each | — | **v7: 42.00% ± 2.65pt;  v8: 41.62% ± 2.56pt;  diff 0.38pt (0.14× pooled SD)** | **Indistinguishable**; established 6pt noise envelope |
 
 > **Column labeling correction (2026-11-02)**: The "in-sample"
 > column header was renamed to "baseline-test" to match the
@@ -779,41 +944,54 @@ version" variation does not. Trial #5 (TB-US-079) was the first
 trial with genuinely varied training data under corrected wiring.
 
 **Current demo configuration**: **bare Llama 3.1 8B Instruct, no
-adapter**. 43% on 200 GSM8K problems — confirmed consistent
-across BOTH baseline-test (E19) and holdout (E22). Pages site
-reflects this. Adapter v7 (Trial #5, 1000 samples) matched bare
-within noise. Adapter v8 (Trial #6, 5000 samples) was strictly
-inferior to v7 on measured dimensions. **Neither adapter is
-promoted; both remain in the registry as historical.**
+adapter**. 43% on 200 GSM8K problems. Pages site reflects this.
+Adapters v7 (Trial #5, 1000 samples) and v8 (Trial #6, 5000
+samples) both measure at ~42% mean holdout (4 draws each),
+indistinguishable from bare Instruct within the 6pt noise
+envelope. **Neither adapter is promoted; both remain in the
+registry as historical.**
 
-**Key method lessons** (now cumulative through Trial #6):
+**Key method lessons** (now cumulative through Trial #7):
 - **Trial #4**: raw-CoT format + hardcoded template deleted
   Instruct's native `#### N`-at-end confirmation and REGRESSED
   accuracy by 20pt. Methodology surfaced this via required
   bare-control measurement.
 - **Trial #5**: chat-template-formatted training with the correct
-  `#### N` marker FIXES the Trial #4 regression (23% → 44.5%)
-  but does NOT exceed bare Instruct's 43% baseline. Format
-  correctness and math capability are **decoupled levers**.
+  `#### N` marker FIXES the Trial #4 regression but does NOT
+  exceed bare Instruct's 43% baseline. Format correctness and
+  math capability are **decoupled levers**.
 - **Trial #6**: scaling training data 5x (1000 → 5000) at same
-  config did NOT help and modestly regressed (-2pt holdout,
-  -6.5pt baseline-test). Dual-#### retention intensified from
-  60% → 74%, meaning the adapter learned the structural pattern
-  EVEN MORE while losing accuracy. **The decoupling becomes
-  pronounced under scale: more training = more format
-  overfitting = less capability.**
+  config intensified format rigidity (dual-#### retention 60% →
+  74%). Single-draw suggested regression; **Trial #7 multi-seed
+  revised this to "no change in accuracy."**
+- **Trial #7**: multi-seed replicate established that GSM8K at
+  n=200 has a ~6pt noise envelope. Trial #6's apparent
+  regression was stochastic noise, not signal. Combined finding:
+  **chat-template-formatted PEFT on Instruct at rank 16 (attention
+  only) preserves bare accuracy across 1000-5000 samples; neither
+  up nor down.** Also surfaced that TB's harness runner uses
+  `do_sample=True, temperature=0.7` with no explicit seed — all
+  prior single-run measurements are stochastic draws.
 
 **Open next-trial candidates**:
 
-1. **TB-US-081** (drafted on Trial #6 close): remaining
-   capability-gain levers:
-   - **D** Multi-seed replicate of Trial #5 + #6 (resolves
-     "is Trial #6's -2pt real or noise?")
-   - **B** Expand LoRA target modules to include MLP
-   - **C** Full fine-tuning (not LoRA)
-2. External data augmentation (synthetic math, MATH, MGSM) —
-   if GSM8K's 7473-row corpus is exhausted
-3. RAG hypothesis test (TB-US-075 Phase 8, deferred)
+1. **TB-US-082** (drafted on Trial #7 close): Candidate B —
+   expand LoRA target modules from 4 (attention) to 7 (attention
+   + MLP). Tests "LoRA capacity trap at rank 16 is specifically
+   about which parameters it touches." Uses v7 training set
+   (constant data). Multi-seed from the start.
+2. **TB-US-083** (would draft if B fails): Candidate C — full
+   fine-tuning (not LoRA). Expensive. Tests "low-rank constraint
+   itself is the ceiling."
+3. Series close condition: if B and C both fail, close the arc
+   with paper-draft section "QLoRA on Llama 3.1 8B Instruct
+   does not materially improve GSM8K accuracy within the
+   explored envelope. Chat-template format alignment prevents
+   regression; scaling within these dimensions is an accuracy
+   no-op."
+4. External data augmentation (synthetic math, MATH, MGSM)
+   remains out-of-scope for this series.
+5. RAG hypothesis test (TB-US-075 Phase 8, deferred).
 
 Operator picks what to fire next (if anything).
 
