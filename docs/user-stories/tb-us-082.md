@@ -1,13 +1,15 @@
 # TB-US-082: Trial #8 — expand LoRA target modules to MLP (Candidate B)
 
-**Status**: Backlog
+**Status**: In Progress
+**Pre-registered**: 2026-11-03
 **Created**: 2026-11-03
+**Started**: 2026-11-03
 **Author**: Jesse Eversole
 **Depends on**: TB-US-081 (Trial #7 multi-seed — closed with
 "indistinguishable" verdict: Trial #6's apparent regression was
 noise; both adapters equivalent to bare Instruct at ~42% within
 6pt noise envelope)
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <filled in on closure commit>
 
 ## Story
 
@@ -188,7 +190,7 @@ observational signal.
 - [ ] R16: Summary table update in search log.
 - [ ] R17: If H8-primary met: update Pages, promote v9 as demo
       adapter.
-- [ ] R18: If H8-primary not met: draft TB-US-083 for Candidate
+- [ ] R18: If H8-primary not met: draft TB-US-084 for Candidate
       C (full fine-tune) OR close the series with final writeup.
 
 ### Phase 6 — Close
@@ -209,7 +211,7 @@ observational signal.
 - [ ] AC7: Deep dive doc exists.
 - [ ] AC8: Pages site reflects whichever is the current best
       demo.
-- [ ] AC9: If H8-primary not met, TB-US-083 drafted (for
+- [ ] AC9: If H8-primary not met, TB-US-084 drafted (for
       Candidate C) OR series closed with final paper-draft
       bullet.
 
@@ -240,7 +242,7 @@ observational signal.
 
 ## Out of Scope
 
-- Candidate C (full fine-tune) — deferred to TB-US-083 if B
+- Candidate C (full fine-tune) — deferred to TB-US-084 if B
   doesn't lift
 - External data (synthetic math, MATH, MGSM)
 - Prompt engineering

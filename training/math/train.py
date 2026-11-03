@@ -659,6 +659,14 @@ def main():
             args.lora_alpha = int(hp["lora_alpha"])
         if "lora_dropout" in hp:
             args.lora_dropout = float(hp["lora_dropout"])
+        # TB-US-082: forward target-modules from launch config so trials
+        # can vary which parameters LoRA touches (e.g., attention-only vs.
+        # attention+MLP). Accept list or space-separated string.
+        if "lora_target_modules" in hp:
+            tm = hp["lora_target_modules"]
+            if isinstance(tm, str):
+                tm = tm.split()
+            args.lora_target_modules = list(tm)
         # TB-US-066 bugfix 2026-10-24: dataset-sampling + logging/save/warmup
         # cadence were missing from the override block, so short-test runs
         # defaulted to the full GSM8K training set. Added here.
