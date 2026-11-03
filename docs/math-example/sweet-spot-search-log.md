@@ -598,7 +598,156 @@ patterns, decoupling analysis, next-direction options).
 
 ---
 
-## Summary table (as of 2026-11-02)
+## 2026-11-02 — Trial #6 planning entry (TB-US-080, Candidate A locked)
+
+**Candidate**: A — Scale training data 5x (1000 → 5000)
+
+### Pre-registered hypotheses
+
+Status: planning entry (training not yet launched).
+
+- **H6-primary**: holdout accuracy ≥ 50% (bare Instruct + 7pt).
+  Primary success threshold. < 48% = null supported; 48-50% =
+  inconclusive.
+- **H6a**: within-P1-strict accuracy ≥ 50% (vs. Trial #5's 44.7%).
+  Tests whether 5x more training signal produces capability
+  INSIDE the already-locked `#### N` structural format.
+- **H6b**: holdout ≥ 43% (no regression; must not re-regress
+  bare).
+- **H6c-strong**: holdout ≥ 60% (published-range result; would
+  justify demo swap and multi-seed replicate for publication).
+- **H6d**: early-stop patience=2 triggers before epoch 3 if
+  overfit emerges. (Testable now — 5000 samples × 3 epochs ≈
+  940 optimizer steps, 3 eval checkpoints; patience=2 can
+  mathematically fire. Trial #5's N/A verdict addressable
+  here.)
+
+### Hyperparameters (locked)
+
+Identical to Trial #5 except training-set size:
+- Instruct base, LoRA rank 16, alpha 32, dropout 0.05
+- lr 1e-4, 3 epochs, batch 4, grad_accum 4
+- Max eval 200
+- Early stop patience 2 on eval_loss
+- **Training set: v8 (5000 chat-template-formatted samples,
+  seed=47, overlap with v7 allowed)**
+
+### Rationale
+
+Trial #5's 1000-sample training set was order-of-magnitude
+smaller than published math-LoRA work (10,000-50,000+). The
+"decoupling finding" at that scale may be an artifact of
+insufficient training signal rather than a fundamental PEFT
+limitation. 5x scale-up tests this directly.
+
+### Decision mapping (pre-registered)
+
+| Holdout result | Interpretation | Next step |
+|---|---|---|
+| < 43% | Regression — unexpected; data scale alone HURT | TB-US-081: investigate regression mechanism; multi-seed replicate |
+| 43–48% | Within-noise of bare; data scale didn't help | TB-US-081 — pursue Candidate B/C (different lever) |
+| 48–50% | Inconclusive; marginal | TB-US-081 — multi-seed replicate (Candidate D) |
+| 50–60% | H6-primary met | Document; try to push via Candidate B/C in TB-US-081 |
+| 60–75% | H6c-strong met | Promote adapter v8 → demo; multi-seed replicate for publication |
+| > 75% | Suspect — audit disjointness, check seeds, re-run with fresh samples | — |
+
+Deliverable (post-run): `scale-up-5000-results.md` deep dive.
+
+---
+
+## 2026-11-03 — Trial #6 complete (TB-US-080 Candidate A: scale data 5x)
+
+### What we did
+
+Trained adapter v8 on `training_set_versions.v8` (5000 chat-template-
+formatted samples from GSM8K train, seed=47). All other hyperparameters
+identical to Trial #5. Training completed in 1h 54min (939 optimizer
+steps across 3 epochs). Eval loss trajectory: 0.4170 (epoch 1) → 0.4121
+(epoch 2, best) → 0.4136 (epoch 3). `load_best_model_at_end=True`
+correctly selected the epoch-2 checkpoint (verified via MD5 against
+checkpoint-626). Early stop didn't fire (only 1 worsening eval; needs 2).
+
+Two measurement experiments at n=200 (bare-Instruct holdout control
+reused from Trial #5 E22):
+- E23 (adapter v8 × baseline-test): **75/200 = 37.5%**
+- E24 (adapter v8 × holdout, primary): **85/200 = 42.5%**
+
+### What we found
+
+**Scaling data 5x DID NOT help and modestly regressed:**
+
+| Setup | baseline-test | holdout | dual-#### |
+|---|---|---|---|
+| Bare Instruct | 43% | 43% | 45% |
+| Adapter v7 (1000 samples) | 44% | 44.5% | 60-63% |
+| **Adapter v8 (5000 samples)** | **37.5%** | **42.5%** | **74-74.5%** |
+
+- **H6-primary (holdout ≥ 50%)**: ❌ NOT MET (42.5%).
+- **H6b (no regression ≥ 43%)**: ❌ NOT MET on baseline-test
+  (37.5% is clearly outside noise band at −5.5pt vs. bare).
+  MARGINAL on holdout (−0.5pt vs. bare).
+- **H6a (within-P1-strict ≥ 50%)**: ❌ NOT MET (42.9% within-structure
+  on holdout vs. Trial #5's 44.7% and bare's 48.2%).
+- **H6d (early stop infrastructure testable)**: ✅ VALIDATED — 3 evals
+  computed; load_best_model_at_end verifiably worked; patience=2
+  mechanism intact but didn't fire (requires 2 consecutive worsenings).
+
+**Dual-#### retention intensified from 60-63% (Trial #5) → 74-74.5%
+(Trial #6).** The adapter learned the GSM8K structural format even more
+rigidly as data increased. Within dual-#### outputs specifically,
+accuracy was 30% for adapter v8 vs. 50% for bare Instruct. **Confidence
+is learned; correctness is not.**
+
+### What we decided
+
+**Trial #5's "format vs. capability decoupling" finding is now
+pronounced**: more training data at this config = more format
+overfitting = less capability. Trial #6 strengthens the Trial #5
+negative-null into a mild negative result on the data-scale lever.
+
+**Three plausible mechanisms** (noted in deep dive):
+1. **Dataset exhaustion** — 5000/7473 = 67% of GSM8K train; marginal
+   new signal only ~302 problems vs. v7 (698/1000 overlap).
+2. **LoRA capacity trap at rank 16** — limited expressive bandwidth;
+   format wins at 5000 samples.
+3. **Format-overfitting cascade** — more reinforcement of the
+   `#### N` pattern replaces bare Instruct's hedged correct answers
+   with confident wrong ones.
+
+**TB-US-081 queued** with 3 remaining candidates:
+- **D (recommended first)** — Multi-seed replicate of Trial #5 + #6.
+  Resolves the "is -2pt real or noise?" question before investing
+  more training compute.
+- **B** — Expand LoRA target modules to MLP. Cheap (~45-60 min);
+  tests the "LoRA capacity trap" mechanism.
+- **C** — Full fine-tuning. Expensive; tests the "low-rank-constraint
+  is the ceiling" mechanism.
+
+**Current demo unchanged**: bare Llama 3.1 8B Instruct at 43%.
+Adapter v8 is strictly inferior to adapter v7 on measured dimensions
+(not promoted; stays in registry as historical).
+
+### Rationale (threats-to-validity post-review)
+
+- **Single-run, n=200**: ±5pt binomial variance. Trial #6 holdout
+  (-2pt vs. Trial #5) is within noise; Trial #6 baseline-test
+  (-6.5pt vs. Trial #5) is marginally outside. Multi-seed replicate
+  (Candidate D) would resolve.
+- **Training infrastructure validated**: load_best_model_at_end
+  worked correctly; eval loss trajectory sane; no overfitting
+  catastrophe at 3 epochs.
+- Overlap v8-v7 = 698 → the data-scale lever is testing "see each
+  pattern more times via epochs" more than "see 5x different
+  problems". Interpretation note included in deep dive.
+
+Deliverable:
+[`scale-up-5000-results.md`](scale-up-5000-results.md)
+(deep dive — full pattern analysis, three-mechanism interpretation,
+next-direction options).
+
+---
+
+## Summary table (as of 2026-11-03)
 
 | Trial | Base | Adapter | Epochs × Samples | Strict baseline-test | Strict holdout | Verdict |
 |---|---|---|---|---|---|---|
@@ -608,6 +757,7 @@ patterns, decoupling analysis, next-direction options).
 | 4 | 8B Instruct | v5 (early stop, 5 ep × 500) | 5 × 500 | 38 / 200 (19%) | 46 / 200 (23%) | Adapter REGRESSED Instruct |
 | 4-control | **8B Instruct** | **none (bare)** | — | **86 / 200 (43%)** | **86 / 200 (43%)** (E22, Trial #5) | **Baseline across both datasets** |
 | 5 | 8B Instruct | **v7 (chat-template, 3 ep × 1000, rank 16, lr 1e-4)** | 3 × 1000 | **88 / 200 (44%)** | **89 / 200 (44.5%)** | **Preserves bare; no capability gain** |
+| 6 | 8B Instruct | **v8 (chat-template, 3 ep × 5000, rank 16, lr 1e-4)** | 3 × 5000 | **75 / 200 (37.5%)** | **85 / 200 (42.5%)** | **Scale data 5x hurt; format decoupling intensified** |
 
 > **Column labeling correction (2026-11-02)**: The "in-sample"
 > column header was renamed to "baseline-test" to match the
@@ -629,37 +779,41 @@ version" variation does not. Trial #5 (TB-US-079) was the first
 trial with genuinely varied training data under corrected wiring.
 
 **Current demo configuration**: **bare Llama 3.1 8B Instruct, no
-adapter**. 43% on 200 GSM8K problems — now confirmed consistent
-across BOTH baseline-test (E19, harness v4) and holdout
-(E22, harness v5) subsets. Pages site reflects this as of
-2026-11-02. Adapter v7 (Trial #5) scored 44-44.5% on the same
-sets — matches bare Instruct within noise, so it's not promoted
-as the demo (no accuracy improvement to justify complexity).
+adapter**. 43% on 200 GSM8K problems — confirmed consistent
+across BOTH baseline-test (E19) and holdout (E22). Pages site
+reflects this. Adapter v7 (Trial #5, 1000 samples) matched bare
+within noise. Adapter v8 (Trial #6, 5000 samples) was strictly
+inferior to v7 on measured dimensions. **Neither adapter is
+promoted; both remain in the registry as historical.**
 
-**Key method lessons** (now cumulative):
-- **Trial #4**: our training approach (raw-CoT format + hardcoded
-  template) deleted Instruct's native `#### N`-at-end
-  confirmation and REGRESSED accuracy by 20pt. Methodology
-  surfaced this via required bare-control measurement.
+**Key method lessons** (now cumulative through Trial #6):
+- **Trial #4**: raw-CoT format + hardcoded template deleted
+  Instruct's native `#### N`-at-end confirmation and REGRESSED
+  accuracy by 20pt. Methodology surfaced this via required
+  bare-control measurement.
 - **Trial #5**: chat-template-formatted training with the correct
   `#### N` marker FIXES the Trial #4 regression (23% → 44.5%)
   but does NOT exceed bare Instruct's 43% baseline. Format
   correctness and math capability are **decoupled levers**.
-  Fine-tuning on CoT format reorganizes structural confidence
-  without adding reasoning capability.
+- **Trial #6**: scaling training data 5x (1000 → 5000) at same
+  config did NOT help and modestly regressed (-2pt holdout,
+  -6.5pt baseline-test). Dual-#### retention intensified from
+  60% → 74%, meaning the adapter learned the structural pattern
+  EVEN MORE while losing accuracy. **The decoupling becomes
+  pronounced under scale: more training = more format
+  overfitting = less capability.**
 
 **Open next-trial candidates**:
 
-1. **TB-US-080** (draft on close): capability-gain levers. Three
-   candidate directions (operator picks one):
-   - Scale training data 5-10x (v7 was 1000 samples; try 5000-10000)
-   - Expand LoRA target modules to include MLP
-     (`gate_proj, up_proj, down_proj` in addition to attention)
-   - Full fine-tuning (not LoRA) — largest-perturbation option
-2. RAG hypothesis test (TB-US-075 Phase 8, deferred) — likely
-   null result given math problems don't need retrieval
-3. Multi-seed replication of Trial #5 — only if +1.5pt
-   improvement needs sharpening (currently within ±5pt noise)
+1. **TB-US-081** (drafted on Trial #6 close): remaining
+   capability-gain levers:
+   - **D** Multi-seed replicate of Trial #5 + #6 (resolves
+     "is Trial #6's -2pt real or noise?")
+   - **B** Expand LoRA target modules to include MLP
+   - **C** Full fine-tuning (not LoRA)
+2. External data augmentation (synthetic math, MATH, MGSM) —
+   if GSM8K's 7473-row corpus is exhausted
+3. RAG hypothesis test (TB-US-075 Phase 8, deferred)
 
 Operator picks what to fire next (if anything).
 

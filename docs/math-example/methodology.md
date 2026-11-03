@@ -39,6 +39,7 @@ Published literature anchors our expectations:
 | **Llama 3.1 8B Instruct (our harness, baseline-test)** | **43%** | **Trial #4 bare control (E19)** |
 | **Llama 3.1 8B Instruct (our harness, holdout)** | **43%** | **Trial #5 bare control (E22)** |
 | Llama 3.1 8B Instruct + QLoRA, chat-template format, 1000s×3ep | **44%** | **Trial #5 adapter v7 (E21, our result)** |
+| Llama 3.1 8B Instruct + QLoRA, chat-template, **5000s**×3ep | **42.5%** | **Trial #6 adapter v8 (E24, our result)** |
 | Llama 3.1 8B + math LoRA (published) | 60–75% typical | Scattered papers 2024-2025 |
 | MetaMath-Mistral-7B (purpose-built) | ~77% | MetaMath paper |
 | Deepseek-Math-7B-Instruct | ~82% | Deepseek paper |
