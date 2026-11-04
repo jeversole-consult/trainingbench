@@ -199,10 +199,12 @@ access it. The format-vs-capability decoupling from Trials #5-#6
 is explained: attention-only adapters compensate for inaccessible
 reasoning capacity by learning format patterns.
 
-**This is a publishable mechanism finding**, not just a positive
+**This is a substantive mechanism finding**, not just a positive
 accuracy result. The series' negative-null results (Trials #5
 and #6) are now RETROACTIVELY explained by the same mechanism
-that Trial #8 confirms.
+that Trial #8 confirms. Not ready to publish — further
+replication (different seeds, different ranks, different
+datasets) would strengthen before external sharing.
 
 ## Interpretation
 
@@ -278,8 +280,9 @@ Mechanism (capacity trap) confirmed.
 
 **TB-US-NNN opportunities** (not yet filed):
 - **Explicit-seed harness runner** — would strengthen Trial #8's
-  reproducibility claims for publication. Implicit RNG is a
-  publication weakness.
+  reproducibility claims for any eventual external sharing.
+  Implicit RNG is an internal-record weakness we'd want to
+  address before any publication decision.
 - **Rank sweep at attn+MLP** — v9 is rank 16. Does rank 32 at
   attn+MLP help further? Or does it regress like Trial #4's rank
   32 attn-only did?

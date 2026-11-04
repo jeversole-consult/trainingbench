@@ -546,10 +546,11 @@ Three measurement experiments at n=200:
   completely (23% → 44.5% holdout) but did not surface new math
   reasoning. Format and capability are **decoupled levers** —
   Trial #5 isolated the format axis as the F13 regression cause.
-- **Negative-null result is publishable**: "PEFT at this scale
-  on Instruct preserves but does not augment GSM8K accuracy."
+- **Negative-null result is a legitimate finding**: "PEFT at this
+  scale on Instruct preserves but does not augment GSM8K accuracy."
   Both the preservation (vs. Trial #4 regression) and the
-  non-improvement (vs. H5c threshold) are informative.
+  non-improvement (vs. H5c threshold) are informative. Not
+  equivalent to "ready to publish."
 - **Current demo configuration unchanged**: bare Llama 3.1 8B
   Instruct at 43% remains the credible headline. Adapter v7
   could be swapped in as a format-rigidity-preserving demo
@@ -975,7 +976,7 @@ reasoning capacity was in modules they couldn't touch.
 the new demo. First positive result in the arc. Pages site
 updated.
 
-**Cumulative Trials #4-#8 narrative** (publishable):
+**Cumulative Trials #4-#8 narrative (so far)**:
 1. Format alignment is NECESSARY (Trial #4 lesson: wrong format
    causes 20pt regression)
 2. Format alignment is NOT SUFFICIENT (Trials #5-#6: format-only
@@ -985,12 +986,17 @@ updated.
 4. The format-vs-capability decoupling in Trials #5-#6 was a
    capacity-trap artifact, not a fundamental PEFT limitation
 
-**Series close candidate**: with Trial #8's positive result,
-mechanism-confirmation, and publishable narrative, the
-math-example research arc has reached a satisfying closing
-chapter. Further trials (rank sweep at attn+MLP, Candidate C
-full fine-tune, external data) are incremental refinements;
-the central narrative stands.
+Research is ongoing; narrative coherence does not mean ready
+to publish. External validation (replication across
+seeds/ranks/datasets) would strengthen before external sharing.
+
+**Series continuation**: with Trial #8's positive result
+and mechanism-confirmation, the math-example research arc has
+reached an internal milestone. Further trials (rank sweep at
+attn+MLP, Candidate C full fine-tune, external data, explicit-
+seed replication, cross-dataset validation) remain open
+directions. Research is ongoing — no publication-readiness
+decision implied.
 
 ### Rationale (threats-to-validity post-review)
 
@@ -1074,10 +1080,13 @@ historical.
   mechanism confirmed: reasoning capacity for math lives in MLP
   layers; attention-only LoRA compensated with format patterns.**
 
-**Cumulative publishable narrative**: format alignment prevents
-regression; target-module reach (including MLP) is the capability
-lever. At rank 16 with attention+MLP, QLoRA on Llama 3.1 8B
-Instruct improves GSM8K holdout by ~11pt over bare.
+**Cumulative narrative (so far, internal to this research arc)**:
+format alignment prevents regression; target-module reach
+(including MLP) is the capability lever. At rank 16 with
+attention+MLP, QLoRA on Llama 3.1 8B Instruct improves GSM8K
+holdout by ~11pt over bare. Not ready to publish — further
+replication (seeds/ranks/datasets) would strengthen before
+external sharing.
 
 **Open next-trial candidates** (series arrival-chapter complete;
 further work is refinement):
@@ -1094,9 +1103,10 @@ further work is refinement):
    package the methodology we developed into TB's UI for users
    without Claude
 6. **TB-US-005** (Proposed): public v0.1 cut — the research arc
-   now has a complete chapter with a positive capability-gain
-   result
+   now has a positive capability-gain result; TB-US-005 is a
+   packaging decision, independent of research-readiness.
 
+Research is ongoing. "Positive result" ≠ "ready to publish."
 Operator picks what to fire next (if anything).
 
 ---

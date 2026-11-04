@@ -103,7 +103,8 @@ envelope for our configuration. "+3pt mean above bare" sits at
 the edge of noise but not inside it; +5pt would be more defensible
 but harder to achieve. Keeping the bar at +3 reflects that we're
 searching for ANY detectable capability lever, not demanding
-publication-ready magnitude.
+a substantial magnitude we could later validate for external
+sharing.
 
 ### H8a — MLP expansion changes the structural signature
 
@@ -125,8 +126,8 @@ about the MLP-expansion lever.
 ### H8c-strong — Published-range improvement
 
 **Claim**: holdout mean ≥ 60%. If met, promote adapter v9 as
-the demo, update Pages, draft multi-seed replication story for
-publication.
+the demo and update Pages. Operator decides separately whether
+external sharing is appropriate.
 
 ### H8d — Early stopping fires or doesn't (observational)
 
