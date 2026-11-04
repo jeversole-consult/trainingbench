@@ -41,6 +41,7 @@ Published literature anchors our expectations:
 | Llama 3.1 8B Instruct + QLoRA, chat-template format, 1000s×3ep | **44%** | **Trial #5 adapter v7 (E21, our result)** |
 | Llama 3.1 8B Instruct + QLoRA, chat-template, **5000s**×3ep | **42.5%** (single draw) → **41.62% mean** (4 draws, Trial #7) | **Trial #6 adapter v8** + Trial #7 revision |
 | Llama 3.1 8B Instruct (our harness, holdout, 4 draws) | **41.8% grand mean** (Trials #5+#6 adapters combined, 8 draws) | **Trial #7 multi-seed** |
+| **Llama 3.1 8B Instruct + QLoRA, chat-template, 1000s×3ep, +MLP targets** | **53.75% mean** (4 draws, SD 2.78pt, +10.75pt vs bare) | **Trial #8 adapter v9 (our positive result)** |
 | Llama 3.1 8B + math LoRA (published) | 60–75% typical | Scattered papers 2024-2025 |
 | MetaMath-Mistral-7B (purpose-built) | ~77% | MetaMath paper |
 | Deepseek-Math-7B-Instruct | ~82% | Deepseek paper |

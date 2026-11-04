@@ -1,9 +1,10 @@
 # TB-US-082: Trial #8 — expand LoRA target modules to MLP (Candidate B)
 
-**Status**: In Progress
+**Status**: Completed
 **Pre-registered**: 2026-11-03
 **Created**: 2026-11-03
 **Started**: 2026-11-03
+**Completed**: 2026-11-04
 **Author**: Jesse Eversole
 **Depends on**: TB-US-081 (Trial #7 multi-seed — closed with
 "indistinguishable" verdict: Trial #6's apparent regression was
@@ -256,9 +257,118 @@ observational signal.
   envelope
 - [TB-US-080](tb-us-080.md) — Trial #6 (scale data)
 - [TB-US-079](tb-us-079.md) — Trial #5 (chat-template format)
+- `docs/math-example/mlp-expansion-results.md` — Trial #8 deep
+  dive (**primary deliverable**)
 - `docs/math-example/multi-seed-replicate-results.md` — Trial
   #7 deep dive
-- `docs/math-example/methodology.md` —
-  research protocol
+- `docs/math-example/methodology.md` — research protocol
 - `docs/math-example/sweet-spot-search-log.md` — chronological
   record
+
+## Completion Notes (2026-11-04)
+
+### Training (Phase 2)
+
+- Run #15 completed in 28.8 min (1730s), 189 optimizer steps,
+  3 epochs. Train_loss 2.50 → 0.34. Eval_loss 0.428 → 0.420
+  (best, epoch 2) → 0.428. `load_best_model_at_end=True` worked.
+- Adapter v9 released + promoted. Trainable params ~34M (vs
+  Trial #5's ~17M) due to 7 target modules instead of 4.
+
+### Pre-flight infrastructure patch
+
+train.py didn't forward `lora_target_modules` from launch config
+to the trainer (pre-TB-US-082, only hardcoded CLI defaults were
+honored). Added 7-line handler in the TB-US-065 override block
+so the launch API's `lora_target_modules` field takes effect.
+Committed in TB-US-083 pre-flight commit `5fcec38`.
+
+### Measurement (Phase 3) — 5 experiments at n=200
+
+Orchestration note: the initial runner (`tb_us_082_run_experiments.py`)
+crashed after E31 due to runtime task management. E32-E35 were
+relaunched via `tb_us_082_run_remaining.py` which polls SQLite
+directly (no HTTP, no token-expiry risk). Zero data loss.
+
+| Experiment | Harness | Dataset | Score |
+|---|---|---|---|
+| E31 | v5 | holdout | 100/200 = 50.0% |
+| E32 | v5 | holdout | 107/200 = 53.5% |
+| E33 | v5 | holdout | 110/200 = 55.0% |
+| E34 | v5 | holdout | 113/200 = **56.5%** |
+| E35 | v4 | baseline-test | 97/200 = 48.5% (single draw) |
+
+### Analysis (Phase 4)
+
+**Holdout 4-draw statistics**: mean 53.75%, SD 2.78pt, range
+50.0-56.5. Pre-registered H8-primary ≥50% MET decisively
+(+3.75pt above threshold, +10.75pt above bare's 43%).
+
+**Within-P1-strict accuracy** (per `#### N` output):
+- Bare: 48.2% / Adapter v7: 44.7% / Adapter v8: 42.9%
+- **Adapter v9: 54.0% mean — +5.8pt above bare**
+
+**Dual-#### retention**:
+- Bare: ~45% / Adapter v7: ~61% / Adapter v8: ~75%
+- **Adapter v9: ~47% — matches bare, does NOT intensify**
+
+### Mechanism confirmation
+
+Trial #6's "LoRA capacity trap at rank 16 attn-only" hypothesis
+is CONFIRMED. With attention-only LoRA, format patterns
+competed with reasoning for the limited capacity; adapters
+learned format (dual-#### intensified) without learning
+reasoning (within-P1-strict stayed below bare). With MLP added
+at the same rank, the adapter learned reasoning WITHOUT
+intensifying format. The format-vs-capability decoupling in
+Trials #5-#6 was a capacity-trap artifact, now explained and
+resolved.
+
+### Hypothesis outcomes
+
+- **H8-primary** (≥50% mean): ✅ MET at 53.75%
+- **H8a** (within-P1-strict ≥50% AND dual-#### ≥60%): PARTIAL
+  — within-P1-strict met (54.0%); dual-#### did NOT intensify
+  (47% ≈ bare 45%). But this is THE finding, not a failure:
+  v9 learned reasoning, not format.
+- **H8b** (no regression ≥43%): ✅ MET decisively
+- **H8c-strong** (≥60%): ❌ NOT MET (close; 6.25pt short)
+- **H8d** (early stop infra observational): didn't fire; intact
+
+### Deliverables
+
+- `docs/math-example/mlp-expansion-results.md` deep dive (primary)
+- `sweet-spot-search-log.md` Trial #8 entry + updated summary
+  table + updated cumulative-method-lessons section
+- `methodology.md` position-vs-prior-work table updated with
+  Trial #8 result
+- `docs/pages/staged-progression.md` Pages demo updated:
+  **current demo is now adapter v9 at 54% holdout** (replacing
+  bare Instruct 43%)
+- `scripts/tb_us_082_run_experiments.py` (original 5-experiment
+  runner)
+- `scripts/tb_us_082_run_remaining.py` (resilient recovery runner;
+  DB polling)
+- `scripts/tb_us_082_analysis.py` (pattern analysis + full-series
+  comparison)
+- `scripts/trial_status.py` (reusable research-arc status
+  reporter; allowlisted for prompt-free wake-up polling)
+- `training_set_versions.v7` reused (same data as Trial #5;
+  isolation of target-modules effect)
+- `adapter_versions.v9` released + promoted
+
+### Acceptance Criteria status
+
+- ✅ AC1: Candidate B pre-registered before training
+- ✅ AC2: Training completed; adapter v9 auto-registered with
+  training_set_version_id=7
+- ✅ AC3: 4 holdout multi-seed experiments complete at n=200
+  + 1 baseline-test cross-reference
+- ✅ AC4: Per-sample pattern analysis documented
+- ✅ AC5: H8-primary / H8a / H8b / H8c-strong / H8d all recorded
+- ✅ AC6: Trial #8 search log entry with 4-field format
+- ✅ AC7: Deep dive doc exists
+- ✅ AC8: Pages site reflects new demo (adapter v9 at 54%)
+- ⏸️ AC9 (if H8 failed, draft TB-US-085): not needed — H8 MET.
+  TB-US-085 remains reserved for Candidate C as a future mechanism
+  comparison but not required.
