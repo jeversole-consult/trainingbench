@@ -190,7 +190,7 @@ observational signal.
 - [ ] R16: Summary table update in search log.
 - [ ] R17: If H8-primary met: update Pages, promote v9 as demo
       adapter.
-- [ ] R18: If H8-primary not met: draft TB-US-084 for Candidate
+- [ ] R18: If H8-primary not met: draft TB-US-085 for Candidate
       C (full fine-tune) OR close the series with final writeup.
 
 ### Phase 6 — Close
@@ -211,7 +211,7 @@ observational signal.
 - [ ] AC7: Deep dive doc exists.
 - [ ] AC8: Pages site reflects whichever is the current best
       demo.
-- [ ] AC9: If H8-primary not met, TB-US-084 drafted (for
+- [ ] AC9: If H8-primary not met, TB-US-085 drafted (for
       Candidate C) OR series closed with final paper-draft
       bullet.
 
@@ -242,7 +242,7 @@ observational signal.
 
 ## Out of Scope
 
-- Candidate C (full fine-tune) — deferred to TB-US-084 if B
+- Candidate C (full fine-tune) — deferred to TB-US-085 if B
   doesn't lift
 - External data (synthetic math, MATH, MGSM)
 - Prompt engineering
