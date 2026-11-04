@@ -1,10 +1,12 @@
 # TB-US-083: System architecture documentation
 
-**Status**: Backlog
+**Status**: Completed
 **Created**: 2026-11-03
+**Started**: 2026-11-04
+**Completed**: 2026-11-04
 **Author**: Jesse Eversole
 **Depends on**: Nothing (pure documentation; can land anytime)
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <filled in on closure commit>
 
 ## Story
 
@@ -228,3 +230,59 @@ useful).
 - Performance tuning
 - Security audit (API-key mechanism is a prerequisite for a
   proper audit)
+
+## Completion Notes (2026-11-04)
+
+Drafted during the Trial #8 experiment-wait window.
+
+### Deliverables
+
+- **`docs/design/system-architecture.md`** — new 3-page
+  orientation doc. Six required sections present:
+  1. System at a glance — ASCII component diagram + 1-paragraph
+     component descriptions
+  2. Request flow walkthroughs — three end-to-end traces
+     (training launch, experiment run, research-script orchestration)
+  3. Where state lives — table of 5 SQLite databases + file-level
+     state
+  4. Auth model — current session-token mechanism + known API-key
+     gap + role vocabulary
+  5. Process boundaries — 4-row table of processes with
+     lifetime + ownership + why-the-boundary rationale
+  6. Debug / observe entry points — 13-row table mapping
+     "where do I look when X" to its answer
+  7. (Bonus) Appendix listing what's deliberately NOT in the doc
+- **`docs/README.md`** — new "Start here" section at the top
+  pointing at the architecture doc; design-docs list now leads
+  with it.
+- **`CONTRIBUTING.md`** — new "Understand the system first"
+  pre-step before the work-flow section.
+
+### Scope validation
+
+- Target length 2-4 pages: ~3 pages rendered ✓
+- All 6 required content sections present ✓
+- ≥2 request-flow walkthroughs (actually 3) ✓
+- SQLite database table ✓
+- `docs/README.md` cross-link at top ✓
+- `CONTRIBUTING.md` cross-link ✓
+- ASCII component diagram (readable in terminal) ✓
+
+### Acceptance criteria status
+
+- ✅ AC1: Architecture doc exists at correct path, 3 pages
+- ✅ AC2: All 6 required content sections present
+- ✅ AC3: 3 request-flow walkthroughs present
+- ✅ AC4: SQLite database table with path + owned concern
+- ✅ AC5: `docs/README.md` "Start here" section cross-links
+- ✅ AC6: `CONTRIBUTING.md` points at the architecture doc
+- ⏸️ AC7 (self-check: reader can describe 5 main components +
+  training-launch flow after reading): deferred to operator
+  review — can validate by reading the doc fresh
+
+### Not done (per out-of-scope)
+
+- API-key credential mechanism (acknowledged as gap in §4; not
+  implemented in code; future TB-US-NNN if operator wants)
+- Configurable `SESSION_MAX_AGE_SECONDS` (same reasoning)
+- OpenAPI endpoint reference (separate concern)

@@ -4,14 +4,24 @@ Welcome. This is TB's internal documentation surface — design
 docs, user stories, operational workflows, release reviews, and
 the math-example demo companion — all in one navigable place.
 
+## Start here
+
+**New to TB?** Read [System Architecture](design/system-architecture.md)
+first. 3-page overview of components (web UI, backend server,
+training subprocesses, databases), request flows, where state
+lives, auth model, and debug entry points. Everything else
+assumes you know the shape.
+
 ## What's here
 
 ### Design docs — `docs/design/`
 
 The architectural thinking that governs how TB is built.
-Both docs are currently in-progress collaborative drafts
-with open operator decisions tracked inline.
 
+- **[System Architecture](design/system-architecture.md)** —
+  **Start here.** Components, request flows, state locations,
+  auth model, process boundaries, debug entry points. The
+  orientation doc for the whole platform.
 - **[Agent Architecture](design/agent-architecture.md)** —
   the top-level `agent` entity, versioned-component pattern,
   component lifecycle. Foundational for everything else.

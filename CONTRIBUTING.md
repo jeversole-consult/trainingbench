@@ -12,6 +12,15 @@ replace them.
 - The maintainer is Eversole Learning, LLC.
 - The platform ships under [Apache 2.0](LICENSE).
 
+## Understand the system first
+
+Before your first contribution, read
+[`docs/design/system-architecture.md`](docs/design/system-architecture.md)
+— a short orientation doc covering TB's components (web UI,
+backend server, training subprocesses, databases, auth model)
+and how they fit together. Everything else assumes you know
+this shape.
+
 ## How work actually happens here
 
 1. A need surfaces (operator ask, bug, design spike, polish idea).
