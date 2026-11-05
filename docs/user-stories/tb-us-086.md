@@ -1,13 +1,85 @@
 # TB-US-086: Spike — TB backend feature audit (what's there, what's UI-exposed, what to resurface pre-US-005)
 
-**Status**: Backlog
+**Status**: Completed
 **Type**: Design spike (produces a design doc; NO code change)
 **Created**: 2026-11-05
+**Started**: 2026-11-05
+**Completed**: 2026-11-05
 **Author**: Jesse Eversole
 **Depends on**: Nothing hard. Naturally lands before TB-US-005
 (public v0.1 cut) because the US-005 pitch depends on what TB
 actually exposes.
-**Commit hash(es)**: <filled in on completion>
+**Commit hash(es)**: <filled in on closure commit>
+
+## Completion Notes (2026-11-05)
+
+### Headline findings
+
+TB is substantially richer than the math-example research arc
+had made visible. Three categories of findings:
+
+1. **MOST surfaced** — Upload, Scrape, Chat (RAG), PowerSearch
+   (multi-LLM comparison with Gemini/ChatGPT/Grok), Compare
+   (A/B two-config), Search, Documents, Query History,
+   Databases (multi-DB), Training Sets, Training Runs, User
+   Management, API Keys all have UI entry points.
+2. **DORMANT** backend-with-no-UI items (US-005 blockers):
+   - Experiments UI — backend complete; `script.js:1202` shows
+     an alert pointing users at the API. TB-US-070 Proposed.
+   - Version-lifecycle UI (release/promote/deprecate for the
+     five component types) — endpoints exist; no buttons in UI.
+     New TB-US-087 drafted.
+   - Spreadsheet calculator surface — wired into Chat silently
+     but no user-visible indicator. New TB-US-088 drafted.
+3. **MISSING** (real gaps): only prompt classification
+   (TB-US-023 Proposed; TB-US-022-030 arc).
+
+### Correction surfaced to TB-US-083
+
+The system-architecture doc (TB-US-083, commit `4ba47e3`) §4
+"Auth model" claims **"no API-key mechanism for automation"**.
+Wrong. TB-US-063 (closed 2026-10-22) shipped
+`backend/api/api_key_manager.py` + `/api-keys` CRUD +
+`static/api_key_management.js` modal. Follow-up patch to
+architecture doc recommended. Also, the token-expiry pain we
+hit during the research arc could have been avoided by using
+API keys; the `feedback_research_infrastructure_resilience`
+memory has the wrong solution shape.
+
+### Deliverables
+
+- `docs/design/backend-feature-audit.md` — 7-section design doc
+  with capability inventory (17 rows across 6 functional
+  surfaces), 3-tier resurface roadmap, open questions, scope
+  boundaries
+- **TB-US-087 drafted** (per-component version lifecycle UI —
+  Tier 1)
+- **TB-US-088 drafted** (spreadsheet calculator surface —
+  Tier 1)
+- (TB-US-070 already existed as Proposed — Tier 1 Experiments UI)
+
+### Tier 1 resurface summary (unblocks US-005 pitch)
+
+| # | Capability | Story | Effort |
+|---|---|---|---|
+| 1 | Experiments UI | TB-US-070 (existing) | Moderate |
+| 2 | Version-lifecycle UI | TB-US-087 (new) | Moderate |
+| 3 | Spreadsheet calculator surface | TB-US-088 (new, Option A) | Minor |
+
+Together these would make US-005 pitch-honest and give an
+external user a demoable capability palette.
+
+### Acceptance Criteria status
+
+- ✅ AC1: Design doc at `docs/design/backend-feature-audit.md`
+- ✅ AC2: Capability table has 17 rows (exceeds minimum 13)
+- ✅ AC3: 3-tier roadmap present
+- ✅ AC4: 2 Tier-1 implementation stories drafted (TB-US-087,
+      TB-US-088); TB-US-070 pre-existed
+- ✅ AC5: Backend gaps section identifies prompt classification
+      as the single net-new work
+- ✅ AC6: Scope boundaries explicit
+- ✅ AC7: Cross-links in place
 
 ## Story
 

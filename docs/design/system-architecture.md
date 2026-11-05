@@ -212,25 +212,35 @@ writes.
   `verify_super_user` lets only super role through;
   `verify_chat_user` accepts any logged-in role, etc.
 
-### Known gap: no API-key mechanism
+### API-key mechanism (correction, 2026-11-05)
 
-Session tokens are designed for interactive browser use with their
-24-hour timeout. Research automation scripts that run longer than
-24 hours get bitten by mid-run expiry (surfaced during TB-US-081
-Trial #7 — the orchestrator crashed at the 24h boundary). Current
-workaround: scripts mint session tokens directly from the backend
-Python module (`generate_session_token`) — this bypasses `/auth/login`
-but still inherits the 24h expiry.
+**Earlier versions of this doc claimed TB had no API-key
+mechanism. That was wrong.** TB ships a full API-key system via
+TB-US-063 (closed 2026-10-22):
+- `backend/api/api_key_manager.py` — `ApiKeyManager` class, keys
+  stored in `users.db` with labels + revocation state
+- Endpoints: `POST /api-keys` (create), `GET /api-keys` (list),
+  `DELETE /api-keys/{id}` (revoke), `GET /api-keys/_whoami`
+- UI: `static/api_key_management.js` modal, super-only, opens
+  from the admin dropdown (per `feedback_admin_tier_drawer_footer`
+  memory)
+- Middleware: `verify_api_key` function (main.py:3347)
+  authenticates via `Authorization: ApiKey <key>` header
 
-**Right fix** (potential future TB-US-NNN): add an explicit
-API-key credential type. Super user mints an API key via UI; keys
-don't auto-expire; scripts use them instead of session tokens.
-Session tokens remain for browser flows. Not yet filed as a story.
+**What the earlier doc was reacting to**: during the research
+arc, scripts minted session tokens directly from the backend
+Python module (`generate_session_token`) and hit the 24h expiry
+mid-campaign (surfaced in TB-US-081 Trial #7). That workaround
+**ignored the already-shipped API-key system** — scripts should
+use API keys for automation, not session tokens.
 
-See the `feedback_research_infrastructure_resilience` memory for
-the broader principle: internal-firewall research deployments can
-relax inner session windows that assume adversarial multi-tenant
-environments.
+The `feedback_research_infrastructure_resilience` memory is
+still correct about the principle (research automation needs
+long-lived credentials) but its proposed solution ("file a TB
+story to add API keys") duplicates work that was already done.
+Correct resolution: update research scripts to use API keys.
+
+Discovered during TB-US-086 backend audit.
 
 ### Other identity notes
 
