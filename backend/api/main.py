@@ -3827,6 +3827,51 @@ async def create_training_run(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Must be declared BEFORE the `/training/runs/{run_id}` catch-all —
+# otherwise FastAPI matches `compare` as `run_id` and 422s on int
+# validation. (Fixed after discovery on 2026-11-06.)
+@app.get("/training/runs/compare")
+async def compare_training_runs(
+    ids: str,
+    user_info: Dict = Depends(verify_super_user)
+):
+    """
+    Compare multiple training runs side by side.
+    Requires super user privileges.
+
+    Args:
+        ids: Comma-separated list of training run IDs (e.g., "1,2,3")
+
+    Returns:
+        Comparison data for all runs
+    """
+    try:
+        # Parse comma-separated IDs
+        run_ids = [int(id.strip()) for id in ids.split(",")]
+
+        if len(run_ids) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="At least 2 training runs are required for comparison"
+            )
+
+        result = training_run_tracker.compare_runs(run_ids)
+
+        if result['status'] == 'error':
+            raise HTTPException(status_code=400, detail=result['error'])
+
+        return result
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid IDs format. Use comma-separated integers (e.g., '1,2,3')"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/training/runs/{run_id}")
 async def get_training_run(
     run_id: int,
@@ -4127,48 +4172,6 @@ async def add_training_run_checkpoint(
             "message": "Checkpoint added successfully",
             **result
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/training/runs/compare")
-async def compare_training_runs(
-    ids: str,
-    user_info: Dict = Depends(verify_super_user)
-):
-    """
-    Compare multiple training runs side by side.
-    Requires super user privileges.
-
-    Args:
-        ids: Comma-separated list of training run IDs (e.g., "1,2,3")
-
-    Returns:
-        Comparison data for all runs
-    """
-    try:
-        # Parse comma-separated IDs
-        run_ids = [int(id.strip()) for id in ids.split(",")]
-
-        if len(run_ids) < 2:
-            raise HTTPException(
-                status_code=400,
-                detail="At least 2 training runs are required for comparison"
-            )
-
-        result = training_run_tracker.compare_runs(run_ids)
-
-        if result['status'] == 'error':
-            raise HTTPException(status_code=400, detail=result['error'])
-
-        return result
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid IDs format. Use comma-separated integers (e.g., '1,2,3')"
-        )
     except HTTPException:
         raise
     except Exception as e:
