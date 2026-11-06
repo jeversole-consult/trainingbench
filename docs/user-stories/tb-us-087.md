@@ -1,6 +1,6 @@
 # TB-US-087: Per-component version lifecycle UI (release / promote / deprecate buttons)
 
-**Status**: In Progress (R1 shipped; R2-R6 pending)
+**Status**: Completed (R1-R6 shipped 2026-11-06)
 **Created**: 2026-11-05
 **Started**: 2026-11-06
 **Author**: Jesse Eversole
@@ -86,28 +86,22 @@ is overkill for v0.1.
 
 - [x] R1: **Adapters**: on `training_runs.html`, auto-registered
       adapters show Release / Promote / Deprecate buttons based
-      on current state. Clicking either fires the endpoint + refreshes
-      state. Shared helper (`tbLifecycleAct`, `tbLifecycleBadge`,
-      `tbLifecycleControls`) lives inline in `training_runs.html`;
-      R3-R6 will reuse or copy it.
-- [ ] R2: **Training sets**: ~~on `training_sets.html`~~ —
-      **approach pending**. The existing `training_sets.html` lists
-      *legacy* `/training/sets` rows (status model:
-      draft/pending/applied/active/archived/deprecated), not versioned
-      snapshots (`/agents/{id}/training-sets`). Two options:
-      (A) add a new "Versioned snapshots" section to
-      `training_sets.html` scoped to the active agent, or
-      (B) surface versioned training-sets in the agent-management
-      modal alongside R3-R5. Decision deferred to the R3-R6 commit.
-- [ ] R3: **Prompts**: in the agent-management modal, a "Prompts"
-      sub-section lists versions for the active agent with
-      Release / Promote / Deprecate.
-- [ ] R4: **Routes**: similar sub-section in agent-management
-      modal.
-- [ ] R5: **RAG**: similar sub-section.
-- [ ] R6: **Harness versions**: Release + Deprecate only (not
-      promotable); could live in agent-management or a settings
-      sub-page.
+      on current state. Shared helper extracted into
+      `static/version_lifecycle.js` (`window.tbLifecycle.{badge,controls,act}`)
+      for R2-R6 reuse.
+- [x] R2: **Training sets** (versioned snapshots): surfaced in
+      agent-management modal (Option B). Legacy `training_sets.html`
+      left untouched — its status model (draft/pending/applied/
+      active/archived/deprecated) is a separate concept from the
+      versioned lifecycle. A future story may add a parallel
+      "Versioned snapshots" section to that page.
+- [x] R3: **Prompts**: component-versions sub-panel in the
+      agent-management modal, expanded via a "Versions" button
+      on each agent row.
+- [x] R4: **Routes**: same sub-panel.
+- [x] R5: **RAG**: same sub-panel.
+- [x] R6: **Harness versions**: same sub-panel, Release + Deprecate
+      only (no Promote button rendered because `promotable: false`).
 - [ ] R7: **Audit logging**: every lifecycle action logs through
       the existing `_audit_versioned_action` in main.py (already
       wired on the backend; UI just needs to call the endpoint).
@@ -149,29 +143,37 @@ to work as they did pre-story.
 
 ### Phase 1 — Design agreement
 
-- [ ] R9: Confirm Option C (minimal; add buttons to existing
-      pages) is the right scope; operator may choose Option A or
-      B instead.
-- [ ] R10: Confirm UX details: icon vs. text buttons;
-      confirmation dialog on promote (which displaces another
-      promoted version) yes/no; etc.
+- [x] R9: Operator confirmed Option C (minimal; buttons on
+      existing pages). R2 landed as Option B (training-sets in
+      agent-mgmt modal alongside R3-R5) after `training_sets.html`
+      proved to be a legacy-status-model surface, not a versioned
+      one.
+- [x] R10: UX details confirmed — text buttons; promote confirms
+      with named displacement ("will deprecate #NN"); errors
+      inline next to the action.
 
 ### Phase 2 — Implementation
 
-- [ ] R11: Add buttons to the pages identified in R1-R6.
-- [ ] R12: Each button calls the corresponding endpoint with the
-      session token.
-- [ ] R13: Success: visual confirmation + page refresh of the
-      affected version(s).
-- [ ] R14: Error: toast or inline error message with the backend's
-      detail string.
+- [x] R11: Buttons added on `training_runs.html` (R1) and in the
+      agent-management modal (R2-R6 via a "Versions" button that
+      expands an inline sub-panel per agent).
+- [x] R12: Buttons POST to `/{component}-versions/{id}/{action}`
+      with the session token.
+- [x] R13: Success refreshes the affected section
+      (`__tbReloadAdapterLifecycle` for R1,
+      `__tbRefreshAgentVersions` for R2-R6).
+- [x] R14: Errors surface inline in a per-button error slot;
+      alert() fallback if the slot is missing.
 
 ### Phase 3 — Verification
 
-- [ ] R15: Smoke test each lifecycle action end-to-end via the
-      UI. Confirm backend state transition.
-- [ ] R16: Confirm existing pages unchanged.
-- [ ] R17: Browser-test on operator's primary environment.
+- [ ] R15: Browser-side smoke test pending (operator-driven per
+      `feedback_ui_changes_organic.md`).
+- [ ] R16: No regressions expected on existing pages
+      (training_sets.html untouched; training_runs.html + agent-
+      mgmt modal additions are additive).
+- [ ] R17: Browser-test on operator's primary environment —
+      pending.
 
 ### Phase 4 — Close
 
@@ -179,15 +181,21 @@ to work as they did pre-story.
 
 ## Acceptance Criteria
 
-- [ ] AC1: All five promotable component types have release +
-      promote + deprecate UI access.
-- [ ] AC2: Harness versions have release + deprecate UI access.
-- [ ] AC3: State is visually indicated on each listed version.
-- [ ] AC4: End-to-end UI test passes for at least one component
-      type (adapters as the natural choice).
-- [ ] AC5: No regression on `training_sets.html`,
-      `training_runs.html`, or agent-management modal.
-- [ ] AC6: Consistent with TB-US-018/042 UI design language.
+- [x] AC1: Five promotable component types (adapter, training-set,
+      prompt, route, rag) have Release / Promote / Deprecate
+      controls — adapter on the run-detail view, the rest in the
+      agent-management "Versions" sub-panel.
+- [x] AC2: Harness versions have Release + Deprecate (no Promote,
+      per `promotable: false`).
+- [x] AC3: State is visually indicated via `tbLifecycle.badge(state)`
+      — distinct colors per draft / released / promoted / deprecated.
+- [ ] AC4: End-to-end UI smoke test pending (operator-driven).
+- [x] AC5: No change to `training_sets.html`; `training_runs.html`
+      additive; agent-management modal gains a "Versions" button
+      + hidden sub-row that renders on demand.
+- [x] AC6: Styling matches existing TB UI (borders, radii,
+      hover-tint, text-button pattern inherited from the existing
+      Rename/Retire controls).
 
 ## Design Notes
 

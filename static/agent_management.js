@@ -122,10 +122,11 @@
             const stateBadge = a.state === 'active'
                 ? '<span style="background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; font-size: 0.85em;">active</span>'
                 : '<span style="background: #fafafa; color: #777; padding: 2px 8px; border-radius: 10px; font-size: 0.85em;">retired</span>';
+            const versionsBtn = `<button onclick="window.__tbToggleVersions(${a.agent_id})" style="padding: 4px 10px; margin-right: 4px; background: white; border: 1px solid #555; color: #555; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" onmouseenter="this.style.background='rgba(85,85,85,0.08)'" onmouseleave="this.style.background='white'">Versions</button>`;
             const actionsHtml = a.state === 'active'
-                ? `<button onclick="window.__tbAgentRename('${escapeAttr(a.name)}')" style="padding: 4px 10px; margin-right: 4px; background: white; border: 1px solid #CC785C; color: #CC785C; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" onmouseenter="this.style.background='rgba(204,120,92,0.08)'" onmouseleave="this.style.background='white'">Rename</button>
+                ? versionsBtn + `<button onclick="window.__tbAgentRename('${escapeAttr(a.name)}')" style="padding: 4px 10px; margin-right: 4px; background: white; border: 1px solid #CC785C; color: #CC785C; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" onmouseenter="this.style.background='rgba(204,120,92,0.08)'" onmouseleave="this.style.background='white'">Rename</button>
                    <button onclick="window.__tbAgentRetire('${escapeAttr(a.name)}')" style="padding: 4px 10px; background: white; border: 1px solid #E65100; color: #E65100; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" onmouseenter="this.style.background='rgba(230,81,0,0.08)'" onmouseleave="this.style.background='white'">Retire</button>`
-                : `<button onclick="window.__tbAgentReactivate('${escapeAttr(a.name)}')" style="padding: 4px 10px; background: white; border: 1px solid #1565C0; color: #1565C0; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" onmouseenter="this.style.background='rgba(21,101,192,0.08)'" onmouseleave="this.style.background='white'">Reactivate</button>`;
+                : versionsBtn + `<button onclick="window.__tbAgentReactivate('${escapeAttr(a.name)}')" style="padding: 4px 10px; background: white; border: 1px solid #1565C0; color: #1565C0; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" onmouseenter="this.style.background='rgba(21,101,192,0.08)'" onmouseleave="this.style.background='white'">Reactivate</button>`;
             return `
 <tr style="border-bottom: 1px solid #F0F0F0;">
     <td style="padding: 10px 8px; font-family: monospace;">${escapeHtml(a.name)}</td>
@@ -134,8 +135,99 @@
     <td style="padding: 10px 8px; font-size: 0.85em; color: #666;">${a.created_at ? a.created_at.slice(0, 10) : ''}</td>
     <td style="padding: 10px 8px; font-size: 0.9em; color: #666;">${escapeHtml(a.description || '')}</td>
     <td style="padding: 10px 8px; white-space: nowrap;">${actionsHtml}</td>
+</tr>
+<tr id="tb-am-versions-row-${a.agent_id}" style="display:none; background:#FAFAFA;">
+    <td colspan="6" style="padding: 12px 20px;">
+        <div id="tb-am-versions-${a.agent_id}">Click "Versions" to load.</div>
+    </td>
 </tr>`;
         }).join('');
+    }
+
+    // TB-US-087 R2-R6: component-versions sub-panel inside agent-management modal.
+    // For each promotable component type (training-set, prompt, route, rag, adapter)
+    // + harness (release+deprecate only), list versions for this agent and expose
+    // lifecycle controls via window.tbLifecycle.
+    const VERSION_COMPONENTS = [
+        { label: 'Training sets', endpoint: 'training-sets',      component: 'training-set', promotable: true  },
+        { label: 'Prompts',       endpoint: 'prompts',            component: 'prompt',       promotable: true  },
+        { label: 'Routes',        endpoint: 'routes',             component: 'route',        promotable: true  },
+        { label: 'RAG',           endpoint: 'rag-versions',       component: 'rag',          promotable: true  },
+        { label: 'Adapters',      endpoint: 'adapter-versions',   component: 'adapter',      promotable: true  },
+        { label: 'Harness',       endpoint: 'harnesses',          component: 'harness',      promotable: false },
+    ];
+
+    window.__tbToggleVersions = function (agentId) {
+        const row = document.getElementById(`tb-am-versions-row-${agentId}`);
+        if (!row) return;
+        if (row.style.display === 'none') {
+            row.style.display = '';
+            renderAgentVersions(agentId);
+        } else {
+            row.style.display = 'none';
+        }
+    };
+
+    window.__tbRefreshAgentVersions = function () {
+        if (window.__tbCurrentVersionsAgentId) renderAgentVersions(window.__tbCurrentVersionsAgentId);
+    };
+
+    async function renderAgentVersions(agentId) {
+        window.__tbCurrentVersionsAgentId = agentId;
+        const container = document.getElementById(`tb-am-versions-${agentId}`);
+        if (!container) return;
+        container.innerHTML = '<div style="color:#999;">Loading component versions...</div>';
+
+        try {
+            const results = await Promise.all(VERSION_COMPONENTS.map(async spec => {
+                try {
+                    const data = await fetchJson(`${API_BASE}/agents/${agentId}/${spec.endpoint}`);
+                    return { spec, data };
+                } catch (e) {
+                    return { spec, error: e.message };
+                }
+            }));
+
+            container.innerHTML = results.map(({ spec, data, error }) => {
+                if (error) {
+                    return `<div style="margin-bottom:14px;">
+                        <strong style="color:#555;">${spec.label}</strong>
+                        <div style="color:#c33; font-size:0.85em; margin-top:4px;">Failed to load: ${escapeHtml(error)}</div>
+                    </div>`;
+                }
+                const versions = data.versions || [];
+                const promotedId = data.promoted_version_id || null;
+                if (versions.length === 0) {
+                    return `<div style="margin-bottom:14px;">
+                        <strong style="color:#555;">${spec.label}</strong>
+                        <span style="color:#999; font-size:0.85em; margin-left:10px;">No versions.</span>
+                    </div>`;
+                }
+                const rows = versions.map(v => {
+                    const label = v.version_label || `v${v.version_id}`;
+                    return `<tr>
+                        <td style="padding:4px 10px; font-family:monospace;">#${v.version_id}</td>
+                        <td style="padding:4px 10px;">${escapeHtml(label)}</td>
+                        <td style="padding:4px 10px;">${window.tbLifecycle.badge(v.state)}</td>
+                        <td style="padding:4px 10px; font-size:0.85em; color:#666;">${v.created_at ? v.created_at.slice(0, 10) : ''}</td>
+                        <td style="padding:4px 10px; white-space:nowrap;">${window.tbLifecycle.controls({
+                            component: spec.component,
+                            versionId: v.version_id,
+                            state: v.state,
+                            promotedId: promotedId,
+                            promotable: spec.promotable,
+                            onDoneName: '__tbRefreshAgentVersions',
+                        })}</td>
+                    </tr>`;
+                }).join('');
+                return `<div style="margin-bottom:14px;">
+                    <strong style="color:#555;">${spec.label}</strong>
+                    <table style="width:100%; border-collapse:collapse; margin-top:6px; font-size:0.9em;">${rows}</table>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            container.innerHTML = `<div style="color:#c33;">Failed to load component versions: ${escapeHtml(e.message)}</div>`;
+        }
     }
 
     function showCreateForm() {

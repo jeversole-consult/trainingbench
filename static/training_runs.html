@@ -716,7 +716,8 @@
 
     <script src="user_management.js?v=20261022a"></script>
     <script src="active_run_strip.js?v=20261022a"></script>
-    <script src="agent_management.js?v=20261022c"></script>
+    <script src="version_lifecycle.js?v=20261106a"></script>
+    <script src="agent_management.js?v=20261106a"></script>
     <script src="api_key_management.js?v=20261022a"></script>
     <script src="left_nav.js?v=20261022f"></script>
     <script>
@@ -1274,85 +1275,8 @@
             loadAdapterLifecycle(run);
         }
 
-        // TB-US-087 helpers: per-component version lifecycle UI.
-        // Minimal footprint — buttons injected into existing views; backend
-        // endpoints already exist (release/promote/deprecate).
-
-        const LIFECYCLE_STATE_STYLE = {
-            draft:      { bg: '#fafafa', fg: '#777' },
-            released:   { bg: '#e3f2fd', fg: '#1565c0' },
-            promoted:   { bg: '#e8f5e9', fg: '#2e7d32' },
-            deprecated: { bg: '#fff3e0', fg: '#8d6e63' },
-        };
-
-        function tbLifecycleBadge(state) {
-            const s = LIFECYCLE_STATE_STYLE[state] || LIFECYCLE_STATE_STYLE.draft;
-            return `<span style="background:${s.bg}; color:${s.fg}; padding:2px 10px; border-radius:10px; font-size:0.85em; font-weight:600;">${state}</span>`;
-        }
-
-        function tbLifecycleButton(label, color, onClick) {
-            return `<button onclick="${onClick}" style="padding:4px 10px; margin-right:6px; background:white; border:1px solid ${color}; color:${color}; border-radius:4px; cursor:pointer; font-size:0.85em; font-weight:500;" onmouseenter="this.style.background='${color}11'" onmouseleave="this.style.background='white'">${label}</button>`;
-        }
-
-        // Returns the HTML string for inline action buttons + error slot.
-        //   component: 'adapter' | 'training-set' | 'prompt' | 'route' | 'rag' | 'harness'
-        //   versionId: numeric
-        //   state: 'draft' | 'released' | 'promoted' | 'deprecated'
-        //   promotedId: currently-promoted version id for this component on this agent (nullable)
-        //   promotable: false for harness
-        //   onDoneName: name of a global JS function (on window) called with no args after a successful transition
-        function tbLifecycleControls(component, versionId, state, promotedId, promotable, onDoneName) {
-            const errorSlot = `<span id="tb-lc-err-${component}-${versionId}" style="color:#c33; font-size:0.85em; margin-left:8px; display:none;"></span>`;
-            const btns = [];
-            const promotedArg = promotedId === null || promotedId === undefined ? 'null' : promotedId;
-            if (state === 'draft') {
-                btns.push(tbLifecycleButton('Release', '#1565C0',
-                    `tbLifecycleAct('${component}', ${versionId}, 'release', ${promotedArg}, '${onDoneName}')`));
-            }
-            if (state === 'released' && promotable) {
-                btns.push(tbLifecycleButton('Promote', '#2E7D32',
-                    `tbLifecycleAct('${component}', ${versionId}, 'promote', ${promotedArg}, '${onDoneName}')`));
-            }
-            if (state !== 'deprecated') {
-                btns.push(tbLifecycleButton('Deprecate', '#8d6e63',
-                    `tbLifecycleAct('${component}', ${versionId}, 'deprecate', ${promotedArg}, '${onDoneName}')`));
-            }
-            return btns.join('') + errorSlot;
-        }
-
-        async function tbLifecycleAct(component, versionId, action, currentPromotedId, onDoneName) {
-            // Confirm if a promote would displace another version.
-            if (action === 'promote' && currentPromotedId && currentPromotedId !== versionId) {
-                if (!confirm(`Promote ${component} version #${versionId}?\n\nThis will deprecate the currently promoted version (#${currentPromotedId}).`)) {
-                    return;
-                }
-            }
-            const errSlot = document.getElementById(`tb-lc-err-${component}-${versionId}`);
-            if (errSlot) { errSlot.style.display = 'none'; errSlot.textContent = ''; }
-            try {
-                const res = await fetch(`/${component}-versions/${versionId}/${action}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}` },
-                });
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    throw new Error(body.detail || `${res.status} ${res.statusText}`);
-                }
-                if (onDoneName && typeof window[onDoneName] === 'function') {
-                    window[onDoneName]();
-                }
-            } catch (e) {
-                if (errSlot) {
-                    errSlot.textContent = `${action} failed: ${e.message}`;
-                    errSlot.style.display = 'inline';
-                } else {
-                    alert(`${action} failed: ${e.message}`);
-                }
-            }
-        }
-        window.tbLifecycleAct = tbLifecycleAct;
-
         // R1: adapter lifecycle on run-detail view.
+        // Helpers live in static/version_lifecycle.js (window.tbLifecycle).
         async function loadAdapterLifecycle(run) {
             if (!run.agent_id) return;
             // Stash run so the global refresh callback can reload without re-plumbing arguments.
@@ -1393,9 +1317,16 @@
                 body.innerHTML = `
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <span><strong>#${match.version_id}</strong> (${escapeHtml(label)})</span>
-                        ${tbLifecycleBadge(match.state)}
+                        ${tbLifecycle.badge(match.state)}
                         <span style="color:#999;">|</span>
-                        ${tbLifecycleControls('adapter', match.version_id, match.state, promotedId, true, '__tbReloadAdapterLifecycle')}
+                        ${tbLifecycle.controls({
+                            component: 'adapter',
+                            versionId: match.version_id,
+                            state: match.state,
+                            promotedId: promotedId,
+                            promotable: true,
+                            onDoneName: '__tbReloadAdapterLifecycle',
+                        })}
                     </div>`;
             } catch (e) {
                 body.textContent = `Failed to load adapter version: ${e.message}`;
