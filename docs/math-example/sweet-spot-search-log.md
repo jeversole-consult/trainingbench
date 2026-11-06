@@ -1019,7 +1019,86 @@ mechanism-confirmation analysis, publication implications).
 
 ---
 
-## Summary table (as of 2026-11-04)
+## 2026-11-06 — Trial #9 complete (TB-US-085: rank sweep at attn+MLP)
+
+### What we did
+
+Adapter v10 = adapter v9 recipe (Instruct + v7 1000 samples +
+attn+MLP target modules + lr 1e-4 + 3 epochs + early stop
+patience=2) EXCEPT **rank 16 → 32** (alpha 32 → 64).
+Training 28.9 min; train_loss 2.55 → 0.296; eval_loss 0.426 →
+0.423 (best) → 0.443 (early-overfit signal, caught by
+load_best_model_at_end). 4 multi-seed holdout experiments (no
+baseline-test this trial).
+
+**Methodological note**: fired conversationally during
+audience/strategy discussion without formal H-threshold
+pre-registration. Methodology was weaker than Trials #5-#8.
+Result stands but discipline slipped.
+
+### What we found
+
+**Holdout 4-draw statistics:**
+- Draws: 63.0, 54.0, 64.0, 59.5
+- **Mean: 60.12% (SD 4.52pt)**
+- Range: 54.0 – 64.0 (spread 10pt)
+
+**vs. Adapter v9 (Trial #8, rank 16 attn+MLP):**
+- +6.38pt
+- Pooled SD: 3.75pt
+- |diff|/pooled-SD: **1.70× — MARGINAL SIGNAL** per Trial #7
+  framework (1-2× bin). Direction unambiguously positive;
+  magnitude uncertain at n=4 per adapter.
+
+**Full-series comparison (holdout, multi-seed mean):**
+
+| Setup | Holdout | dual-#### | within-P1-strict |
+|---|---|---|---|
+| Bare Instruct | 43% | 45% | 48.2% |
+| Adapter v7 (attn-only, rank 16) | 42.00% ± 2.65 | 61% | 44.7% |
+| Adapter v8 (attn-only, 5000 samp) | 41.62% ± 2.56 | 75% | 42.9% |
+| Adapter v9 (+MLP, rank 16) | 53.75% ± 2.78 | 47% | 54.0% |
+| **Adapter v10 (+MLP, rank 32)** | **60.12% ± 4.52** | **59%** | **60.5%** |
+
+### What we decided
+
+**More capacity, used differently**: v10 picks up BOTH reasoning
+(within-P1-strict 60.5%, +12.3pt vs bare, +5.8pt vs v9) AND
+format rigidity (dual-#### 59%, re-intensified from v9's 47%).
+At rank 16 the adapter had to choose; at rank 32 it can learn
+both. Reasoning gain is the accuracy driver; format
+re-intensification is a byproduct of extra capacity.
+
+**SD jumped** (v9: 2.78pt → v10: 4.52pt). Possible explanations:
+larger adapter = more seed sensitivity; overfit proximity
+(epoch-3 eval rose); or small-n sampling noise. Not resolved.
+
+**Current demo UPDATES**: adapter v10 at ~60% mean becomes the
+new demo. Approaches the published 60-75% math-LoRA band for
+the first time in the series.
+
+**Research arc closes here** (operator decision 2026-11-06):
+math-example has served its purpose as PEFT demonstration;
+further trials (rank 64, full fine-tune, external data, best-of-N,
+70B model) are out of scope given cost + TB strategy. Research
+continues on stalite's side with different priorities
+(small-dataset PEFT, deployment, proprietary separation).
+
+### Rationale (threats-to-validity post-review)
+
+- Marginal signal at n=4 per adapter (acknowledged)
+- Pre-registration slipped this trial (acknowledged)
+- No baseline-test for v10 (could add retroactively)
+- No multi-seed confirmation of Trial #9 specifically — one
+  training-seed, four generation-seeds
+- GSM8K-specific; usual external-validity caveats
+
+Deliverable:
+[`rank-sweep-results.md`](rank-sweep-results.md) (deep dive).
+
+---
+
+## Summary table (as of 2026-11-06)
 
 | Trial | Base | Adapter | Epochs × Samples | Strict baseline-test | Strict holdout | Verdict |
 |---|---|---|---|---|---|---|
@@ -1032,6 +1111,7 @@ mechanism-confirmation analysis, publication implications).
 | 6 | 8B Instruct | **v8 (chat-template, 3 ep × 5000, rank 16, lr 1e-4)** | 3 × 5000 | **75 / 200 (37.5%)** | **85 / 200 (42.5%)** → revised to **41.62% mean (4 draws)** | Trial #6 single-draw suggested regression; **Trial #7 multi-seed revised to "no change vs. Trial #5"** |
 | 7 | — | multi-seed replicate of v7 + v8 | 4 draws each | — | **v7: 42.00% ± 2.65pt;  v8: 41.62% ± 2.56pt;  diff 0.38pt (0.14× pooled SD)** | **Indistinguishable**; established 6pt noise envelope |
 | 8 | 8B Instruct | **v9 (chat-template, 3 ep × 1000, rank 16, lr 1e-4, +MLP targets)** | 3 × 1000 | **97 / 200 (48.5%)** | **53.75% mean (4 draws), SD 2.78pt** | **First positive result**; +10.75pt above bare; capacity-trap mechanism confirmed |
+| 9 | 8B Instruct | **v10 (chat-template, 3 ep × 1000, rank 32, lr 1e-4, +MLP targets, alpha 64)** | 3 × 1000 | — (not run) | **60.12% mean (4 draws), SD 4.52pt** | **Series close**; +6.38pt over v9 (MARGINAL signal 1.70×); within-P1-strict +12.3pt vs bare; approaches published 60-75% band |
 
 > **Column labeling correction (2026-11-02)**: The "in-sample"
 > column header was renamed to "baseline-test" to match the
@@ -1052,14 +1132,18 @@ comparisons across trials remain valid; apparent "training set
 version" variation does not. Trial #5 (TB-US-079) was the first
 trial with genuinely varied training data under corrected wiring.
 
-**Current demo configuration**: **Adapter v9 (MLP-expanded LoRA)
-on Llama 3.1 8B Instruct**. Holdout mean ~54% (4 draws, +10.75pt
-above bare's 43%). First adapter in the arc to exceed bare
-Instruct on measurable math capability. Pages site updated (via
-TB-US-082 close). Adapters v5/v7/v8 remain in registry as
+**Current demo configuration**: **Adapter v10 (rank 32 attn+MLP
+QLoRA) on Llama 3.1 8B Instruct**. Holdout mean ~60% (4 draws,
++17.1pt above bare's 43%). First adapter in the arc to approach
+the published 60-75% math-LoRA band. Pages site updated (via
+TB-US-085 close). Adapters v5/v7/v8/v9 remain in registry as
 historical.
 
-**Key method lessons** (now cumulative through Trial #8):
+**Research arc closes here** (operator decision 2026-11-06):
+math-example has served its purpose as PEFT demonstration;
+further trials out of scope given cost + TB strategy.
+
+**Key method lessons** (now cumulative through Trial #9):
 - **Trial #4**: raw-CoT format + hardcoded template deleted
   Instruct's native `#### N`-at-end confirmation and REGRESSED
   accuracy by 20pt. **Format alignment is NECESSARY.**
@@ -1079,6 +1163,15 @@ historical.
   structure accuracy +5.8pt above bare. **"LoRA capacity trap"
   mechanism confirmed: reasoning capacity for math lives in MLP
   layers; attention-only LoRA compensated with format patterns.**
+- **Trial #9**: doubling LoRA rank from 16 to 32 at attn+MLP
+  continues to help (+6.38pt over v9, marginal signal 1.70×).
+  Mean 60.12% approaches published 60-75% band. Larger adapter
+  = more seed variability (SD 4.52pt vs. v9's 2.78pt). v10
+  learns both reasoning AND format rigidity (bigger capacity =
+  doesn't have to choose). Eval-loss overfit signal at epoch 3
+  suggests rank 32 is near the overfit wall at 1000 samples ×
+  3 epochs. Methodological slip: fired without formal
+  pre-registration.
 
 **Cumulative narrative (so far, internal to this research arc)**:
 format alignment prevents regression; target-module reach

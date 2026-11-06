@@ -24,28 +24,32 @@ and measured.
 pedagogical artifacts. The workflow is what the first-install example
 demonstrates — not performance.
 
-## The current demo: Adapter v9 (MLP-expanded LoRA) on Llama 3.1 8B Instruct (2026-11-04)
+## The current demo: Adapter v10 (rank 32 attn+MLP QLoRA) on Llama 3.1 8B Instruct (2026-11-06)
 
-After eight trials of training and measurement, we have the
-**first adapter that materially outperforms bare Llama 3.1 8B
-Instruct** on math reasoning.
+After nine trials of training and measurement, we have
+**approached the published math-LoRA band** for the first time
+in the series. This is our pedagogical demonstration of what
+PEFT can accomplish on consumer hardware (RTX 3090, 24 GB VRAM)
+with 1000 training samples.
 
 | Setup | GSM8K holdout accuracy (strict `#### N`-aware harness) |
 |---|---|
-| **Llama 3.1 8B Instruct + adapter v9 (MLP-expanded QLoRA)** | **53.75% mean (4 draws, SD 2.78pt, range 50.0–56.5)** |
+| **Llama 3.1 8B Instruct + adapter v10 (rank 32 attn+MLP QLoRA)** | **60.12% mean (4 draws, SD 4.52pt, range 54–64)** |
+| Llama 3.1 8B Instruct + adapter v9 (rank 16 attn+MLP QLoRA) | 53.75% mean (4 draws, SD 2.78pt) |
 | Llama 3.1 8B Instruct, no adapter (bare) | 86 / 200 (43%) on holdout |
 | Llama 3.1 8B base + our best QLoRA adapter (v3, Trial #2) | 52 / 200 (26%) on holdout |
 
-**Adapter v9 gains +10.75 points over bare Instruct** on the
-same 200-question GSM8K holdout subset. The gap is **far outside
-the 6-point stochastic-generation noise envelope** we characterized
-in Trial #7, so this is real signal, not luck.
+**Adapter v10 gains +17.1 points over bare Instruct** on the
+same 200-question GSM8K holdout subset. Multi-seed resolution
+(v10 vs. v9) is MARGINAL SIGNAL per our Trial #7 noise-envelope
+framework — direction unambiguously positive, magnitude
+uncertain at n=4 draws per adapter.
 
-### How we got here (eight trials)
+### How we got here (nine trials)
 
-- Trial #4: our first attempt at an Instruct-base adapter
-  REGRESSED accuracy by 20 points (format-mismatch bug deleted
-  Instruct's native `#### N`-at-end confirmation pattern).
+- Trial #4: first attempt at an Instruct-base adapter REGRESSED
+  accuracy by 20 points (format-mismatch bug deleted Instruct's
+  native `#### N`-at-end confirmation pattern).
 - Trial #5: chat-template-formatted training fixed the regression
   but matched bare Instruct within noise (no capability gain).
 - Trial #6: scaling training data 5x (1000 → 5000 samples) was
@@ -54,30 +58,37 @@ in Trial #7, so this is real signal, not luck.
 - Trial #7: multi-seed replicate revealed a ~6-point noise
   envelope at n=200, making prior single-draw comparisons more
   conservative.
-- **Trial #8**: expanding LoRA target modules from 4 (attention
-  only: `q_proj, v_proj, k_proj, o_proj`) to 7 (attention + MLP:
-  adding `gate_proj, up_proj, down_proj`) at the SAME rank 16,
-  SAME data, SAME epochs — UNLOCKED reasoning capacity.
+- Trial #8: expanding LoRA target modules from 4 (attention only)
+  to 7 (attention + MLP) at the SAME rank 16, SAME data, SAME
+  epochs — UNLOCKED reasoning capacity. First positive result
+  (adapter v9 at 53.75% mean).
+- **Trial #9**: doubling LoRA rank from 16 to 32 at attn+MLP
+  continues to help (+6.38pt over v9, marginal signal). Reached
+  60% mean — approaches the published 60-75% math-LoRA band for
+  the first time.
 
 ### The mechanism
 
 Attention-only LoRA at rank 16 was format-constrained. It
 compensated for inaccessible reasoning capacity by learning
-format patterns (dual-#### retention jumped from bare's 45%
-to 61-75% in attention-only adapters, with no accuracy benefit).
+format patterns (dual-#### retention jumped from bare's 45% to
+61-75% in attention-only adapters, with no accuracy benefit).
 Adding MLP target modules at the same rank gave the adapter a
-path to the reasoning capacity. **Within-structure accuracy per
-`#### N` output jumped from bare's 48.2% to adapter v9's 54.0%**
-— the adapter is actually solving more problems, not just
-producing more confident-looking outputs.
+path to reasoning capacity. **Within-structure accuracy per
+`#### N` output jumped from bare's 48.2% to adapter v9's 54.0%
+and adapter v10's 60.5%** — the adapter is actually solving
+more problems, not just producing more confident-looking
+outputs.
 
 See [`mlp-expansion-results.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/mlp-expansion-results.md)
-for the full deep dive.
+(Trial #8 deep dive) and
+[`rank-sweep-results.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/rank-sweep-results.md)
+(Trial #9 deep dive).
 
 ### How to reproduce
 
 ```python
-# Load Llama 3.1 8B Instruct + adapter v9 (QLoRA, rank 16, 7 target modules)
+# Load Llama 3.1 8B Instruct + adapter v10 (QLoRA, rank 32, 7 target modules)
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 base = AutoModelForCausalLM.from_pretrained(
@@ -85,27 +96,29 @@ base = AutoModelForCausalLM.from_pretrained(
     # ... 4-bit QLoRA via bitsandbytes
 )
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct")
-model = PeftModel.from_pretrained(base, "adapters/math-example/v9")
+model = PeftModel.from_pretrained(base, "adapters/math-example/v10")
 # Trained on 1000 chat-template-formatted GSM8K train-split samples,
 # target modules: q,v,k,o + gate,up,down (attention + MLP)
-# Measured: holdout mean 53.75% across 4 multi-seed draws
+# LoRA rank 32, alpha 64, lr 1e-4, 3 epochs, early-stop patience 2
+# Measured: holdout mean 60.12% across 4 multi-seed draws
 ```
 
-### Can we do better than 54%?
+### Can we do better than 60%?
 
-Published Llama 3.1 8B Instruct + math-LoRA numbers land in the
-60–75% range; our 54% is close to but below that band. Likely
-next levers (not yet tested):
+Likely yes — but our research arc closes here (2026-11-06) given
+cost + strategy constraints. Remaining levers not pursued:
 
-- **Rank sweep at attn+MLP** (does rank 32 help further, or
-  regress as rank-32 attention-only did in Trial #4?)
+- **Rank 64 at attn+MLP** (overfit risk at 1000 samples; v10
+  already showed early-overfit signal at epoch 3)
 - **External-data scale-up** (MATH, MGSM, synthetic math) to
   escape GSM8K's 7473-row training corpus
-- **Full fine-tuning** as a mechanism-comparison (TB-US-085
-  reserved)
+- **Full fine-tuning** as a mechanism-comparison
+- **Best-of-N inference** (self-consistency sampling)
+- **Larger base model** (70B — out of consumer-GPU reach)
 
-Current adapter v9 is a defensible floor: multi-seed-validated,
-mechanism-confirmed, publicly reproducible.
+Current adapter v10 is our teaching-grade baseline:
+multi-seed-validated, mechanism-explained, publicly
+reproducible, achievable on a single RTX 3090.
 
 ---
 
