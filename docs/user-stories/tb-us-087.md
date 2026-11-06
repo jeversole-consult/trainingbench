@@ -1,7 +1,8 @@
 # TB-US-087: Per-component version lifecycle UI (release / promote / deprecate buttons)
 
-**Status**: Backlog
+**Status**: In Progress (R1 shipped; R2-R6 pending)
 **Created**: 2026-11-05
+**Started**: 2026-11-06
 **Author**: Jesse Eversole
 **Depends on**: TB-US-086 backend audit (completed)
 **Blocks (soft)**: TB-US-005 public v0.1 cut — without version-lifecycle
@@ -83,11 +84,21 @@ is overkill for v0.1.
 
 ### Required UI touchpoints
 
-- [ ] R1: **Adapters**: on `training_runs.html`, auto-registered
-      adapters show a Release + Promote button on completion.
-      Clicking either fires the endpoint + refreshes state.
-- [ ] R2: **Training sets**: on `training_sets.html`, each listed
-      version shows Release + Promote + Deprecate actions.
+- [x] R1: **Adapters**: on `training_runs.html`, auto-registered
+      adapters show Release / Promote / Deprecate buttons based
+      on current state. Clicking either fires the endpoint + refreshes
+      state. Shared helper (`tbLifecycleAct`, `tbLifecycleBadge`,
+      `tbLifecycleControls`) lives inline in `training_runs.html`;
+      R3-R6 will reuse or copy it.
+- [ ] R2: **Training sets**: ~~on `training_sets.html`~~ —
+      **approach pending**. The existing `training_sets.html` lists
+      *legacy* `/training/sets` rows (status model:
+      draft/pending/applied/active/archived/deprecated), not versioned
+      snapshots (`/agents/{id}/training-sets`). Two options:
+      (A) add a new "Versioned snapshots" section to
+      `training_sets.html` scoped to the active agent, or
+      (B) surface versioned training-sets in the agent-management
+      modal alongside R3-R5. Decision deferred to the R3-R6 commit.
 - [ ] R3: **Prompts**: in the agent-management modal, a "Prompts"
       sub-section lists versions for the active agent with
       Release / Promote / Deprecate.
