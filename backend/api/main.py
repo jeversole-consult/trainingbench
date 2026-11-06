@@ -678,6 +678,31 @@ async def get_version():
     return get_version_info()
 
 
+# TB-US-NNN auto-reload: lightweight build-stamp endpoint the UI polls
+# every 30s. When the stamp differs from the one the page booted with,
+# the client banners "New version available" with a reload button.
+# Derived at boot time; constant per-process lifetime.
+import subprocess as _subprocess, time as _time
+try:
+    _BUILD_SHA = _subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(Path(__file__).resolve().parent.parent.parent),
+        stderr=_subprocess.DEVNULL,
+    ).decode().strip()
+except Exception:
+    _BUILD_SHA = None
+_BOOT_TIME = datetime.utcnow().isoformat() + "Z"
+
+
+@app.get("/version/build")
+async def get_build_stamp():
+    """Build-stamp endpoint for the UI's version-check poller. Returns a
+    short identifier that changes whenever the process restarts (i.e.
+    on any deploy). No auth required so the poller can run before login.
+    """
+    return {"sha": _BUILD_SHA, "boot_time": _BOOT_TIME, "ts": datetime.utcnow().isoformat() + "Z"}
+
+
 @app.get("/settings/mode")
 async def get_settings_mode(user_info: dict = Depends(verify_web_auth)):
     """Return the current demo_mode flag for the UI mode pill."""
