@@ -41,6 +41,7 @@ VERSIONING_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "trainingbe
 
 MIGRATION_ID = "tb-us-051"
 MIGRATION_ID_APPSETTINGS = "tb-us-055-appsettings"
+MIGRATION_ID_EXPERIMENTS_PROGRESS = "tb-us-070-experiments-progress"
 
 
 _CREATE_SCHEMA_MIGRATIONS = """
@@ -203,10 +204,12 @@ CREATE TABLE IF NOT EXISTS experiments (
     results_json TEXT,
     created_at TEXT NOT NULL,
     created_by TEXT NOT NULL,
+    started_at TEXT,
     completed_at TEXT,
     promoted_at TEXT,
     displaced_at TEXT,
     archived_at TEXT,
+    progress_json TEXT,
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id),
     FOREIGN KEY (parent_experiment_id) REFERENCES experiments(experiment_id)
 )
@@ -337,3 +340,34 @@ def migrate_appsettings_prompt_and_routes(db_path: Path = VERSIONING_DB_PATH) ->
         "prompt_chars": len(prompt_text),
         "routes_count": len(routes),
     }
+
+
+def migrate_experiments_progress(db_path: Path = VERSIONING_DB_PATH) -> dict:
+    """TB-US-070 R15/R18: add ``started_at`` and ``progress_json`` columns
+    to the experiments table on existing DBs. Idempotent."""
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM schema_migrations WHERE migration_id = ?",
+            (MIGRATION_ID_EXPERIMENTS_PROGRESS,),
+        )
+        if cur.fetchone():
+            return {"migration_id": MIGRATION_ID_EXPERIMENTS_PROGRESS, "already_applied": True}
+
+        cur.execute("PRAGMA table_info(experiments)")
+        cols = {r[1] for r in cur.fetchall()}
+        added = []
+        if "started_at" not in cols:
+            cur.execute("ALTER TABLE experiments ADD COLUMN started_at TEXT")
+            added.append("started_at")
+        if "progress_json" not in cols:
+            cur.execute("ALTER TABLE experiments ADD COLUMN progress_json TEXT")
+            added.append("progress_json")
+
+        cur.execute(
+            "INSERT INTO schema_migrations (migration_id, applied_at) VALUES (?, ?)",
+            (MIGRATION_ID_EXPERIMENTS_PROGRESS, datetime.now().isoformat()),
+        )
+        conn.commit()
+
+    return {"migration_id": MIGRATION_ID_EXPERIMENTS_PROGRESS, "columns_added": added}

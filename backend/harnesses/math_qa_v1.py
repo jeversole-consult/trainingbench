@@ -128,10 +128,16 @@ def run(
     if n_cap and isinstance(n_cap, int) and n_cap > 0:
         samples = samples[:n_cap]
 
+    # TB-US-070 R18: optional progress heartbeat. Runner injects
+    # ``progress_cb(current_sample, total_samples, running_correct)``.
+    progress_cb = config.get("progress_cb")
+    progress_every_n = config.get("progress_every_n", 5) or 5
+
     started = time.time()
     per_sample: List[Dict[str, Any]] = []
     correct_count = 0
-    for sample in samples:
+    total = len(samples)
+    for i, sample in enumerate(samples, start=1):
         question = sample.get("question", "")
         expected = sample.get("expected_answer", "")
         try:
@@ -151,6 +157,11 @@ def run(
             "correct": correct,
             "domain": sample.get("domain"),
         })
+        if progress_cb is not None and (i % progress_every_n == 0 or i == total):
+            try:
+                progress_cb(i, total, correct_count)
+            except Exception:
+                pass  # heartbeat is best-effort; never crash the eval loop
 
     n = len(samples)
     accuracy = (correct_count / n) if n else 0.0

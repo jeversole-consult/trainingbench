@@ -33,10 +33,13 @@ _ensure_secrets()  # TB-US-050: boot-time read/generate before anything else nee
 
 from api.schema_migrations import apply_versioning_schema as _apply_versioning_schema
 from api.schema_migrations import migrate_appsettings_prompt_and_routes as _migrate_appsettings_prompt_and_routes
+from api.schema_migrations import migrate_experiments_progress as _migrate_experiments_progress
 _schema_result = _apply_versioning_schema()  # TB-US-051: idempotent versioning-tables migration
 print(f"[schema] {_schema_result}")
 _appsettings_migration = _migrate_appsettings_prompt_and_routes()  # TB-US-055 R8/R9
 print(f"[schema] {_appsettings_migration}")
+_experiments_progress_migration = _migrate_experiments_progress()  # TB-US-070 R15/R18
+print(f"[schema] {_experiments_progress_migration}")
 
 from api.first_run_seeder import seed_math_example as _seed_math_example  # TB-US-057 Phase A
 _seed_result = _seed_math_example()
@@ -3494,13 +3497,25 @@ async def deprecate_harness_version(version_id: int, user_info: Dict = Depends(v
 
 # ---- Experiment CRUD ----
 
+_EXPERIMENT_STATES = {
+    "draft", "running", "completed", "promoted", "displaced", "archived",
+}
+
+
 @app.get("/experiments")
 async def list_experiments(
     agent_id: Optional[int] = None,
+    state: Optional[str] = None,
     user_info: Dict = Depends(verify_web_auth),
 ):
-    rows = experiment_manager.list_experiments(agent_id=agent_id)
-    return {"experiments": rows, "agent_id": agent_id}
+    # TB-US-070 R17: optional state filter, validated against the enum.
+    if state is not None and state not in _EXPERIMENT_STATES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid state {state!r}; allowed: {sorted(_EXPERIMENT_STATES)}",
+        )
+    rows = experiment_manager.list_experiments(agent_id=agent_id, state=state)
+    return {"experiments": rows, "agent_id": agent_id, "state": state}
 
 
 @app.get("/experiments/{experiment_id}")

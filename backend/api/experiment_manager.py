@@ -37,18 +37,28 @@ class ExperimentManager:
     # Reads
     # ------------------------------------------------------------------ #
 
-    def list_experiments(self, agent_id: Optional[int] = None) -> List[Dict]:
+    def list_experiments(
+        self,
+        agent_id: Optional[int] = None,
+        state: Optional[str] = None,
+    ) -> List[Dict]:
+        # TB-US-070 R17: optional state filter (validated against enum
+        # by the endpoint layer, not here).
+        clauses: List[str] = []
+        values: List[Any] = []
+        if agent_id is not None:
+            clauses.append("agent_id = ?")
+            values.append(agent_id)
+        if state is not None:
+            clauses.append("state = ?")
+            values.append(state)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
-            if agent_id is not None:
-                rows = conn.execute(
-                    "SELECT * FROM experiments WHERE agent_id = ? ORDER BY experiment_id",
-                    (agent_id,),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM experiments ORDER BY experiment_id"
-                ).fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM experiments {where} ORDER BY experiment_id DESC",
+                values,
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def get_by_id(self, experiment_id: int) -> Optional[Dict]:
@@ -117,8 +127,9 @@ class ExperimentManager:
             )
 
         now = datetime.now().isoformat()
+        # TB-US-070 R15: write started_at when transitioning into running.
         timestamp_col = {
-            "running":   None,
+            "running":   "started_at",
             "completed": "completed_at",
             "promoted":  "promoted_at",
             "displaced": "displaced_at",
@@ -149,6 +160,26 @@ class ExperimentManager:
             experiment_id, "completed",
             extra={"results_json": json.dumps(results, sort_keys=True)},
         )
+
+    def update_progress(self, experiment_id: int, progress: Dict) -> None:
+        """TB-US-070 R18: harness-runner heartbeat.
+
+        ``progress`` is any JSON-serializable dict; conventionally
+        ``{current_sample, total_samples, running_correct, last_updated}``.
+        Writes to ``progress_json`` without changing state.
+        Best-effort: errors are swallowed so a slow DB can't crash the
+        harness mid-run.
+        """
+        payload = json.dumps(progress, sort_keys=True)
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE experiments SET progress_json = ? WHERE experiment_id = ?",
+                    (payload, experiment_id),
+                )
+                conn.commit()
+        except sqlite3.Error:
+            pass
 
     # ------------------------------------------------------------------ #
 

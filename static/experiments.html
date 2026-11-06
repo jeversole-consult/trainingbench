@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experiments - TrainingBench</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #CC785C;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        h1 { color: #CC785C; font-size: 28px; }
+        .user-info {
+            padding: 8px 15px;
+            background: #f0f4f8;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #555;
+        }
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        .filters {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filters label { font-size: 0.9em; color: #555; font-weight: 600; }
+        .filters select, .filters input {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+        th {
+            text-align: left;
+            padding: 10px 8px;
+            border-bottom: 2px solid #E0E0E0;
+            color: #555;
+            font-weight: 600;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #F0F0F0;
+            vertical-align: top;
+        }
+        tr.exp-row:hover { background: rgba(204, 120, 92, 0.04); cursor: pointer; }
+        .state-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .state-draft      { background: #fafafa; color: #777; }
+        .state-running    { background: rgba(204, 120, 92, 0.15); color: #CC785C; }
+        .state-completed  { background: #e8f5e9; color: #2e7d32; }
+        .state-promoted   { background: #c8e6c9; color: #1b5e20; }
+        .state-displaced  { background: #f5f5f5; color: #616161; }
+        .state-archived   { background: #ffebee; color: #c62828; }
+        .pins {
+            font-family: monospace;
+            font-size: 0.85em;
+            color: #555;
+            white-space: nowrap;
+        }
+        .pins .pin {
+            display: inline-block;
+            margin-right: 6px;
+            padding: 1px 6px;
+            background: #f5f5f5;
+            border-radius: 3px;
+        }
+        .empty {
+            padding: 40px;
+            text-align: center;
+            color: #999;
+            font-size: 0.95em;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 14px;
+            color: #CC785C;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .detail-item { padding: 10px 14px; background: #fafafa; border-radius: 6px; }
+        .detail-label {
+            font-size: 0.8em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .detail-value { color: #333; font-size: 0.95em; word-break: break-word; }
+        .panel-title {
+            color: #CC785C;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        pre.json-block {
+            background: #f8f9fa;
+            border: 1px solid #E0E0E0;
+            border-radius: 6px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 0.85em;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .error-panel {
+            background: #ffebee;
+            border-left: 4px solid #c62828;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .lineage-link {
+            color: #CC785C;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .lineage-link:hover { text-decoration: underline; }
+        .btn-small {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #CC785C;
+            background: white;
+            color: #CC785C;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+        .btn-small:hover { background: rgba(204, 120, 92, 0.08); }
+        .btn-danger {
+            border-color: #c62828;
+            color: #c62828;
+        }
+        .btn-danger:hover { background: rgba(198, 40, 40, 0.08); }
+        .running-metric { color: #CC785C; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧪 Experiments</h1>
+            <div class="user-info" id="userInfo">Loading...</div>
+        </header>
+
+        <!-- List view -->
+        <div id="listView">
+            <div class="panel">
+                <div class="filters">
+                    <label>Agent:</label>
+                    <select id="agentFilter"><option value="">All</option></select>
+                    <label>State:</label>
+                    <select id="stateFilter">
+                        <option value="">All</option>
+                        <option value="running">Running</option>
+                        <option value="completed">Completed</option>
+                        <option value="promoted">Promoted</option>
+                        <option value="displaced">Displaced</option>
+                        <option value="draft">Draft</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                    <span id="listLoader" style="color:#999; font-size:0.85em; display:none;">Loading…</span>
+                </div>
+            </div>
+            <div class="panel">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Label</th>
+                            <th>Agent</th>
+                            <th>State</th>
+                            <th>Pins</th>
+                            <th>Final metric</th>
+                            <th>Started / Duration</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="expTbody"></tbody>
+                </table>
+                <div id="expEmpty" class="empty" style="display:none;">No experiments match your filter.</div>
+            </div>
+        </div>
+
+        <!-- Detail view -->
+        <div id="detailView" style="display:none;">
+            <a href="#" class="back-link" onclick="navigateToList(); return false;">← Back to list</a>
+            <div class="panel">
+                <div id="detailContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="user_management.js?v=20261022a"></script>
+    <script src="active_run_strip.js?v=20261022a"></script>
+    <script src="active_experiment_strip.js?v=20261106a"></script>
+    <script src="version_lifecycle.js?v=20261106a"></script>
+    <script src="agent_management.js?v=20261106a"></script>
+    <script src="api_key_management.js?v=20261022a"></script>
+    <script src="left_nav.js?v=20261106a"></script>
+    <script>
+        // TB-US-070 experiments page: list + detail.
+        // Super-only; redirects non-super.
+
+        let authToken = '';
+        let currentUser = null;
+        let allAgents = [];
+        let currentAgentFilter = '';   // either '' or an agent_id as string
+        let currentStateFilter = '';
+        let listPollTimer = null;
+        let detailPollTimer = null;
+        const LIST_POLL_MS = 10 * 1000;
+        const DETAIL_POLL_RUNNING_MS = 5 * 1000;
+        const DETAIL_POLL_IDLE_MS = 60 * 1000;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            window.addEventListener('hashchange', route);
+        });
+
+        async function checkAuth() {
+            authToken = sessionStorage.getItem('session_token');
+            if (!authToken) { window.location.href = '/static/login.html'; return; }
+            try {
+                const res = await fetch('/auth/verify', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error('auth failed');
+                const data = await res.json();
+                currentUser = data;
+                document.getElementById('userInfo').textContent = `${data.username} (${data.user_type})`;
+                if (data.user_type !== 'super') {
+                    alert('Access denied. Experiments require super-user privileges.');
+                    window.location.href = '/static/index.html';
+                    return;
+                }
+                await loadAgents();
+                applyUrlParams();
+                wireFilters();
+                route();
+            } catch (e) {
+                console.error(e);
+                window.location.href = '/static/login.html';
+            }
+        }
+
+        async function loadAgents() {
+            try {
+                const res = await fetch('/agents?include_retired=true', { headers: authHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                allAgents = data.agents || [];
+                const sel = document.getElementById('agentFilter');
+                sel.innerHTML = '<option value="">All</option>' + allAgents.map(a =>
+                    `<option value="${a.agent_id}">${escapeHtml(a.display_name || a.name)}</option>`).join('');
+            } catch (e) { console.error('agent load failed', e); }
+        }
+
+        function applyUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const agentId = params.get('agent_id');
+            const agentName = params.get('agent_name');
+            if (agentId) {
+                currentAgentFilter = agentId;
+            } else if (agentName) {
+                const match = allAgents.find(a => a.name === agentName);
+                if (match) currentAgentFilter = String(match.agent_id);
+            }
+            document.getElementById('agentFilter').value = currentAgentFilter;
+        }
+
+        function wireFilters() {
+            document.getElementById('agentFilter').addEventListener('change', e => {
+                currentAgentFilter = e.target.value;
+                loadList();
+            });
+            document.getElementById('stateFilter').addEventListener('change', e => {
+                currentStateFilter = e.target.value;
+                loadList();
+            });
+        }
+
+        function route() {
+            const hash = window.location.hash;
+            const m = hash.match(/^#experiment\/(\d+)$/);
+            if (m) {
+                showDetail(parseInt(m[1], 10));
+            } else {
+                showList();
+            }
+        }
+
+        function navigateToList() {
+            history.pushState(null, '', window.location.pathname + window.location.search);
+            showList();
+        }
+
+        function showList() {
+            document.getElementById('listView').style.display = '';
+            document.getElementById('detailView').style.display = 'none';
+            stopDetailPoll();
+            loadList();
+            startListPoll();
+        }
+
+        function showDetail(experimentId) {
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = '';
+            stopListPoll();
+            loadDetail(experimentId, true);
+        }
+
+        function startListPoll() {
+            stopListPoll();
+            listPollTimer = setInterval(loadList, LIST_POLL_MS);
+        }
+        function stopListPoll() {
+            if (listPollTimer) { clearInterval(listPollTimer); listPollTimer = null; }
+        }
+        function stopDetailPoll() {
+            if (detailPollTimer) { clearInterval(detailPollTimer); detailPollTimer = null; }
+        }
+
+        async function loadList() {
+            const loader = document.getElementById('listLoader');
+            loader.style.display = 'inline';
+            try {
+                const qs = new URLSearchParams();
+                if (currentAgentFilter) qs.set('agent_id', currentAgentFilter);
+                if (currentStateFilter) qs.set('state', currentStateFilter);
+                const url = '/experiments' + (qs.toString() ? `?${qs}` : '');
+                const res = await fetch(url, { headers: authHeaders() });
+                if (!res.ok) throw new Error(`${res.status}`);
+                const data = await res.json();
+                renderList(data.experiments || []);
+            } catch (e) {
+                document.getElementById('expTbody').innerHTML = '';
+                document.getElementById('expEmpty').style.display = 'block';
+                document.getElementById('expEmpty').textContent = `Failed to load: ${e.message}`;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        function renderList(experiments) {
+            const tbody = document.getElementById('expTbody');
+            const empty = document.getElementById('expEmpty');
+            if (experiments.length === 0) {
+                tbody.innerHTML = '';
+                empty.style.display = 'block';
+                empty.textContent = 'No experiments match your filter.';
+                return;
+            }
+            empty.style.display = 'none';
+            tbody.innerHTML = experiments.map(exp => {
+                const agent = allAgents.find(a => a.agent_id === exp.agent_id);
+                const agentLabel = agent ? (agent.display_name || agent.name) : `#${exp.agent_id}`;
+                const pins = renderPins(exp);
+                const metric = renderFinalMetric(exp);
+                const timing = renderTiming(exp);
+                return `<tr class="exp-row" onclick="openExperiment(${exp.experiment_id})">
+                    <td style="font-family:monospace; color:#666;">#${exp.experiment_id}</td>
+                    <td><strong>${escapeHtml(exp.label)}</strong></td>
+                    <td>${escapeHtml(agentLabel)}</td>
+                    <td><span class="state-badge state-${exp.state}">${exp.state}</span></td>
+                    <td class="pins">${pins}</td>
+                    <td>${metric}</td>
+                    <td style="font-size:0.85em; color:#666;">${timing}</td>
+                    <td><button class="btn-small" onclick="event.stopPropagation(); openExperiment(${exp.experiment_id});">View →</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderPins(exp) {
+            const pins = [];
+            if (exp.adapter_version_id) pins.push(`<span class="pin">adapter #${exp.adapter_version_id}</span>`);
+            if (exp.rag_version_id) pins.push(`<span class="pin">rag #${exp.rag_version_id}</span>`);
+            if (exp.system_prompt_version_id) pins.push(`<span class="pin">prompt #${exp.system_prompt_version_id}</span>`);
+            if (exp.harness_version_id) pins.push(`<span class="pin">harness #${exp.harness_version_id}</span>`);
+            if (exp.llm_identifier) pins.push(`<span class="pin">${escapeHtml(exp.llm_identifier)}</span>`);
+            return pins.length ? pins.join('') : '<span style="color:#bbb;">none</span>';
+        }
+
+        function renderFinalMetric(exp) {
+            if (exp.state === 'running') {
+                const prog = parseJson(exp.progress_json);
+                if (prog && prog.total_samples) {
+                    const acc = prog.current_sample > 0
+                        ? (prog.running_correct / prog.current_sample * 100).toFixed(1) + '%'
+                        : '';
+                    return `<span class="running-metric">${prog.current_sample}/${prog.total_samples}${acc ? ' · ' + acc : ''}</span>`;
+                }
+                return '<span class="running-metric">running…</span>';
+            }
+            const results = parseJson(exp.results_json);
+            if (!results) return '<span style="color:#bbb;">—</span>';
+            if (results.metric === 'error') return '<span style="color:#c62828;">error</span>';
+            if (results.value === null || results.value === undefined) return '<span style="color:#bbb;">—</span>';
+            const v = typeof results.value === 'number' ? results.value.toFixed(3) : String(results.value);
+            return `<span>${escapeHtml(results.metric || 'value')}=${escapeHtml(v)}</span>`;
+        }
+
+        function renderTiming(exp) {
+            if (exp.state === 'running' && exp.started_at) {
+                return `Started ${formatDate(exp.started_at)} · ${elapsed(exp.started_at, null)}`;
+            }
+            if (exp.started_at && exp.completed_at) {
+                return `Duration ${elapsed(exp.started_at, exp.completed_at)}`;
+            }
+            if (exp.completed_at) return `Completed ${formatDate(exp.completed_at)}`;
+            if (exp.archived_at) return `Archived ${formatDate(exp.archived_at)}`;
+            return `Created ${formatDate(exp.created_at)}`;
+        }
+
+        function openExperiment(experimentId) {
+            window.location.hash = `experiment/${experimentId}`;
+        }
+
+        // ---- Detail view ----
+
+        async function loadDetail(experimentId, initial) {
+            try {
+                const res = await fetch(`/experiments/${experimentId}`, { headers: authHeaders() });
+                if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+                const exp = await res.json();
+                renderDetail(exp);
+                scheduleDetailPoll(experimentId, exp.state);
+            } catch (e) {
+                document.getElementById('detailContent').innerHTML =
+                    `<div class="error-panel">Failed to load experiment #${experimentId}: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function scheduleDetailPoll(experimentId, state) {
+            stopDetailPoll();
+            const ms = state === 'running' ? DETAIL_POLL_RUNNING_MS : DETAIL_POLL_IDLE_MS;
+            detailPollTimer = setInterval(() => loadDetail(experimentId, false), ms);
+        }
+
+        function renderDetail(exp) {
+            const agent = allAgents.find(a => a.agent_id === exp.agent_id);
+            const agentLabel = agent ? (agent.display_name || agent.name) : `#${exp.agent_id}`;
+            const results = parseJson(exp.results_json);
+            const progress = parseJson(exp.progress_json);
+            const isRunning = exp.state === 'running';
+            const isArchived = exp.state === 'archived';
+            const isCompleted = exp.state === 'completed' || exp.state === 'promoted' || exp.state === 'displaced';
+
+            const archiveBtn = (currentUser.user_type === 'super' && (exp.state === 'draft' || exp.state === 'completed'))
+                ? `<button class="btn-small btn-danger" onclick="archiveExperiment(${exp.experiment_id})">Archive</button>`
+                : '';
+
+            const pinsPanel = `
+                <div class="panel-title">Pins</div>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Agent</div>
+                        <div class="detail-value">${escapeHtml(agentLabel)}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Base LLM</div>
+                        <div class="detail-value">${exp.llm_identifier ? escapeHtml(exp.llm_identifier) : '<span style="color:#bbb;">inherit</span>'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Adapter version</div>
+                        <div class="detail-value">${exp.adapter_version_id ? '#' + exp.adapter_version_id : '<span style="color:#bbb;">inherit</span>'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">RAG version</div>
+                        <div class="detail-value">${exp.rag_version_id ? '#' + exp.rag_version_id : '<span style="color:#bbb;">inherit</span>'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Prompt version</div>
+                        <div class="detail-value">${exp.system_prompt_version_id ? '#' + exp.system_prompt_version_id : '<span style="color:#bbb;">inherit</span>'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Harness version</div>
+                        <div class="detail-value">${exp.harness_version_id ? '#' + exp.harness_version_id : '<span style="color:#bbb;">—</span>'}</div>
+                    </div>
+                </div>`;
+
+            const liveProgressPanel = (isRunning && progress) ? `
+                <div class="panel-title">Live progress</div>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Sample</div>
+                        <div class="detail-value"><span class="running-metric">${progress.current_sample || 0}</span> / ${progress.total_samples || '?'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Running correct</div>
+                        <div class="detail-value">${progress.running_correct !== undefined ? progress.running_correct : '—'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Running accuracy</div>
+                        <div class="detail-value">${(progress.running_correct !== undefined && progress.current_sample > 0)
+                            ? (progress.running_correct / progress.current_sample * 100).toFixed(1) + '%'
+                            : '—'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Last heartbeat</div>
+                        <div class="detail-value" style="font-size:0.85em;">${progress.last_updated ? escapeHtml(progress.last_updated) : '—'}</div>
+                    </div>
+                </div>` : (isRunning ? `
+                <div class="panel-title">Live progress</div>
+                <div style="color:#999; margin-bottom:16px;">Heartbeat not yet received (first sample may take a minute on initial load).</div>
+                ` : '');
+
+            const resultsPanel = (isCompleted && results) ? `
+                <div class="panel-title">Results</div>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Metric</div>
+                        <div class="detail-value">${escapeHtml(results.metric || 'value')}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Value</div>
+                        <div class="detail-value"><strong>${results.value !== null && results.value !== undefined
+                            ? (typeof results.value === 'number' ? results.value.toFixed(4) : escapeHtml(String(results.value)))
+                            : '—'}</strong></div>
+                    </div>
+                    ${results.n_samples ? `<div class="detail-item">
+                        <div class="detail-label">Samples</div>
+                        <div class="detail-value">${results.n_samples}</div>
+                    </div>` : ''}
+                    ${results.correct_count !== undefined ? `<div class="detail-item">
+                        <div class="detail-label">Correct</div>
+                        <div class="detail-value">${results.correct_count}</div>
+                    </div>` : ''}
+                    ${results.duration_seconds ? `<div class="detail-item">
+                        <div class="detail-label">Duration</div>
+                        <div class="detail-value">${results.duration_seconds}s</div>
+                    </div>` : ''}
+                </div>
+                ${results._stack ? `<div class="panel-title" style="font-size:0.95em;">Stack summary</div>
+                <pre class="json-block">${escapeHtml(JSON.stringify(results._stack, null, 2))}</pre>` : ''}
+                ` : '';
+
+            const errorPanel = (isArchived && results && results.error) ? `
+                <div class="panel-title">Error</div>
+                <div class="error-panel">
+                    <strong>${escapeHtml(results.error)}</strong>
+                </div>
+                ${results.traceback ? `<pre class="json-block" style="margin-top:10px;">${escapeHtml(results.traceback)}</pre>` : ''}
+                ` : '';
+
+            // Lineage: parent + children.
+            let lineageHtml = '';
+            if (exp.parent_experiment_id) {
+                lineageHtml += `<div class="detail-item">
+                    <div class="detail-label">Parent</div>
+                    <div class="detail-value"><a class="lineage-link" href="#experiment/${exp.parent_experiment_id}">#${exp.parent_experiment_id}</a></div>
+                </div>`;
+            }
+            // Children query runs async (below) after render.
+            lineageHtml += `<div class="detail-item" id="childrenSlot">
+                <div class="detail-label">Children</div>
+                <div class="detail-value" style="color:#999;">loading…</div>
+            </div>`;
+
+            const lineagePanel = `
+                <div class="panel-title">Lineage</div>
+                <div class="detail-grid">${lineageHtml}</div>`;
+
+            document.getElementById('detailContent').innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+                    <h2 style="color:#333; font-size:1.3em;">
+                        🧪 <span style="color:#CC785C;">#${exp.experiment_id}</span> ${escapeHtml(exp.label)}
+                        <span class="state-badge state-${exp.state}" style="margin-left:10px; vertical-align:middle;">${exp.state}</span>
+                    </h2>
+                    <div>${archiveBtn}</div>
+                </div>
+                <div class="detail-grid" style="margin-bottom:20px;">
+                    <div class="detail-item">
+                        <div class="detail-label">Created</div>
+                        <div class="detail-value" style="font-size:0.9em;">${formatDate(exp.created_at)} by ${escapeHtml(exp.created_by || '—')}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Started</div>
+                        <div class="detail-value" style="font-size:0.9em;">${exp.started_at ? formatDate(exp.started_at) : '<span style="color:#bbb;">—</span>'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Elapsed</div>
+                        <div class="detail-value"><strong>${exp.started_at ? elapsed(exp.started_at, exp.completed_at || exp.archived_at) : '—'}</strong></div>
+                    </div>
+                </div>
+                ${pinsPanel}
+                ${liveProgressPanel}
+                ${resultsPanel}
+                ${errorPanel}
+                ${lineagePanel}
+            `;
+
+            loadChildren(exp.experiment_id, exp.agent_id);
+        }
+
+        async function loadChildren(experimentId, agentId) {
+            const slot = document.getElementById('childrenSlot');
+            if (!slot) return;
+            try {
+                const res = await fetch(`/experiments?agent_id=${agentId}`, { headers: authHeaders() });
+                if (!res.ok) throw new Error(`${res.status}`);
+                const data = await res.json();
+                const children = (data.experiments || []).filter(e => e.parent_experiment_id === experimentId);
+                if (!children.length) {
+                    slot.querySelector('.detail-value').innerHTML = '<span style="color:#bbb;">none</span>';
+                    return;
+                }
+                slot.querySelector('.detail-value').innerHTML = children.map(c =>
+                    `<a class="lineage-link" href="#experiment/${c.experiment_id}">#${c.experiment_id}</a>`
+                ).join(', ');
+            } catch (e) {
+                slot.querySelector('.detail-value').innerHTML = '<span style="color:#c33;">failed to load</span>';
+            }
+        }
+
+        async function archiveExperiment(experimentId) {
+            if (!confirm(`Archive experiment #${experimentId}? This marks it archived; it cannot be un-archived.`)) return;
+            try {
+                const res = await fetch(`/experiments/${experimentId}/archive`, {
+                    method: 'POST',
+                    headers: authHeaders(),
+                });
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    throw new Error(body.detail || `${res.status}`);
+                }
+                loadDetail(experimentId, false);
+            } catch (e) {
+                alert(`Archive failed: ${e.message}`);
+            }
+        }
+
+        // ---- helpers ----
+
+        function authHeaders() {
+            return { 'Authorization': `Bearer ${authToken}` };
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+        }
+
+        function parseJson(s) {
+            if (!s) return null;
+            try { return JSON.parse(s); } catch (e) { return null; }
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '—';
+            try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+        }
+
+        function elapsed(startedIso, endedIso) {
+            try {
+                const start = new Date(startedIso).getTime();
+                const end = endedIso ? new Date(endedIso).getTime() : Date.now();
+                const secs = Math.max(0, Math.floor((end - start) / 1000));
+                const h = Math.floor(secs / 3600);
+                const m = Math.floor((secs % 3600) / 60);
+                const s = secs % 60;
+                if (h > 0) return `${h}h ${m}m ${s.toString().padStart(2, '0')}s`;
+                if (m > 0) return `${m}m ${s.toString().padStart(2, '0')}s`;
+                return `${s}s`;
+            } catch (e) { return '—'; }
+        }
+    </script>
+</body>
+</html>

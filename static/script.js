@@ -1198,8 +1198,9 @@ function switchToMathExample() {
 }
 
 function viewMathExampleExperiments() {
-    // Experiments UI (R1 card) ships with a future story; for now, link to a placeholder.
-    alert('Experiment viewer ships with the next release. For now, use the API: GET /experiments?agent_id={math-example-id}');
+    // TB-US-070 R11: navigate to the experiments page, filtered to math-example.
+    // experiments.html resolves agent_name → agent_id client-side.
+    window.location.href = '/static/experiments.html?agent_name=math-example';
 }
 
 function escapeHtmlLite(s) {

@@ -24,12 +24,14 @@
         { id: 'databases',     label: 'Databases',      icon: '🗄️', target: 'tab'  },
         { id: 'training_sets', label: 'Training Sets',  icon: '🎓', target: 'page', href: '/static/training_sets.html' },
         { id: 'training_runs', label: 'Training Runs',  icon: '🏃', target: 'page', href: '/static/training_runs.html' },
+        { id: 'experiments',   label: 'Experiments',    icon: '🧪', target: 'page', href: '/static/experiments.html' },
     ];
 
     function detectCurrentPage() {
         const path = window.location.pathname;
         if (path.endsWith('/training_sets.html')) return 'training_sets';
         if (path.endsWith('/training_runs.html')) return 'training_runs';
+        if (path.endsWith('/experiments.html'))   return 'experiments';
         return 'index';
     }
 
@@ -37,6 +39,7 @@
         const page = detectCurrentPage();
         if (page === 'training_sets') return 'training_sets';
         if (page === 'training_runs') return 'training_runs';
+        if (page === 'experiments')   return 'experiments';
         // On index: find the active tab-content element and strip -tab suffix
         const activeTab = document.querySelector('.tab-content.active');
         if (activeTab) {

@@ -35,6 +35,7 @@ import logging
 import os
 import sys
 import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -291,6 +292,25 @@ def run_experiment(experiment_id: int) -> Dict:
             "harness_runner: experiment %s → module %s dataset %s stack %s",
             experiment_id, module_dotted, dataset_path, stack["summary"],
         )
+
+        # TB-US-070 R18: progress heartbeat. Harness modules that honor
+        # ``config["progress_cb"]`` will tick it every N samples; modules
+        # that ignore it (back-compat) still work, just without live progress.
+        def _progress_cb(current_sample: int, total_samples: int, running_correct: int) -> None:
+            _experiments.update_progress(
+                experiment_id,
+                {
+                    "current_sample": current_sample,
+                    "total_samples": total_samples,
+                    "running_correct": running_correct,
+                    "last_updated": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                },
+            )
+        config = dict(config) if config else {}
+        config["progress_cb"] = _progress_cb
+        # Default heartbeat cadence: every 5 samples (R18 recommendation).
+        config.setdefault("progress_every_n", 5)
+
         results = harness_mod.run(dataset_path=dataset_path, model_fn=model_fn, config=config)
         # Attach the stack summary to the results for audit
         results["_stack"] = stack["summary"]

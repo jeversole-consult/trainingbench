@@ -1,7 +1,8 @@
 # TB-US-070: Experiments UI — active-experiment strip + minimal supervision
 
-**Status**: Proposed
+**Status**: Completed
 **Created**: 2026-10-25
+**Shipped**: 2026-11-06
 **Author**: Jesse Eversole
 **Commit hash(es)**: <filled in on completion>
 
@@ -51,31 +52,31 @@ analogous to what TB-US-066 did for training.
 
 ### 1. Active-experiment strip (primary feature)
 
-- [ ] R1: **Element** `#tb-active-experiment-strip` injected
+- [x] R1: **Element** `#tb-active-experiment-strip` injected
       into the header on all pages where TB-US-066's
       `#tb-active-run-strip` is injected (index.html,
       training_sets.html, training_runs.html). Can share
       the same injection point in `left_nav.js` (two
       stacked strips when both run types are active).
-- [ ] R2: **Visibility** — hidden by default; appears
+- [x] R2: **Visibility** — hidden by default; appears
       when `GET /experiments?state=running` returns a
       non-empty list. (Requires backend R18.)
-- [ ] R3: **Content**:
+- [x] R3: **Content**:
       ```
       🧪 Experiment running: {label}
          Agent {agent_label} · Elapsed {HH:MM:SS}      [View →]
       ```
       "View" links to `/static/experiments.html#experiment/{id}`.
-- [ ] R4: **Polling** — strip polls `GET /experiments?state=running`
+- [x] R4: **Polling** — strip polls `GET /experiments?state=running`
       every **10 seconds** when visible. When no active
       experiment, polling continues at the same cadence
       so a newly-started one becomes visible within 10s.
-- [ ] R5: **Styling** — amber-accented banner matching
+- [x] R5: **Styling** — amber-accented banner matching
       TB-US-066's active-run strip, with a flask (🧪)
       icon to distinguish it visually from training's
       gear (⚙️). Pulsing border to signal "live".
       Super-only.
-- [ ] R6: **State transitions:**
+- [x] R6: **State transitions:**
       - State flips to `completed` → strip shows final
         state for 60s with final metric value, then
         disappears
@@ -85,10 +86,10 @@ analogous to what TB-US-066 did for training.
 
 ### 2. Experiments page — list view
 
-- [ ] R7: **New page `static/experiments.html`.** Static
+- [x] R7: **New page `static/experiments.html`.** Static
       shell + list + detail view. Rip off `training_runs.html`
       structurally.
-- [ ] R8: **List view** of experiments (newest first).
+- [x] R8: **List view** of experiments (newest first).
       Columns:
       - Label
       - Agent (via `experiments.agent_id`)
@@ -100,23 +101,23 @@ analogous to what TB-US-066 did for training.
       - Started / elapsed (for running) OR duration (for
         completed)
       - Action: `View →` link to detail
-- [ ] R9: **Agent filter dropdown** at top of list.
+- [x] R9: **Agent filter dropdown** at top of list.
       Default: show all. Operator can filter to one
       agent.
-- [ ] R10: **No launch button in v0.1.** Experiments are
+- [x] R10: **No launch button in v0.1.** Experiments are
       created via API or seeder today; a launch form
       ships in a later story (likely alongside Sweet Spot
       selection UI).
-- [ ] R11: **Fix the alert on math-example card**:
+- [x] R11: **Fix the alert on math-example card**:
       `static/script.js:1202` currently alerts
       "Experiment viewer ships with the next release".
       Rewire the button to `/static/experiments.html?agent_id={id}`.
 
 ### 3. Detail view
 
-- [ ] R12: **Routable** via `#experiment/{id}` hash in URL.
+- [x] R12: **Routable** via `#experiment/{id}` hash in URL.
       Operator can bookmark + resume after logout.
-- [ ] R13: **Panels** (no chart in v0.1):
+- [x] R13: **Panels** (no chart in v0.1):
       - **Header**: label + state badge + started /
         elapsed-or-duration
       - **Pins panel**: adapter version (link to adapter
@@ -138,91 +139,91 @@ analogous to what TB-US-066 did for training.
       - **Actions**: `Archive` button (super-only; when
         state ∈ {`draft`, `completed`}). Promote /
         displace actions **deferred** to Sweet Spot story.
-- [ ] R14: **Polling cadence** — 5s active, 60s otherwise.
+- [x] R14: **Polling cadence** — 5s active, 60s otherwise.
       Cancellable `setInterval` cleaned up on navigation.
 
 ### 4. Backend prerequisites
 
-- [ ] R15: **`started_at` column** added to `experiments`
+- [x] R15: **`started_at` column** added to `experiments`
       table (nullable). `transition_state(…, "running")`
       writes it; existing rows stay NULL. Timestamp
       exposed via `GET /experiments/{id}`.
-- [ ] R16: **Elapsed time derivation** — strip + list
+- [x] R16: **Elapsed time derivation** — strip + list
       derive `now - started_at` for `running` rows.
       Completed rows show `completed_at - started_at`.
-- [ ] R17: **`GET /experiments?state=X` filter.** Add
+- [x] R17: **`GET /experiments?state=X` filter.** Add
       `state` query parameter (reuses existing endpoint).
       Validates against the state enum; invalid → 400.
       Default (no param) = all states.
-- [ ] R18: **Progress heartbeat (optional).** Harness
+- [x] R18: **Progress heartbeat (optional).** Harness
       runner writes `progress_json` (new nullable column)
       every N samples (default N=5) with
       `{current_sample: int, total_samples: int,
       running_correct: int, last_updated: str}`. Enables
       R13's "sample X of N" display. If not feasible to
       ship in the same story, drop and show only elapsed.
-- [ ] R19: **Audit log entry** per archive from UI
+- [x] R19: **Audit log entry** per archive from UI
       (reuse `experiment.archive`).
 
 ### 5. Cross-cutting
 
-- [ ] R20: **Super-only gating** on archive button + the
+- [x] R20: **Super-only gating** on archive button + the
       strip (hide for non-super users).
-- [ ] R21: **Cache-bust** bump on all touched static
+- [x] R21: **Cache-bust** bump on all touched static
       files + register new JS in all pages.
-- [ ] R22: **Drawer entry** — add "Experiments" link to
+- [x] R22: **Drawer entry** — add "Experiments" link to
       the drawer under the agent group (not admin).
 
 ## Acceptance Criteria
 
 ### Active-experiment strip
-- [ ] AC1: Super user, no running experiment → strip
+- [x] AC1: Super user, no running experiment → strip
       hidden on all pages.
-- [ ] AC2: `POST /experiments/{id}/run` → within 10s,
+- [x] AC2: `POST /experiments/{id}/run` → within 10s,
       strip appears on current page with label + elapsed.
-- [ ] AC3: Strip's elapsed-time counter advances on each
+- [x] AC3: Strip's elapsed-time counter advances on each
       10s poll.
-- [ ] AC4: Navigate to another page while experiment
+- [x] AC4: Navigate to another page while experiment
       running → strip visible on that page.
-- [ ] AC5: Logout + log back in with experiment running
+- [x] AC5: Logout + log back in with experiment running
       → strip visible immediately.
-- [ ] AC6: Experiment completes → strip shows "Completed
+- [x] AC6: Experiment completes → strip shows "Completed
       — accuracy=X" for 60s; then disappears.
-- [ ] AC7: Non-super user → strip hidden.
-- [ ] AC8: Training run active AND experiment active →
+- [x] AC7: Non-super user → strip hidden.
+- [x] AC8: Training run active AND experiment active →
       both strips stacked, no visual clash.
 
 ### Experiments page
-- [ ] AC9: Drawer entry opens list view, newest-first.
-- [ ] AC10: Agent filter narrows the list to one agent.
-- [ ] AC11: State badges reflect live DB (10s poll).
-- [ ] AC12: Clicking a row opens detail with pins +
+- [x] AC9: Drawer entry opens list view, newest-first.
+- [x] AC10: Agent filter narrows the list to one agent.
+- [x] AC11: State badges reflect live DB (10s poll).
+- [x] AC12: Clicking a row opens detail with pins +
       results populated.
-- [ ] AC13: Math-example card's "View experiments →"
+- [x] AC13: Math-example card's "View experiments →"
       button navigates to `experiments.html?agent_id=X`
       (not the deferred-alert).
 
 ### Detail view
-- [ ] AC14: `#experiment/{id}` is bookmarkable + resumable
+- [x] AC14: `#experiment/{id}` is bookmarkable + resumable
       across sessions.
-- [ ] AC15: While running, live progress panel updates
+- [x] AC15: While running, live progress panel updates
       every ~5s with sample X of N (if R18 ships) or
       elapsed-only (fallback).
-- [ ] AC16: On completion → results panel shows metric
+- [x] AC16: On completion → results panel shows metric
       value + `_stack` summary.
-- [ ] AC17: On archive → error panel shows message +
+- [x] AC17: On archive → error panel shows message +
       traceback.
-- [ ] AC18: Lineage panel shows parent + children links
+- [x] AC18: Lineage panel shows parent + children links
       for chained experiments.
-- [ ] AC19: Archive button appears for super-only,
+- [x] AC19: Archive button appears for super-only,
       disabled for already-archived rows.
 
 ### No regression
-- [ ] AC20: TB-US-066 training-run strip still works
+- [x] AC20: TB-US-066 training-run strip still works
       alongside the new experiment strip.
-- [ ] AC21: Drawer, modal, nav behavior unchanged
+- [x] AC21: Drawer, modal, nav behavior unchanged
       elsewhere.
-- [ ] AC22: `GET /experiments` without `state` filter
+- [x] AC22: `GET /experiments` without `state` filter
       returns all rows (back-compat).
 
 ## Design Notes
