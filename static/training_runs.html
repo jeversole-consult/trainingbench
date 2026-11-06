@@ -1663,7 +1663,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${rows.map(row => `
+                            ${rows
+                                .filter(row => !row.raw.every(v => v === null || v === undefined))
+                                .map(row => `
                                 <tr>
                                     <td style="padding:8px; color:#555; font-weight:600; border-bottom:1px solid #F0F0F0; vertical-align:top;">${escapeHtml(row.label)}</td>
                                     ${runs.map((_, idx) => dataCell(row, idx)).join('')}
