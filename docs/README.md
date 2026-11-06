@@ -6,11 +6,20 @@ the math-example demo companion — all in one navigable place.
 
 ## Start here
 
-**New to TB?** Read [System Architecture](design/system-architecture.md)
-first. 3-page overview of components (web UI, backend server,
-training subprocesses, databases), request flows, where state
-lives, auth model, and debug entry points. Everything else
-assumes you know the shape.
+**New to TB?**
+
+- To **understand what TB is + how it works**: read
+  [System Architecture](design/system-architecture.md). 3-page
+  overview of components (web UI, backend server, training
+  subprocesses, databases), request flows, where state lives,
+  auth model, and debug entry points. Everything else assumes
+  you know the shape.
+- To **use TB in your organization** (fork it, customize for
+  your domain, keep your customizations private): read
+  [Forking and Customizing TrainingBench](design/fork-and-customize.md).
+  Explains how TB expects to be consumed, what belongs in
+  your fork vs. mainline, how to keep your fork aligned with
+  TB updates, and license/attribution clarity.
 
 ## What's here
 
@@ -22,6 +31,11 @@ The architectural thinking that governs how TB is built.
   **Start here.** Components, request flows, state locations,
   auth model, process boundaries, debug entry points. The
   orientation doc for the whole platform.
+- **[Forking and Customizing TB](design/fork-and-customize.md)** —
+  **Start here if you're an adopter.** How TB expects to be
+  forked, what belongs in your fork vs. mainline, license
+  clarity, common pitfalls, merge strategy for pulling TB
+  updates into a customized fork.
 - **[Agent Architecture](design/agent-architecture.md)** —
   the top-level `agent` entity, versioned-component pattern,
   component lifecycle. Foundational for everything else.
