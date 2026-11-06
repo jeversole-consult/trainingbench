@@ -1534,22 +1534,66 @@
             const fmtDur = (s) => (s === null || s === undefined) ? '—' : `${s}s`;
             const fmtDate = (s) => s ? new Date(s).toLocaleString() : '—';
 
+            // Derive final metrics from the metrics array when the DB
+            // final_* columns are null (older runs recorded metrics but
+            // the completion callback didn't backfill the row). Also
+            // derive best-ever eval-loss across all metric points for a
+            // more interesting comparison on fully-trained runs.
+            function lastMetricValue(run, field) {
+                const ms = run.metrics || [];
+                for (let i = ms.length - 1; i >= 0; i--) {
+                    const v = ms[i][field];
+                    if (v !== null && v !== undefined) return v;
+                }
+                return null;
+            }
+            function bestMetricValue(run, field, mode) {
+                const vals = (run.metrics || [])
+                    .map(m => m[field])
+                    .filter(v => v !== null && v !== undefined && typeof v === 'number');
+                if (!vals.length) return null;
+                return mode === 'min' ? Math.min(...vals) : Math.max(...vals);
+            }
+            function finalOrDerived(run, column, metricField) {
+                const direct = run[column];
+                if (direct !== null && direct !== undefined) return { v: direct, derived: false };
+                const derived = lastMetricValue(run, metricField);
+                return { v: derived, derived: derived !== null };
+            }
+            function cellWithDerivedTag(entry, formatter) {
+                if (entry.v === null || entry.v === undefined) return '—';
+                return formatter(entry.v) + (entry.derived
+                    ? ' <span style="color:#999; font-size:0.8em;">(from metrics)</span>'
+                    : '');
+            }
+
+            // Pre-compute derived cells for each run so raw[] used by the
+            // winner-highlight logic sees the derived values too.
+            const finalTrainLoss = runs.map(r => finalOrDerived(r, 'final_train_loss', 'train_loss'));
+            const finalEvalLoss  = runs.map(r => finalOrDerived(r, 'final_eval_loss',  'eval_loss'));
+            const finalTrainAcc  = runs.map(r => finalOrDerived(r, 'final_train_accuracy', 'train_accuracy'));
+            const finalEvalAcc   = runs.map(r => finalOrDerived(r, 'final_eval_accuracy',  'eval_accuracy'));
+            const bestEvalLoss   = runs.map(r => bestMetricValue(r, 'eval_loss', 'min'));
+            const bestEvalAcc    = runs.map(r => bestMetricValue(r, 'eval_accuracy', 'max'));
+
             // Build rows. Each row: {label, cells: [valuePerRun], raw: [rawForDiff], format: 'num'|'pct'|'str'|'json'}
             const rows = [
                 { label: 'ID', cells: runs.map(r => `#${r.id}`), raw: runs.map(r => r.id), fmt: 'str' },
                 { label: 'Status', cells: runs.map(r => `<span class="status-badge status-${r.status}">${r.status}</span>`), raw: runs.map(r => r.status), fmt: 'str' },
                 { label: 'Created by', cells: runs.map(r => escapeHtml(r.created_by || '')), raw: runs.map(r => r.created_by), fmt: 'str' },
                 { label: 'Base model', cells: runs.map(r => escapeHtml(r.base_model || '')), raw: runs.map(r => r.base_model), fmt: 'str' },
-                { label: 'Training set', cells: runs.map(r => `#${r.training_set_id}`), raw: runs.map(r => r.training_set_id), fmt: 'str' },
+                { label: 'Training set', cells: runs.map(r => r.training_set_id ? `#${r.training_set_id}` : '—'), raw: runs.map(r => r.training_set_id), fmt: 'str' },
                 { label: 'Test set', cells: runs.map(r => r.test_set_id ? `#${r.test_set_id}` : '—'), raw: runs.map(r => r.test_set_id), fmt: 'str' },
                 { label: 'Training-set version', cells: runs.map(r => r.training_set_version_id ? `#${r.training_set_version_id}` : '—'), raw: runs.map(r => r.training_set_version_id), fmt: 'str' },
                 { label: 'Adapter path', cells: runs.map(r => `<code style="font-size:0.85em;">${escapeHtml(r.adapter_output_path || '')}</code>`), raw: runs.map(r => r.adapter_output_path), fmt: 'str' },
                 { label: 'Started', cells: runs.map(r => fmtDate(r.started_at)), raw: runs.map(r => r.started_at), fmt: 'str' },
                 { label: 'Duration', cells: runs.map(r => fmtDur(r.duration_seconds)), raw: runs.map(r => r.duration_seconds), fmt: 'num' },
-                { label: 'Final train loss', cells: runs.map(r => fmtNum(r.final_train_loss)), raw: runs.map(r => r.final_train_loss), fmt: 'num' },
-                { label: 'Final eval loss', cells: runs.map(r => fmtNum(r.final_eval_loss)), raw: runs.map(r => r.final_eval_loss), fmt: 'num' },
-                { label: 'Final train accuracy', cells: runs.map(r => fmtPct(r.final_train_accuracy)), raw: runs.map(r => r.final_train_accuracy), fmt: 'pct' },
-                { label: 'Final eval accuracy', cells: runs.map(r => fmtPct(r.final_eval_accuracy)), raw: runs.map(r => r.final_eval_accuracy), fmt: 'pct' },
+                { label: 'Final train loss', cells: finalTrainLoss.map(e => cellWithDerivedTag(e, v => fmtNum(v))), raw: finalTrainLoss.map(e => e.v), fmt: 'num' },
+                { label: 'Final eval loss', cells: finalEvalLoss.map(e => cellWithDerivedTag(e, v => fmtNum(v))),  raw: finalEvalLoss.map(e => e.v),  fmt: 'num' },
+                { label: 'Best eval loss (across training)', cells: bestEvalLoss.map(v => v === null ? '—' : fmtNum(v)), raw: bestEvalLoss, fmt: 'num' },
+                { label: 'Final train accuracy', cells: finalTrainAcc.map(e => cellWithDerivedTag(e, v => fmtPct(v))), raw: finalTrainAcc.map(e => e.v), fmt: 'pct' },
+                { label: 'Final eval accuracy', cells: finalEvalAcc.map(e => cellWithDerivedTag(e, v => fmtPct(v))),   raw: finalEvalAcc.map(e => e.v),   fmt: 'pct' },
+                { label: 'Best eval accuracy (across training)', cells: bestEvalAcc.map(v => v === null ? '—' : fmtPct(v)), raw: bestEvalAcc, fmt: 'pct' },
                 { label: 'Metric points recorded', cells: runs.map(r => (r.metrics || []).length), raw: runs.map(r => (r.metrics || []).length), fmt: 'num' },
             ];
 
@@ -1557,8 +1601,10 @@
             const WINNERS = {
                 'Final train loss': 'min',
                 'Final eval loss':  'min',
+                'Best eval loss (across training)': 'min',
                 'Final train accuracy': 'max',
                 'Final eval accuracy':  'max',
+                'Best eval accuracy (across training)': 'max',
             };
 
             function headerCell(run) {
