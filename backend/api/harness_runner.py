@@ -111,7 +111,7 @@ def _maybe_backfill_training_run_accuracy(experiment: Dict[str, Any], results: D
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def _build_experiment_stack(experiment: Dict) -> Dict[str, Any]:
+def _build_experiment_stack(experiment: Dict, config: Optional[Dict] = None) -> Dict[str, Any]:
     """TB-US-069: construct the per-experiment inference stack.
 
     Returns a dict with:
@@ -121,8 +121,21 @@ def _build_experiment_stack(experiment: Dict) -> Dict[str, Any]:
       (model, tokenizer, pipeline, vector_store). Caller must
       ``del`` these + ``torch.cuda.empty_cache()`` after the harness
       finishes.
-    - ``summary`` — brief dict of what got resolved; used for logging
+    - ``summary`` — brief dict of what got resolved; used for logging.
+      TB-US-092: carries ``prompting_mode`` indicating whether the
+      inference path used the model's chat template or raw-string
+      concatenation.
+
+    TB-US-092 Phase 1: prompting mode resolution.
+    - If ``config["prompting_mode"]`` is set, honor it
+      ("chat-template" or "raw-string").
+    - Else: use "chat-template" when the tokenizer exposes a
+      non-empty ``chat_template`` attribute (HF's authoritative
+      signal that the model expects chat formatting — true for
+      Instruct / chat / it variants of most modern families).
+    - Else: fall back to "raw-string" (base / completion-only models).
     """
+    config = config or {}
     # Lazy imports to avoid loading heavy ML libs at module import time.
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
@@ -208,6 +221,23 @@ def _build_experiment_stack(experiment: Dict) -> Dict[str, Any]:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # TB-US-092 Phase 1: resolve the inference prompting mode now
+    # that the tokenizer is loaded.
+    mode_override = config.get("prompting_mode")
+    if mode_override in ("chat-template", "raw-string"):
+        prompting_mode = mode_override
+        mode_source = "config-override"
+    elif getattr(tokenizer, "chat_template", None):
+        prompting_mode = "chat-template"
+        mode_source = "tokenizer-chat-template"
+    else:
+        prompting_mode = "raw-string"
+        mode_source = "no-chat-template"
+    log.info(
+        "[runner] experiment %s: prompting_mode=%s (source=%s)",
+        experiment["experiment_id"], prompting_mode, mode_source,
+    )
+
     pipe = pipeline(
         "text-generation",
         model=model,
@@ -219,43 +249,79 @@ def _build_experiment_stack(experiment: Dict) -> Dict[str, Any]:
         top_k=LLM_TOP_K,
     )
 
-    def _model_fn(question: str) -> str:
-        # Retrieve context if RAG is pinned
-        context = ""
-        if vector_store is not None:
-            try:
-                results = vector_store.similarity_search(question, k=4)
-                if isinstance(results, list):
-                    # Each result may be a dict with 'document' / 'content' / 'text'
-                    parts = []
-                    for r in results:
-                        if isinstance(r, dict):
-                            parts.append(r.get("document") or r.get("content") or r.get("text") or "")
-                        else:
-                            parts.append(str(r))
-                    context = "\n\n".join(p for p in parts if p)
-            except Exception as e:
-                log.warning(f"[runner] retrieval failed; proceeding without context: {e}")
-                context = ""
-
-        # Build the full prompt
-        if prompt_text:
-            # Prompt v1 template has {context} + {question} placeholders; honor them if present.
-            if "{context}" in prompt_text and "{question}" in prompt_text:
-                full_prompt = prompt_text.format(context=context, question=question)
-            elif "{question}" in prompt_text:
-                full_prompt = prompt_text.format(question=question)
-            else:
-                # Treat as system prompt; append the question
-                if context:
-                    full_prompt = f"{prompt_text}\n\nContext:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+    def _retrieve_context(question: str) -> str:
+        if vector_store is None:
+            return ""
+        try:
+            results = vector_store.similarity_search(question, k=4)
+            if not isinstance(results, list):
+                return ""
+            parts = []
+            for r in results:
+                if isinstance(r, dict):
+                    parts.append(r.get("document") or r.get("content") or r.get("text") or "")
                 else:
-                    full_prompt = f"{prompt_text}\n\nQuestion: {question}\n\nAnswer:"
-        else:
-            # No prompt text at all; just send the question
-            full_prompt = question if not context else f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+                    parts.append(str(r))
+            return "\n\n".join(p for p in parts if p)
+        except Exception as e:
+            log.warning(f"[runner] retrieval failed; proceeding without context: {e}")
+            return ""
 
-        # Generate
+    def _build_raw_prompt(question: str, context: str) -> str:
+        """Raw-string concatenation for base / completion-only models."""
+        if prompt_text:
+            if "{context}" in prompt_text and "{question}" in prompt_text:
+                return prompt_text.format(context=context, question=question)
+            if "{question}" in prompt_text:
+                return prompt_text.format(question=question)
+            # Treat as system prompt; append the question
+            if context:
+                return f"{prompt_text}\n\nContext:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+            return f"{prompt_text}\n\nQuestion: {question}\n\nAnswer:"
+        # No prompt text at all; just send the question
+        if context:
+            return f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+        return question
+
+    def _build_chat_prompt(question: str, context: str) -> str:
+        """TB-US-092: apply the tokenizer's chat template for Instruct
+        variants. Inlines retrieved context into the user turn.
+
+        If ``prompt_text`` is a placeholder template (has {context}
+        and/or {question}), expand it first and use the result as the
+        system message — preserves existing prompt-version content
+        without shoehorning it into the chat format.
+        """
+        if prompt_text and "{question}" in prompt_text:
+            if "{context}" in prompt_text:
+                system_or_user = prompt_text.format(context=context, question=question)
+            else:
+                system_or_user = prompt_text.format(question=question)
+            # The template already encoded question + context, so
+            # don't duplicate in a user turn — pass it as the user
+            # message directly to keep the chat template structure.
+            messages = [{"role": "user", "content": system_or_user}]
+        else:
+            messages = []
+            if prompt_text:
+                messages.append({"role": "system", "content": prompt_text})
+            user_content = question
+            if context:
+                user_content = f"Context:\n{context}\n\nQuestion: {question}"
+            messages.append({"role": "user", "content": user_content})
+        return tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+
+    def _model_fn(question: str) -> str:
+        context = _retrieve_context(question)
+        if prompting_mode == "chat-template":
+            full_prompt = _build_chat_prompt(question, context)
+        else:
+            full_prompt = _build_raw_prompt(question, context)
+
         try:
             output = pipe(full_prompt, return_full_text=False, num_return_sequences=1)
             if isinstance(output, list) and output:
@@ -278,6 +344,8 @@ def _build_experiment_stack(experiment: Dict) -> Dict[str, Any]:
             "adapter": adapter_path,
             "rag_collection": collection_name,
             "prompt_chars": len(prompt_text),
+            "prompting_mode": prompting_mode,
+            "prompting_mode_source": mode_source,
         },
     }
 
@@ -336,8 +404,11 @@ def run_experiment(experiment_id: int) -> Dict:
                 f"Harness module {module_dotted} does not expose a run() function"
             )
 
-        # TB-US-069: build the per-experiment stack
-        stack = _build_experiment_stack(experiment)
+        # TB-US-069: build the per-experiment stack.
+        # TB-US-092: pass harness config through so an operator can
+        # force prompting_mode ("chat-template" or "raw-string") via
+        # the harness definition's config dict.
+        stack = _build_experiment_stack(experiment, config=config)
         model_fn = stack["model_fn"]
         dataset_path = config.get("dataset_path")
 

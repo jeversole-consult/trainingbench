@@ -1,6 +1,6 @@
 # TB-US-092: Harness fairness + published-benchmark re-baseline
 
-**Status**: Backlog
+**Status**: Phase 1 shipped 2026-11-06; Phase 2-5 pending
 **Created**: 2026-11-06
 **Author**: Jesse Eversole
 **Depends on**: TB-US-057 (harness + eval dataset + seed agent), TB-US-065
@@ -99,26 +99,26 @@ appearing in any public material.
 
 ### Phase 1 — Harness fix (code)
 
-- [ ] R1: In `harness_runner._build_experiment_stack._model_fn`,
+- [x] R1: In `harness_runner._build_experiment_stack._model_fn`,
       detect whether the base model is instruction-tuned. Heuristic:
       the HF tokenizer exposes a non-empty `chat_template` attribute
       AND/OR the model name contains "Instruct" / "chat" / "it".
       Operator may want a config flag to force one mode or the other;
       design it in.
-- [ ] R2: When chat-template mode is active, format the inference
+- [x] R2: When chat-template mode is active, format the inference
       prompt via
       `tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)`.
       Build `messages` from:
       - `system`: the pinned system prompt text (if any) with context
         appended inline
       - `user`: the question
-- [ ] R3: Preserve the raw-string path (R2's `else` branch) for base
+- [x] R3: Preserve the raw-string path (R2's `else` branch) for base
       (non-Instruct) model backbones. Document which path a run used
       in the experiment's results payload for post-hoc auditing.
-- [ ] R4: Expose the chosen mode in the harness runner logs AND in
+- [x] R4: Expose the chosen mode in the harness runner logs AND in
       the experiment's `_stack` summary so comparison modals surface
       "chat-template" vs. "raw-string" prompting.
-- [ ] R5: Consider: should `training/math/train.py` and the harness
+- [ ] R5: Consider (deferred — would be a separate small refactor; train.py stays as-is for now, only the inference side moved): should `training/math/train.py` and the harness
       share a single "format for this model" helper? Light
       refactor; reduces future drift.
 
