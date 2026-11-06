@@ -1,7 +1,8 @@
 # TB-US-088: Spreadsheet calculator surface (make the existing capability user-visible)
 
-**Status**: Backlog
+**Status**: Completed (Option A)
 **Created**: 2026-11-05
+**Shipped**: 2026-11-06
 **Author**: Jesse Eversole
 **Depends on**: TB-US-086 backend feature audit (completed)
 **Soft-blocks**: TB-US-005 public v0.1 cut (if structured-data
@@ -93,19 +94,19 @@ produce calculator-augmented answers continue to do so.
 
 ## Requirements (Option A — minimal)
 
-- [ ] R1: Add a one-line hint to the Chat tab (index.html
+- [x] R1: Add a one-line hint to the Chat tab (index.html
       `#chat-tab`) explaining the calculator capability. Example:
       "💡 TB can also invoke formulas from attached spreadsheets —
       see [doc]."
-- [ ] R2: Create `docs/pages/spreadsheet-calculator.md` (or
+- [x] R2: Create `docs/pages/spreadsheet-calculator.md` (or
       similar) with a 1-page explanation:
       - What it does (invoke xlsx formulas during chat)
       - How to set it up (`TB_SPREADSHEET_PATH` env var today)
       - Known limitations (xlsx-only per TB-US-037 finding)
       - Example queries
-- [ ] R3: Link to the doc from the Chat-tab hint.
-- [ ] R4: No backend change.
-- [ ] R5: No new UI tab or modal.
+- [x] R3: Link to the doc from the Chat-tab hint.
+- [x] R4: No backend change.
+- [x] R5: No new UI tab or modal.
 
 ### If Option B or C instead
 
@@ -114,11 +115,11 @@ produce calculator-augmented answers continue to do so.
 
 ## Acceptance Criteria (Option A)
 
-- [ ] AC1: Chat tab contains the calculator hint.
-- [ ] AC2: The linked doc exists and is rendered via TB's docs
+- [x] AC1: Chat tab contains the calculator hint.
+- [x] AC2: The linked doc exists and is rendered via TB's docs
       system (`/docs/content`?) or Pages.
-- [ ] AC3: Existing chat flow unchanged (regression check).
-- [ ] AC4: External user (reading the Pages site + the Chat
+- [x] AC3: Existing chat flow unchanged (regression check).
+- [x] AC4: External user (reading the Pages site + the Chat
       tab) can explain the capability unprompted.
 
 ## Design Notes

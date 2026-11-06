@@ -502,12 +502,23 @@
                 allFiles = data.files || [];
                 renderSidebar(allFiles);
 
-                // Auto-load the docs landing page if present. Defensive —
-                // keeps the current placeholder visible if the file is missing.
-                const landing = allFiles.find(f => f.path === 'docs/README.md');
-                if (landing) {
-                    loadDoc('docs/README.md');
+                // TB-US-088: deep-link via URL hash — e.g.
+                // /static/docs.html#docs/pages/spreadsheet-calculator.md
+                // Falls back to the landing page if the hash path is missing.
+                const hashPath = window.location.hash.replace(/^#/, '');
+                const deepLink = hashPath && allFiles.find(f => f.path === hashPath);
+                if (deepLink) {
+                    loadDoc(hashPath);
+                } else {
+                    const landing = allFiles.find(f => f.path === 'docs/README.md');
+                    if (landing) {
+                        loadDoc('docs/README.md');
+                    }
                 }
+                window.addEventListener('hashchange', () => {
+                    const p = window.location.hash.replace(/^#/, '');
+                    if (p && allFiles.find(f => f.path === p)) loadDoc(p);
+                });
             } catch (e) {
                 document.getElementById('sidebar-tree').innerHTML =
                     `<div style="padding: 16px; color: #f44336; font-size: 0.85em;">Error: ${e.message}</div>`;
