@@ -34,12 +34,15 @@ _ensure_secrets()  # TB-US-050: boot-time read/generate before anything else nee
 from api.schema_migrations import apply_versioning_schema as _apply_versioning_schema
 from api.schema_migrations import migrate_appsettings_prompt_and_routes as _migrate_appsettings_prompt_and_routes
 from api.schema_migrations import migrate_experiments_progress as _migrate_experiments_progress
+from api.schema_migrations import migrate_training_run_source_experiment as _migrate_training_run_source_experiment
 _schema_result = _apply_versioning_schema()  # TB-US-051: idempotent versioning-tables migration
 print(f"[schema] {_schema_result}")
 _appsettings_migration = _migrate_appsettings_prompt_and_routes()  # TB-US-055 R8/R9
 print(f"[schema] {_appsettings_migration}")
 _experiments_progress_migration = _migrate_experiments_progress()  # TB-US-070 R15/R18
 print(f"[schema] {_experiments_progress_migration}")
+_training_run_source_experiment_migration = _migrate_training_run_source_experiment()  # TB-US-091
+print(f"[schema] {_training_run_source_experiment_migration}")
 
 from api.first_run_seeder import seed_math_example as _seed_math_example  # TB-US-057 Phase A
 _seed_result = _seed_math_example()
@@ -3870,6 +3873,29 @@ async def compare_training_runs(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/backfill-training-run-accuracy")
+async def admin_backfill_training_run_accuracy(
+    user_info: Dict = Depends(verify_super_user),
+):
+    """TB-US-091: one-off migration — walk completed harness experiments
+    (metric=accuracy) and backfill the training_runs.final_eval_accuracy
+    of the run that produced each experiment's pinned adapter.
+
+    Idempotent: first-wins semantics mean rows already carrying a
+    final_eval_accuracy are left alone.
+    """
+    summary = training_run_tracker.backfill_accuracy_from_experiments(
+        experiment_manager=experiment_manager,
+        adapter_version_manager=adapter_version_manager,
+    )
+    _audit_versioned_action(
+        "training_run.accuracy_backfill_migration",
+        user_info["username"], None,
+        summary, True,
+    )
+    return summary
 
 
 @app.get("/training/runs/{run_id}")

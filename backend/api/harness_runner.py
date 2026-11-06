@@ -44,6 +44,8 @@ from api.harness_version_manager import HarnessVersionManager
 from api.adapter_version_manager import AdapterVersionManager
 from api.rag_version_manager import RAGVersionManager
 from api.prompt_version_manager import PromptVersionManager
+from api.training_run_tracker import TrainingRunTracker
+from api.user_manager import UserManager
 
 
 log = logging.getLogger(__name__)
@@ -53,6 +55,57 @@ _harnesses = HarnessVersionManager()
 _adapters = AdapterVersionManager()
 _rags = RAGVersionManager()
 _prompts = PromptVersionManager()
+_training_runs = TrainingRunTracker()
+_users = UserManager()
+
+
+def _maybe_backfill_training_run_accuracy(experiment: Dict[str, Any], results: Dict[str, Any]) -> None:
+    """TB-US-091: after a completed experiment, write final_eval_accuracy
+    onto the training_runs row that produced the pinned adapter.
+
+    First-wins: only updates when final_eval_accuracy IS NULL. Any
+    failure here is logged as a warning and swallowed — backfill must
+    never interrupt the experiment completion path.
+    """
+    if results.get("metric") != "accuracy":
+        return
+    value = results.get("value")
+    if value is None or not isinstance(value, (int, float)):
+        return
+    adapter_version_id = experiment.get("adapter_version_id")
+    if not adapter_version_id:
+        return
+    adapter = _adapters.get_by_id(adapter_version_id)
+    if adapter is None:
+        return
+    meta_raw = adapter.get("training_run_metadata_json")
+    if not meta_raw:
+        return
+    try:
+        meta = json.loads(meta_raw) if isinstance(meta_raw, str) else meta_raw
+    except (json.JSONDecodeError, TypeError):
+        return
+    run_id = (meta or {}).get("run_id")
+    if run_id is None:
+        return
+    exp_id = experiment.get("experiment_id")
+    result = _training_runs.backfill_accuracy(int(run_id), int(exp_id), float(value))
+    _users.append_audit(
+        actor="harness_runner",
+        action="training_run.accuracy_backfill",
+        target=str(run_id),
+        details={
+            "experiment_id": exp_id,
+            "accuracy": value,
+            "backfill_status": result.get("status"),
+        },
+        success=(result.get("status") in ("updated", "skipped")),
+    )
+    if result.get("status") == "updated":
+        log.info(
+            "TB-US-091 backfill: training_run #%s final_eval_accuracy=%s from experiment #%s",
+            run_id, value, exp_id,
+        )
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -314,7 +367,14 @@ def run_experiment(experiment_id: int) -> Dict:
         results = harness_mod.run(dataset_path=dataset_path, model_fn=model_fn, config=config)
         # Attach the stack summary to the results for audit
         results["_stack"] = stack["summary"]
-        return _experiments.save_results(experiment_id, results)
+        saved = _experiments.save_results(experiment_id, results)
+        # TB-US-091: best-effort backfill of final_eval_accuracy on the
+        # training run that produced the adapter this experiment pinned.
+        try:
+            _maybe_backfill_training_run_accuracy(saved, results)
+        except Exception as e:
+            log.warning("TB-US-091 backfill failed (non-fatal): %s", e)
+        return saved
 
     except Exception as e:
         # Capture failure as results and archive so the trace is preserved.

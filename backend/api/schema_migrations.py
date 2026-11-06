@@ -42,6 +42,7 @@ VERSIONING_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "trainingbe
 MIGRATION_ID = "tb-us-051"
 MIGRATION_ID_APPSETTINGS = "tb-us-055-appsettings"
 MIGRATION_ID_EXPERIMENTS_PROGRESS = "tb-us-070-experiments-progress"
+MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT = "tb-us-091-training-run-source-experiment"
 
 
 _CREATE_SCHEMA_MIGRATIONS = """
@@ -371,3 +372,72 @@ def migrate_experiments_progress(db_path: Path = VERSIONING_DB_PATH) -> dict:
         conn.commit()
 
     return {"migration_id": MIGRATION_ID_EXPERIMENTS_PROGRESS, "columns_added": added}
+
+
+TRAINING_RUNS_DB_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "training" / "runs" / "runs_tracker.db"
+)
+
+
+def migrate_training_run_source_experiment(
+    tracker_db_path: Path = VERSIONING_DB_PATH,
+    training_runs_db_path: Path = TRAINING_RUNS_DB_PATH,
+) -> dict:
+    """TB-US-091: add ``source_experiment_id`` to the ``training_runs``
+    table so the comparison UI can link a run's backfilled accuracy back
+    to the harness experiment that produced it.
+
+    ``training_runs`` lives in a separate SQLite file (default
+    ``training/runs/runs_tracker.db``), but the schema_migrations tracker
+    lives in ``trainingbench.db``. We update both: write the column on
+    the target DB, record the migration-applied row on the tracker DB.
+    Idempotent.
+    """
+    # Idempotency check against the tracker DB.
+    with sqlite3.connect(tracker_db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM schema_migrations WHERE migration_id = ?",
+            (MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT,),
+        )
+        if cur.fetchone():
+            return {"migration_id": MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT, "already_applied": True}
+
+    if not Path(training_runs_db_path).exists():
+        with sqlite3.connect(tracker_db_path) as conn:
+            conn.execute(
+                "INSERT INTO schema_migrations (migration_id, applied_at) VALUES (?, ?)",
+                (MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT, datetime.now().isoformat()),
+            )
+            conn.commit()
+        return {
+            "migration_id": MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT,
+            "columns_added": [],
+            "note": f"training_runs DB not found at {training_runs_db_path}",
+        }
+
+    added = []
+    with sqlite3.connect(training_runs_db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='training_runs'")
+        if not cur.fetchone():
+            return {
+                "migration_id": MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT,
+                "columns_added": [],
+                "note": "training_runs table not present even in runs_tracker.db",
+            }
+        cur.execute("PRAGMA table_info(training_runs)")
+        cols = {r[1] for r in cur.fetchall()}
+        if "source_experiment_id" not in cols:
+            cur.execute("ALTER TABLE training_runs ADD COLUMN source_experiment_id INTEGER")
+            added.append("source_experiment_id")
+        conn.commit()
+
+    with sqlite3.connect(tracker_db_path) as conn:
+        conn.execute(
+            "INSERT INTO schema_migrations (migration_id, applied_at) VALUES (?, ?)",
+            (MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT, datetime.now().isoformat()),
+        )
+        conn.commit()
+
+    return {"migration_id": MIGRATION_ID_TRAINING_RUN_SOURCE_EXPERIMENT, "columns_added": added}

@@ -1573,6 +1573,17 @@
             const finalEvalLoss  = runs.map(r => finalOrDerived(r, 'final_eval_loss',  'eval_loss'));
             const finalTrainAcc  = runs.map(r => finalOrDerived(r, 'final_train_accuracy', 'train_accuracy'));
             const finalEvalAcc   = runs.map(r => finalOrDerived(r, 'final_eval_accuracy',  'eval_accuracy'));
+            // TB-US-091: tag the eval accuracy cell with its source experiment
+            // if one is present. Harness-backfilled rows carry source_experiment_id.
+            const finalEvalAccCells = finalEvalAcc.map((entry, i) => {
+                if (entry.v === null || entry.v === undefined) return '—';
+                const base = fmtPct(entry.v);
+                const srcId = runs[i].source_experiment_id;
+                if (srcId) {
+                    return `${base} <a href="/static/experiments.html#experiment/${srcId}" style="color:#CC785C; font-size:0.85em; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Backfilled from harness experiment #${srcId}">(from experiment #${srcId})</a>`;
+                }
+                return base + (entry.derived ? ' <span style="color:#999; font-size:0.8em;">(from metrics)</span>' : '');
+            });
             const bestEvalLoss   = runs.map(r => bestMetricValue(r, 'eval_loss', 'min'));
             const bestEvalAcc    = runs.map(r => bestMetricValue(r, 'eval_accuracy', 'max'));
 
@@ -1592,7 +1603,7 @@
                 { label: 'Final eval loss', cells: finalEvalLoss.map(e => cellWithDerivedTag(e, v => fmtNum(v))),  raw: finalEvalLoss.map(e => e.v),  fmt: 'num' },
                 { label: 'Best eval loss (across training)', cells: bestEvalLoss.map(v => v === null ? '—' : fmtNum(v)), raw: bestEvalLoss, fmt: 'num' },
                 { label: 'Final train accuracy', cells: finalTrainAcc.map(e => cellWithDerivedTag(e, v => fmtPct(v))), raw: finalTrainAcc.map(e => e.v), fmt: 'pct' },
-                { label: 'Final eval accuracy', cells: finalEvalAcc.map(e => cellWithDerivedTag(e, v => fmtPct(v))),   raw: finalEvalAcc.map(e => e.v),   fmt: 'pct' },
+                { label: 'Final eval accuracy', cells: finalEvalAccCells, raw: finalEvalAcc.map(e => e.v), fmt: 'pct' },
                 { label: 'Best eval accuracy (across training)', cells: bestEvalAcc.map(v => v === null ? '—' : fmtPct(v)), raw: bestEvalAcc, fmt: 'pct' },
                 { label: 'Metric points recorded', cells: runs.map(r => (r.metrics || []).length), raw: runs.map(r => (r.metrics || []).length), fmt: 'num' },
             ];

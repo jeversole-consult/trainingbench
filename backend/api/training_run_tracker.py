@@ -7,7 +7,7 @@ Provides experiment tracking, metrics logging, and comparison capabilities.
 import sqlite3
 import json
 import shutil
-from typing import Optional, Dict, List
+from typing import Any, Optional, Dict, List
 from datetime import datetime
 from pathlib import Path
 
@@ -280,6 +280,9 @@ class TrainingRunTracker:
                     "pid": row['pid'] if 'pid' in row.keys() else None,
                     "agent_id": row['agent_id'] if 'agent_id' in row.keys() else None,
                     "training_set_version_id": row['training_set_version_id'] if 'training_set_version_id' in row.keys() else None,
+                    # TB-US-091: link back to the harness experiment whose
+                    # accuracy populated the final_eval_accuracy column.
+                    "source_experiment_id": row['source_experiment_id'] if 'source_experiment_id' in row.keys() else None,
                 }
 
             return None
@@ -909,6 +912,118 @@ class TrainingRunTracker:
             "runs": runs,
             "count": len(runs)
         }
+
+    # ------------------------------------------------------------------ #
+    # TB-US-091: harness-experiment accuracy backfill
+    # ------------------------------------------------------------------ #
+
+    def backfill_accuracy(
+        self,
+        run_id: int,
+        experiment_id: int,
+        accuracy: float,
+    ) -> Dict:
+        """Write final_eval_accuracy + source_experiment_id on the training
+        run — but ONLY if final_eval_accuracy is currently NULL (first-wins
+        semantics, per the TB-US-091 design).
+
+        Returns:
+            {"status": "updated", ...}: the update happened
+            {"status": "skipped", "reason": "already-set"}: row already has
+                a final_eval_accuracy; preserved
+            {"status": "skipped", "reason": "run-not-found"}: run_id missing
+            {"status": "error", ...}: unexpected SQLite error
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT final_eval_accuracy FROM training_runs WHERE id = ?",
+                    (run_id,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return {"status": "skipped", "reason": "run-not-found", "run_id": run_id}
+                if row["final_eval_accuracy"] is not None:
+                    return {
+                        "status": "skipped",
+                        "reason": "already-set",
+                        "run_id": run_id,
+                        "existing_value": row["final_eval_accuracy"],
+                    }
+                cur.execute(
+                    "UPDATE training_runs SET final_eval_accuracy = ?, source_experiment_id = ? WHERE id = ?",
+                    (accuracy, experiment_id, run_id),
+                )
+                conn.commit()
+            return {
+                "status": "updated",
+                "run_id": run_id,
+                "experiment_id": experiment_id,
+                "accuracy": accuracy,
+            }
+        except sqlite3.Error as e:
+            return {"status": "error", "error": str(e), "run_id": run_id}
+
+    def backfill_accuracy_from_experiments(
+        self,
+        experiment_manager: Any,
+        adapter_version_manager: Any,
+    ) -> Dict:
+        """One-off migration: walk every completed experiment with
+        metric=accuracy and backfill the training_run that produced the
+        adapter it pinned. Idempotent via first-wins (``backfill_accuracy``
+        skips runs that already have a final_eval_accuracy).
+
+        Args:
+            experiment_manager: ExperimentManager instance
+            adapter_version_manager: AdapterVersionManager instance
+
+        Returns:
+            {"scanned": N, "updated": M, "skipped": K, "errors": [...]}
+        """
+        results = experiment_manager.list_experiments()
+        summary = {"scanned": 0, "updated": 0, "skipped": 0, "errors": []}
+        for exp in results:
+            if exp.get("state") != "completed":
+                continue
+            if not exp.get("results_json"):
+                continue
+            try:
+                payload = json.loads(exp["results_json"])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if payload.get("metric") != "accuracy":
+                continue
+            value = payload.get("value")
+            if value is None or not isinstance(value, (int, float)):
+                continue
+            adapter_version_id = exp.get("adapter_version_id")
+            if not adapter_version_id:
+                continue
+            adapter = adapter_version_manager.get_by_id(adapter_version_id)
+            if adapter is None:
+                continue
+            meta_json = adapter.get("training_run_metadata_json")
+            if not meta_json:
+                continue
+            try:
+                meta = json.loads(meta_json) if isinstance(meta_json, str) else meta_json
+            except (json.JSONDecodeError, TypeError):
+                continue
+            run_id = (meta or {}).get("run_id")
+            if run_id is None:
+                continue
+            summary["scanned"] += 1
+            r = self.backfill_accuracy(int(run_id), exp["experiment_id"], float(value))
+            if r["status"] == "updated":
+                summary["updated"] += 1
+            elif r["status"] == "skipped":
+                summary["skipped"] += 1
+            else:
+                summary["errors"].append({"experiment_id": exp["experiment_id"], "error": r.get("error")})
+        return summary
 
 
 # CLI for training run management

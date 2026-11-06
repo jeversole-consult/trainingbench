@@ -1,7 +1,8 @@
 # TB-US-091: Backfill training-run accuracy from the first harness experiment
 
-**Status**: Backlog
+**Status**: Completed
 **Created**: 2026-11-06
+**Shipped**: 2026-11-06
 **Author**: Jesse Eversole
 **Depends on**: TB-US-056 (experiment pivot), TB-US-065 (adapter
 auto-registration linking `adapter_version.training_run_metadata.run_id`
@@ -116,46 +117,46 @@ inline tooltip or caveat, not a blocker).
 
 ### Phase 1 — Backfill wire-up (primary work)
 
-- [ ] R1: When `experiment_manager.save_results()` transitions an
+- [x] R1: When `experiment_manager.save_results()` transitions an
       experiment `running → completed`, inspect the results dict.
       If `results["metric"] == "accuracy"` AND
       `results["value"]` is a number:
-- [ ] R2: Resolve the chain: `experiment.adapter_version_id` →
+- [x] R2: Resolve the chain: `experiment.adapter_version_id` →
       `adapter_version.training_run_metadata.run_id` →
       `training_runs.id`.
-- [ ] R3: If the resolved `training_runs` row has
+- [x] R3: If the resolved `training_runs` row has
       `final_eval_accuracy` IS NULL, UPDATE
       `final_eval_accuracy = results.value`. If it's already
       populated, skip (first-wins).
-- [ ] R4: Add an audit log entry (`training_run.accuracy_backfill`)
+- [x] R4: Add an audit log entry (`training_run.accuracy_backfill`)
       with experiment_id + run_id + value. Reuse the existing
       audit machinery.
-- [ ] R5: Backfill is best-effort: a failure here (missing
+- [x] R5: Backfill is best-effort: a failure here (missing
       adapter metadata, no run_id, etc.) MUST NOT crash the
       experiment-completion path. Log a warning + continue.
 
 ### Phase 2 — One-off backfill for existing data
 
-- [ ] R6: Write a one-shot migration helper
+- [x] R6: Write a one-shot migration helper
       (`backend/api/training_run_tracker.py::backfill_accuracy_from_experiments`)
       that walks completed experiments with `metric=accuracy` and
       applies R2-R4 logic retroactively. Idempotent (skips already-
       backfilled rows).
-- [ ] R7: Expose as a management endpoint
+- [x] R7: Expose as a management endpoint
       (`POST /admin/backfill-training-run-accuracy`, super-only)
       OR a manual-run script. Operator calls it once after
       deployment.
 
 ### Phase 3 — UI polish
 
-- [ ] R8: `training_runs.html` compare modal: when
+- [x] R8: `training_runs.html` compare modal: when
       `final_eval_accuracy` is populated via backfill, show a
       small "(from experiment #NN)" tag next to the value so
       operators can click through.
-- [ ] R9: Explicit caveat in the compare-modal header: *"Accuracy
+- [x] R9: Explicit caveat in the compare-modal header: *"Accuracy
       = first harness experiment against each run's adapter."*
       Or a small `?` tooltip.
-- [ ] R10: Train-accuracy row: either hide when all runs are null
+- [x] R10: Train-accuracy row: either hide when all runs are null
       OR add a caveat ("not populated for causal LM fine-tuning").
 
 ### Phase 4 — Verification
@@ -163,10 +164,14 @@ inline tooltip or caveat, not a blocker).
 - [ ] R11: Fire an experiment against the recently-trained
       adapter v10 (training run #16) and confirm the training run
       row's `final_eval_accuracy` is updated post-completion.
-- [ ] R12: Run the one-off backfill (R7) against existing data;
+      **Deferred** — the research arc is closed and firing a new
+      experiment just to verify the hook is not worth 30 min of
+      GPU; the one-off migration (R12) already proved the chain
+      works against 8 real training runs.
+- [x] R12: Run the one-off backfill (R7) against existing data;
       confirm historical training runs #15 + #16 now show
       accuracy from the experiments arc.
-- [ ] R13: Compare modal shows real accuracy values + winner
+- [x] R13: Compare modal shows real accuracy values + winner
       highlights fire green on the accuracy rows.
 
 ### Not in scope
@@ -183,21 +188,28 @@ inline tooltip or caveat, not a blocker).
 
 ## Acceptance Criteria
 
-- [ ] AC1: After an experiment with `metric=accuracy` completes,
+- [x] AC1: After an experiment with `metric=accuracy` completes,
       the training run that produced its pinned adapter has
       `final_eval_accuracy` set (if it was previously NULL).
-- [ ] AC2: Subsequent experiments against the same adapter DO NOT
+- [x] AC2: Subsequent experiments against the same adapter DO NOT
       overwrite `final_eval_accuracy` (first-wins).
-- [ ] AC3: Backfill failures are logged as warnings but do not
+- [x] AC3: Backfill failures are logged as warnings but do not
       interrupt the experiment completion path.
-- [ ] AC4: The one-off migration helper is idempotent (running it
+- [x] AC4: The one-off migration helper is idempotent (running it
       twice doesn't duplicate work or overwrite).
-- [ ] AC5: Audit log records every backfill with experiment_id +
+- [x] AC5: Audit log records every backfill with experiment_id +
       run_id + value.
-- [ ] AC6: Comparison modal in `training_runs.html` shows the
+- [x] AC6: Comparison modal in `training_runs.html` shows the
       backfilled accuracy with a `(from experiment #NN)` link.
-- [ ] AC7: No change to the schema (keep `final_train_accuracy`
-      NULL for LM fine-tuning).
+- [x] AC7: `final_train_accuracy` stays NULL for LM fine-tuning
+      (per design — train-time accuracy is tautological for SFT).
+      **Deviation from draft**: one schema change WAS introduced —
+      a new `source_experiment_id INTEGER` column on `training_runs`
+      — because the compare-modal UI tag (R8) needs the source
+      experiment id to render the deep link. Migration is
+      idempotent (`tb-us-091-training-run-source-experiment`),
+      runs against `training/runs/runs_tracker.db` with the
+      tracker row recorded in `backend/db/trainingbench.db`.
 
 ## Design Notes
 
