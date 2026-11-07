@@ -1,28 +1,32 @@
 """TB-US-092 Phase 2 — fixed-harness re-baseline runner.
 
-Fires 12 experiments sequentially against the math-example agent:
-    4 × bare Instruct (no adapter)
-    4 × adapter v9
-    4 × adapter v10
+Fires experiments sequentially against the math-example agent,
+one subprocess per experiment so CUDA state is pristine every
+time. Avoids the memory-fragmentation slowdown observed when all
+12 experiments ran in a single long-lived Python process
+(VRAM fragmented from ~16 GB to ~21 GB after one model reload,
+causing #53 to pace 33× slower than #52).
 
-All three conditions pin:
+Two modes:
+  (default)        — parent: create experiment rows + spawn workers
+  --exp <id>       — worker: run exactly one experiment then exit
+                     (releases CUDA + model on process exit)
+
+All conditions pin:
     agent_id=3 (math-example)
     system_prompt_version_id=3 (promoted)
     harness_version_id=5 (released, GSM8K-200 holdout)
     llm_identifier=None (defaults to meta-llama/Meta-Llama-3.1-8B-Instruct)
 
-The TB-US-092 Phase 1 harness fix is live, so these experiments run
-with chat-template prompting by default (tokenizer.chat_template is
-non-null for Llama 3.1 Instruct).
-
-Serial execution — the GPU can only run one at a time. Each run is
-~29 min; the batch should complete in ~6 hours.
-
-Per-experiment exceptions are caught + logged; the batch continues.
+Per-experiment exceptions are caught + logged; batch continues.
 Progress + final summary written to logs/tb_us_092_phase2.log.
 """
 from __future__ import annotations
 
+import argparse
+import json
+import os
+import subprocess
 import sys
 import time
 import traceback
@@ -31,8 +35,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-from api.experiment_manager import ExperimentManager
-from api.harness_runner import run_experiment
+from api.experiment_manager import ExperimentManager  # noqa: E402
 
 AGENT_ID = 3
 PROMPT_V_ID = 3
@@ -40,11 +43,6 @@ HARNESS_V_ID = 5
 
 CONDITIONS = [
     # label_prefix, adapter_version_id
-    # "stopfix" distinguishes this cohort from the aborted earlier one
-    # (experiments #40-#51) which ran before the stop-token-ids fix
-    # was applied to the pipeline. #40 completed at 85% under the
-    # slow generator; #41 was archived mid-flight; #42-#51 were
-    # deleted as drafts. All current-cohort runs use stop_token_ids.
     ("tb-us-092-stopfix-bare-instruct", None),
     ("tb-us-092-stopfix-v9", 9),
     ("tb-us-092-stopfix-v10", 10),
@@ -52,6 +50,7 @@ CONDITIONS = [
 SEEDS_PER_CONDITION = 4
 
 LOG_PATH = REPO_ROOT / "logs" / "tb_us_092_phase2.log"
+VENV_PYTHON = str(REPO_ROOT / "venv" / "bin" / "python")
 
 
 def _log(msg: str) -> None:
@@ -63,12 +62,46 @@ def _log(msg: str) -> None:
         f.write(line + "\n")
 
 
-def main() -> None:
-    em = ExperimentManager()
-    _log("=== TB-US-092 Phase 2 runner start ===")
+def _worker(experiment_id: int) -> int:
+    """Run exactly one experiment in this (fresh) Python process.
+    Imports harness_runner lazily so model-load happens here, inside
+    the subprocess, not in the parent. Process exit returns full
+    CUDA state to the OS — the whole point of subprocess isolation.
+    """
+    from api.experiment_manager import ExperimentManager  # noqa: F811
+    from api.harness_runner import run_experiment
 
-    # Pre-register all 12 experiments as draft rows so we have a stable
-    # plan visible in the UI before any GPU time is spent.
+    em = ExperimentManager()
+    em.transition_state(experiment_id, "running")
+    try:
+        row = run_experiment(experiment_id)
+    except Exception as e:
+        # Experiment is already flipped to archived inside run_experiment
+        # on exception. Print the trace so the parent sees it.
+        print(f"WORKER ERROR on #{experiment_id}: {e}", flush=True)
+        traceback.print_exc()
+        return 1
+    # Print a tight summary the parent can grep from the stdout.
+    results = {}
+    if row and row.get("results_json"):
+        try:
+            results = json.loads(row["results_json"])
+        except Exception:
+            pass
+    print(
+        f"WORKER_DONE experiment_id={experiment_id} "
+        f"state={row.get('state') if row else '?'} "
+        f"metric={results.get('metric','?')} value={results.get('value','?')}",
+        flush=True,
+    )
+    return 0
+
+
+def _parent() -> None:
+    em = ExperimentManager()
+    _log("=== TB-US-092 Phase 2 subprocess runner start ===")
+
+    # Pre-register experiments as draft rows.
     plan = []
     for prefix, adapter_vid in CONDITIONS:
         for seed in range(1, SEEDS_PER_CONDITION + 1):
@@ -86,51 +119,59 @@ def main() -> None:
             plan.append((row["experiment_id"], label))
             _log(f"created experiment #{row['experiment_id']} label={label} adapter={adapter_vid}")
 
-    _log(f"plan: {len(plan)} experiments queued")
+    _log(f"plan: {len(plan)} experiments queued; one subprocess per experiment")
 
-    # Execute sequentially. For each experiment, flip state to running
-    # (so progress_json polling + strip visibility fire), then invoke
-    # the harness runner synchronously. The runner saves results +
-    # transitions state to completed/archived on its own.
     summary = {"completed": 0, "archived": 0, "errors": []}
     for exp_id, label in plan:
-        _log(f"--- starting experiment #{exp_id} ({label})")
+        _log(f"--- spawning worker for #{exp_id} ({label})")
         t0 = time.time()
+        # Spawn a fresh Python process. All CUDA allocations get
+        # fully released when this subprocess exits.
+        cmd = [VENV_PYTHON, str(Path(__file__).resolve()), "--exp", str(exp_id)]
         try:
-            em.transition_state(exp_id, "running")
-            result = run_experiment(exp_id)
+            # Inherit stdout/stderr so HF warnings still land in
+            # the top-level stdout log; worker also prints a
+            # WORKER_DONE summary line we can parse.
+            result = subprocess.run(
+                cmd,
+                cwd=str(REPO_ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
             elapsed = int(time.time() - t0)
-            metric = "?"
-            value = None
-            if result and result.get("results_json"):
-                import json as _json
-                try:
-                    payload = _json.loads(result["results_json"])
-                    metric = payload.get("metric", "?")
-                    value = payload.get("value")
-                except Exception:
-                    pass
-            if result and result.get("state") == "completed":
+            # Parse the summary line from worker stdout.
+            summary_line = next(
+                (ln for ln in reversed(result.stdout.splitlines())
+                 if ln.startswith("WORKER_DONE") or ln.startswith("WORKER ERROR")),
+                None,
+            )
+            if result.returncode == 0:
                 summary["completed"] += 1
-                _log(f"OK #{exp_id} {label} elapsed={elapsed}s metric={metric} value={value}")
+                _log(f"OK #{exp_id} {label} elapsed={elapsed}s | {summary_line or 'no summary line'}")
             else:
                 summary["archived"] += 1
-                _log(f"ARCHIVED #{exp_id} {label} elapsed={elapsed}s state={result.get('state') if result else 'unknown'}")
+                _log(f"FAIL #{exp_id} {label} elapsed={elapsed}s rc={result.returncode} | {summary_line or 'no summary line'}")
+                summary["errors"].append({"experiment_id": exp_id, "label": label, "rc": result.returncode})
         except Exception as e:
             elapsed = int(time.time() - t0)
             summary["errors"].append({"experiment_id": exp_id, "label": label, "error": str(e)})
-            _log(f"ERROR #{exp_id} {label} elapsed={elapsed}s: {e}")
-            _log(traceback.format_exc())
-            # Best-effort flip to archived so the UI reflects reality.
-            try:
-                em.transition_state(exp_id, "archived")
-            except Exception:
-                pass
+            _log(f"ERROR spawning #{exp_id} {label} elapsed={elapsed}s: {e}")
 
-    _log("=== TB-US-092 Phase 2 runner complete ===")
-    _log(f"summary: completed={summary['completed']} archived={summary['archived']} errors={len(summary['errors'])}")
+    _log("=== TB-US-092 Phase 2 subprocess runner complete ===")
+    _log(f"summary: completed={summary['completed']} failed={summary['archived']} errors={len(summary['errors'])}")
     for err in summary["errors"]:
-        _log(f"  error on #{err['experiment_id']} ({err['label']}): {err['error']}")
+        _log(f"  error on #{err['experiment_id']} ({err['label']}): {err.get('error') or ('rc=' + str(err.get('rc')))}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exp", type=int, help="Worker mode: run this experiment then exit")
+    args = parser.parse_args()
+    if args.exp is not None:
+        sys.exit(_worker(args.exp))
+    _parent()
 
 
 if __name__ == "__main__":
