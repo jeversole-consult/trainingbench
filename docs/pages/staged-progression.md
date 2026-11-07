@@ -12,6 +12,23 @@ harness. All pre-wired. Running the three experiments shows what the
 TB staged-progression workflow does and how each component is pinned
 and measured.
 
+> **Methodology correction in progress (2026-11-07).** The accuracy
+> numbers reported below (through Trial #9 / adapter v10) were
+> measured with a harness that built inference prompts via raw-string
+> concatenation (`"Question: ...\n\nAnswer:"`), while the training
+> script applies the Llama 3.1 Instruct chat template. That
+> train/eval format mismatch suppressed bare-Instruct baseline scores
+> (48% on our harness vs. Meta's reported ~80%+ for Llama 3.1 8B
+> Instruct on GSM8K). A fixed-harness re-baseline is underway
+> (TB-US-092). Preliminary: experiment #40 of the 12-experiment
+> re-baseline batch — bare Instruct + fixed harness — scored
+> **85.0% (170/200)**. If remaining seeds confirm, the entire
+> adapter arc below was measuring a format-decoding artifact rather
+> than real math-reasoning gain, and the +17pt lift narrative needs
+> to be withdrawn or reframed. This page will update when the batch
+> completes. See [TB-US-092 story](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-092.md)
+> for the design, hypotheses, and acceptance criteria.
+
 ## Real baselines (shipped artifacts, measured 2026-10-25)
 
 | # | Label | Prompt | RAG | Adapter | Base | Correct | Duration |
