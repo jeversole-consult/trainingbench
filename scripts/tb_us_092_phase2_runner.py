@@ -40,9 +40,14 @@ HARNESS_V_ID = 5
 
 CONDITIONS = [
     # label_prefix, adapter_version_id
-    ("tb-us-092-bare-instruct", None),
-    ("tb-us-092-v9-fixed-harness", 9),
-    ("tb-us-092-v10-fixed-harness", 10),
+    # "stopfix" distinguishes this cohort from the aborted earlier one
+    # (experiments #40-#51) which ran before the stop-token-ids fix
+    # was applied to the pipeline. #40 completed at 85% under the
+    # slow generator; #41 was archived mid-flight; #42-#51 were
+    # deleted as drafts. All current-cohort runs use stop_token_ids.
+    ("tb-us-092-stopfix-bare-instruct", None),
+    ("tb-us-092-stopfix-v9", 9),
+    ("tb-us-092-stopfix-v10", 10),
 ]
 SEEDS_PER_CONDITION = 4
 

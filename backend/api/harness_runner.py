@@ -221,6 +221,26 @@ def _build_experiment_stack(experiment: Dict, config: Optional[Dict] = None) -> 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # TB-US-092 (post-#40/#41 observation): resolve stop token IDs so
+    # generation halts when the model signals end-of-turn instead of
+    # running to max_new_tokens. Llama 3.1 Instruct uses <|eot_id|> at
+    # the end of an assistant turn; the tokenizer's canonical eos
+    # stays as a secondary stop. Without this, chat-template
+    # generations ran 30× slower than they needed to because the
+    # model kept generating past its answer until hitting
+    # max_new_tokens.
+    _stop_ids = []
+    try:
+        eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
+        if eot_id is not None and eot_id != tokenizer.unk_token_id:
+            _stop_ids.append(eot_id)
+    except Exception:
+        pass
+    if tokenizer.eos_token_id is not None:
+        _stop_ids.append(tokenizer.eos_token_id)
+    _stop_ids = list(dict.fromkeys(_stop_ids))  # dedupe, preserve order
+    log.info("[runner] stop_token_ids=%s", _stop_ids)
+
     # TB-US-092 Phase 1: resolve the inference prompting mode now
     # that the tokenizer is loaded.
     mode_override = config.get("prompting_mode")
@@ -247,6 +267,8 @@ def _build_experiment_stack(experiment: Dict, config: Optional[Dict] = None) -> 
         do_sample=True,
         top_p=LLM_TOP_P,
         top_k=LLM_TOP_K,
+        eos_token_id=_stop_ids if _stop_ids else None,
+        pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
     )
 
     def _retrieve_context(question: str) -> str:
