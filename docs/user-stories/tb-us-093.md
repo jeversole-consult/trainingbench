@@ -1,17 +1,14 @@
 # TB-US-093: Reframe the math-example demo (conditional on TB-US-092 H92b)
 
-**Status**: Backlog — conditional. Only fires if TB-US-092 Phase 2
-confirms H92b: adapter v10 performs ≤ bare Instruct on the fixed
-harness. If the adapter still wins, this story does not fire; the
-narrative stays as "adapter beats bare" and only numbers get
-updated.
+**Status**: Backlog — H92b CONFIRMED by TB-US-092 Phase 2 cohort
+(#64-#75, completed 2026-11-07 11:51 UTC). Ready to fire.
 **Created**: 2026-11-07
-**Pre-staged while**: TB-US-092 Phase 2's 12-experiment batch runs
-overnight. Experiment #40 landed at 85.0% for bare Instruct — a
-strong preliminary signal that the adapter was likely worse than
-bare on fair measurement. Draft exists so the operator can decide
-on reframing quickly when the batch completes, rather than drafting
-from scratch at that point.
+**Confirmed by**: TB-US-092 Phase 2 cohort #64-#75 (4 seeds × 3
+conditions = 12 experiments, 0 failures) — bare Instruct 84.1%
+(SD 1.4pt), adapter v9 74.4% (SD 3.2pt, −9.75pt at 3.96× pooled
+SD), adapter v10 73.6% (SD 3.0pt, −10.5pt at 4.55× pooled SD).
+v10 vs v9: 0.24× pooled SD (indistinguishable). Both adapters
+strongly hurt the model's GSM8K performance on fair measurement.
 **Author**: Jesse Eversole
 **Depends on**: TB-US-092 Phase 2 (re-baseline experiments) + Phase 3
 (citations). Must NOT fire before both are complete.
@@ -34,6 +31,40 @@ unfair (train/eval format mismatch), re-measured honestly, found
 the adapter was hurting performance, and changed what we tell
 people" is a more defensible research-methodology story than the
 original "+17pt" claim.
+
+**Framing (operator direction, 2026-11-07)**: the demo is a
+**disciplined negative result against the flagship labs' home
+turf, run on a single GPU**. Specifically:
+
+- GSM8K is a well-known public benchmark. Meta, OpenAI, Anthropic,
+  and others have trained their flagship models against it
+  (directly or through curated math corpora derived from it).
+  Llama 3.1 8B Instruct's ~84% score is the result of a
+  large-compute, large-data, carefully-tuned pipeline we did not
+  replicate.
+- We ran disciplined PEFT (QLoRA, rank 16-32, attn+MLP, 1-5K
+  training samples) on a single RTX 3090 — effectively competing
+  on the flagship labs' home turf with ~0.001% of their compute
+  budget.
+- **We did not move the needle, and in fact degraded by ~10pt.**
+  On a benchmark the flagship labs have already heavily optimized
+  for, starting from a model that already carries that
+  optimization, modest PEFT buys nothing.
+- The methodology lesson — train/eval format mismatch produces
+  apparent gain that isn't real — generalizes beyond this demo
+  and is the first thing every PEFT practitioner should check.
+
+**The message to TB users is NOT "PEFT doesn't work."** It is:
+
+- **"PEFT earns its keep where flagship models haven't already
+  optimized."** That's proprietary domain data, internal knowledge
+  bases, customer-service corpora, novel-task domains — things no
+  Meta/OpenAI/Anthropic team ever trained against. Not public
+  benchmarks already thoroughly saturated by frontier training.
+- **"When you run PEFT, measure with discipline."** Format
+  alignment, multi-seed, documented grader, published-benchmark
+  comparison when available. Otherwise you convince yourself of
+  gains that aren't there.
 
 ## Scope
 
@@ -121,15 +152,42 @@ original "+17pt" claim.
         capability gain
       - Multi-seed discipline (TB-US-081) didn't catch this —
         single-seed measurement would have been just as wrong
-      - **The adapter made the model worse, not because fine-tuning
-        is bad, but because the measurement was unfair**
+      - **The adapter made the model worse on fair measurement.**
+        Not because fine-tuning is bad — because we were competing
+        on the flagship labs' home turf, on a benchmark their
+        models had already been trained against, with ~0.001% of
+        their compute. There was no headroom to gain.
       - How TB-US-092's audit was triggered (compare modal exposed
         suspicious numbers → asked "why so high" → found bug)
 
-- [ ] R12: (Optional) Draft a short write-up suitable for the TB
-      public site at `docs/pages/methodology-lesson.md` — "A PEFT
-      cautionary tale from the TB math-example." May be worth it
-      if operator wants the lesson to be a drawable artifact.
+- [ ] R11a: Add a dedicated **"When PEFT DOES earn its keep"**
+      subsection (new since operator framing 2026-11-07). The
+      message TB wants to send to users: don't repeat our mistake
+      of benchmarking against a public dataset flagship LLMs have
+      already crushed. Apply PEFT to:
+      - **Proprietary domain data** flagship labs never saw
+        (customer-service corpora, legal documents, internal
+        knowledge bases, specialized scientific domains)
+      - **Novel task framings** that haven't been optimized at
+        pretraining scale
+      - **Weaker base models** that have real capability headroom
+        the adapter can fill
+      - **Much larger training sets** (10K-100K+, not 1-5K) when
+        competing on well-studied benchmarks
+      This is the actionable take-away for TB users considering
+      PEFT: use TB to improve on things the big labs haven't
+      already optimized. The math-example arc shows what NOT to
+      do, and points at what to do instead.
+
+- [ ] R12: Draft a short write-up suitable for the TB public site
+      at `docs/pages/methodology-lesson.md` — "A PEFT cautionary
+      tale from the TB math-example." Lead with the
+      disciplined-negative-result-on-flagship-home-turf framing;
+      close with the "where PEFT DOES earn its keep" signpost.
+      Probably 2-3 pages. This becomes a drawable artifact — a
+      shareable research vignette that is more valuable as a
+      pedagogical piece than the original +17pt claim would have
+      been.
 
 ### 5. Close the research arc (really this time)
 
@@ -220,6 +278,31 @@ reader. May prove false.
   crowded field. The reframed story is memorable *because* it
   surfaces a failure mode that other PEFT demos quietly avoid
   disclosing.
+- **Why the "flagship home turf" framing matters** (operator
+  2026-11-07): the reframe isn't just "we were wrong." It's "we
+  competed on the hardest possible turf — a public benchmark the
+  flagship labs have already optimized for, starting from one of
+  their best Instruct models, on a single consumer GPU — and
+  honestly reported that we didn't win." That framing:
+  - Names the structural disadvantage so the negative result
+    isn't mistaken for "PEFT is broken"
+  - Points users toward the condition where PEFT DOES work (their
+    own data, their own domain, their own unexplored corners)
+  - Lets TB occupy a defensible pedagogical niche: the
+    open-source workbench that teaches you what the flagship labs
+    don't openly disclose about PEFT limits
+- **Finalized numbers for R4/R20** (from TB-US-092 Phase 2
+  cohort #64-#75, completed 2026-11-07 11:51 UTC):
+
+      | Setup | GSM8K-200 holdout (fixed harness) |
+      |---|---|
+      | Llama 3.1 8B Instruct (bare) | 84.1% mean (SD 1.4pt, 4 draws) |
+      | + adapter v9 (rank 16 attn+MLP QLoRA) | 74.4% mean (SD 3.2pt) → −9.75pt (3.96× pooled SD) |
+      | + adapter v10 (rank 32 attn+MLP QLoRA) | 73.6% mean (SD 3.0pt) → −10.5pt (4.55× pooled SD) |
+      | v10 vs v9 | 0.24× pooled SD (indistinguishable noise) |
+
+  Both adapters strongly regress; v9 vs v10 difference is
+  indistinguishable. The "rank 32 sweep" of Trial #9 was noise.
 
 ## Related
 
