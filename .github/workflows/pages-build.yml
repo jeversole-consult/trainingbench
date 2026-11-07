@@ -35,7 +35,11 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.3"
+          # Pinned to 3.2 — Jekyll 3.9.3's transitive dep
+          # http_parser.rb 0.8.1 fails to build on Ruby 3.3+. Caused
+          # silent CI failures from ~2026-10-25 through 2026-11-07
+          # even though the markdown itself was clean.
+          ruby-version: "3.2"
           bundler-cache: false
 
       - name: Install Jekyll + plugins
