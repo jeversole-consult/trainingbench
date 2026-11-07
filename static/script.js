@@ -1141,8 +1141,8 @@ function renderMathExampleVariant(currentIsMathExample) {
     <p style="margin: 0 0 14px 0; color: #555; font-size: 0.95em;">Explore the shipped <strong>math-example</strong> staged progression or create your own agent.</p>
     <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <div style="flex: 1 1 220px; min-width: 220px; padding: 14px; background: white; border: 1px solid #E0E0E0; border-radius: 6px;">
-            <div style="font-weight: 600; color: #333; margin-bottom: 6px;">📊 See the staged progression</div>
-            <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">Stage 0 → 1 → 2 accuracy deltas on 200 math questions.</div>
+            <div style="font-weight: 600; color: #333; margin-bottom: 6px;">📚 Math-example: a methodology lesson</div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">9 PEFT trials + an honest re-baseline on GSM8K. What NOT to do with PEFT — and where it actually earns its keep.</div>
             <button onclick="viewMathExampleExperiments()" style="padding: 6px 12px; background: #CC785C; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">View experiments →</button>
         </div>
         ${switchCardOrChatCard}

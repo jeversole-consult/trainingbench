@@ -1098,7 +1098,83 @@ Deliverable:
 
 ---
 
-## Summary table (as of 2026-11-06)
+## 2026-11-07 — Trial #10: harness fairness fix + full re-baseline (TB-US-092)
+
+**What we did**: After the 9-trial arc closed at adapter v10 (60.12%
+mean, reported as +17.1pt vs bare Instruct's 43%), a compare-modal
+sanity check surfaced that bare Instruct's score was far below
+Meta's published Llama 3.1 8B Instruct GSM8K performance (~80%+).
+Audit of `backend/api/harness_runner.py` showed the inference path
+built prompts via **raw-string concatenation**
+(`"Question: ...\n\nAnswer:"`) while `training/math/train.py`
+applied the Llama 3.1 Instruct **chat template**. Train/eval
+format mismatch.
+
+Fix (TB-US-092 Phase 1, commit `b34df33`): detect Instruct bases
+via tokenizer.chat_template; apply `tokenizer.apply_chat_template`
+in inference; add `<|eot_id|>` to the pipeline's stop-token list
+so generation halts at end-of-turn.
+
+Followup fix (commit `3734fa5`): launch each experiment in a fresh
+subprocess so CUDA state resets between runs — the single-process
+runner had been fragmenting VRAM between experiments and slowing
+inference 30×.
+
+Re-baseline: 12 experiments (4 seeds × 3 conditions) on the 200-item
+GSM8K holdout via the fixed harness. Experiments #64-#75, pid
+870631, logs at `logs/tb_us_092_phase2.log`.
+
+**What we found**:
+
+| Condition | Mean | SD | vs. bare | pooled-SD multiple |
+|---|---|---|---|---|
+| **Bare Llama 3.1 8B Instruct** | **84.1%** | 1.4pt | — | — |
+| **Adapter v9** (rank 16 attn+MLP) | **74.4%** | 3.2pt | **−9.75pt** | **3.96×** (highly significant) |
+| **Adapter v10** (rank 32 attn+MLP) | **73.6%** | 3.0pt | **−10.5pt** | **4.55×** (highly significant) |
+| v10 vs v9 | — | — | −0.75pt | 0.24× (indistinguishable) |
+
+Bare-Instruct baseline lifted from 43% (broken harness) to 84.1%
+(fixed harness) — +41pt from just the format fix. Both adapters
+regress ~10pt below bare on fair measurement. The v10-vs-v9
+"rank 32 helps" result from Trial #9 is indistinguishable noise.
+
+**What we decided**:
+
+1. Adapter v10 is deprecated (unpromoted from math-example +
+   `state=deprecated`). The math-example agent now runs **bare
+   Llama 3.1 8B Instruct**.
+2. The entire adapter arc (Trials #4-#9) was measuring
+   format-decoding compensation against a suppressed bare baseline.
+   Direct comparisons between trials remain internally consistent,
+   but the absolute numbers all inflate adapter contributions by
+   the format-decoding margin.
+3. TB-US-093 fires to reframe the public-facing math-example demo:
+   methodology-lesson artifact (what the arc actually teaches)
+   replaces the retracted "+17pt" performance claim.
+4. The research arc closes here — honestly this time.
+
+**Rationale**: a disciplined negative result against the flagship
+labs' home turf (public benchmark they've already optimized
+against; single consumer GPU) is a more useful pedagogical
+artifact than a performance claim we can't defend. **TB users
+should apply PEFT where flagship models haven't already optimized**
+— proprietary domain data, novel task framings, weaker bases with
+real headroom, not GSM8K-class benchmarks already saturated by
+frontier training.
+
+Deliverables:
+- Code: TB-US-092 Phase 1 (`b34df33`), subprocess fix (`3734fa5`)
+- Experiments: #64-#75 (4 seeds × 3 conditions), all completed, 0
+  failures
+- Doc updates: `staged-progression.md` rewritten, `methodology.md`
+  updated with chat-template requirement, new
+  `docs/pages/methodology-lesson.md` as the shareable artifact
+- Story close: TB-US-092 (phases 1+2 complete; 3+4+5 landed in
+  this doc batch), TB-US-093 fires this commit
+
+---
+
+## Summary table (as of 2026-11-07)
 
 | Trial | Base | Adapter | Epochs × Samples | Strict baseline-test | Strict holdout | Verdict |
 |---|---|---|---|---|---|---|
@@ -1111,7 +1187,8 @@ Deliverable:
 | 6 | 8B Instruct | **v8 (chat-template, 3 ep × 5000, rank 16, lr 1e-4)** | 3 × 5000 | **75 / 200 (37.5%)** | **85 / 200 (42.5%)** → revised to **41.62% mean (4 draws)** | Trial #6 single-draw suggested regression; **Trial #7 multi-seed revised to "no change vs. Trial #5"** |
 | 7 | — | multi-seed replicate of v7 + v8 | 4 draws each | — | **v7: 42.00% ± 2.65pt;  v8: 41.62% ± 2.56pt;  diff 0.38pt (0.14× pooled SD)** | **Indistinguishable**; established 6pt noise envelope |
 | 8 | 8B Instruct | **v9 (chat-template, 3 ep × 1000, rank 16, lr 1e-4, +MLP targets)** | 3 × 1000 | **97 / 200 (48.5%)** | **53.75% mean (4 draws), SD 2.78pt** | **First positive result**; +10.75pt above bare; capacity-trap mechanism confirmed |
-| 9 | 8B Instruct | **v10 (chat-template, 3 ep × 1000, rank 32, lr 1e-4, +MLP targets, alpha 64)** | 3 × 1000 | — (not run) | **60.12% mean (4 draws), SD 4.52pt** | **Series close**; +6.38pt over v9 (MARGINAL signal 1.70×); within-P1-strict +12.3pt vs bare; approaches published 60-75% band |
+| 9 | 8B Instruct | **v10 (chat-template, 3 ep × 1000, rank 32, lr 1e-4, +MLP targets, alpha 64)** | 3 × 1000 | — (not run) | **60.12% mean (4 draws), SD 4.52pt** [mismatched harness] | ~~Series close; +6.38pt over v9 (MARGINAL signal 1.70×); within-P1-strict +12.3pt vs bare; approaches published 60-75% band~~ **Retracted by Trial #10** — measurement used mismatched harness; see Trial #10 row below for corrected numbers. |
+| 10 | 8B Instruct | **v9 vs. v10 re-baseline against bare** (fixed-harness: chat template + <\|eot_id\|> stop) | n/a (no new training) | — | **bare 84.1% (SD 1.4) · v9 74.4% (SD 3.2) · v10 73.6% (SD 3.0)** | **Both adapters regress ~10pt below bare** at 3.96×/4.55× pooled SD; v10 vs v9 indistinguishable (0.24× pooled SD). Prior +17pt gain was train/eval format-mismatch artifact. **Adapter v10 deprecated.** Arc closes honestly. |
 
 > **Column labeling correction (2026-11-02)**: The "in-sample"
 > column header was renamed to "baseline-test" to match the
@@ -1132,75 +1209,98 @@ comparisons across trials remain valid; apparent "training set
 version" variation does not. Trial #5 (TB-US-079) was the first
 trial with genuinely varied training data under corrected wiring.
 
-**Current demo configuration**: **Adapter v10 (rank 32 attn+MLP
-QLoRA) on Llama 3.1 8B Instruct**. Holdout mean ~60% (4 draws,
-+17.1pt above bare's 43%). First adapter in the arc to approach
-the published 60-75% math-LoRA band. Pages site updated (via
-TB-US-085 close). Adapters v5/v7/v8/v9 remain in registry as
-historical.
+**Current demo configuration** (updated 2026-11-07 via TB-US-093):
+**bare Llama 3.1 8B Instruct**, no PEFT adapter. Fixed-harness
+mean 84.1% (4 draws, SD 1.4pt) — in line with Meta's published
+Llama 3.1 8B Instruct GSM8K performance. Adapter v10 is
+`state=deprecated` and no longer promoted. Adapters v5/v7/v8/v9
+remain in registry as historical; they can be loaded by version
+id but aren't the promoted demo path.
 
-**Research arc closes here** (operator decision 2026-11-06):
-math-example has served its purpose as PEFT demonstration;
-further trials out of scope given cost + TB strategy.
+**Research arc closes here** (operator decision 2026-11-06,
+confirmed with reframe 2026-11-07): math-example served its
+PEFT-demonstration purpose, but not in the direction originally
+claimed. The arc now exists as a methodology lesson about
+train/eval format mismatch + format-decoding compensation on
+public benchmarks. TB users should apply PEFT to proprietary
+domains, novel tasks, or weaker bases where flagship models
+haven't already optimized — not public benchmarks like GSM8K.
 
-**Key method lessons** (now cumulative through Trial #9):
-- **Trial #4**: raw-CoT format + hardcoded template deleted
-  Instruct's native `#### N`-at-end confirmation and REGRESSED
-  accuracy by 20pt. **Format alignment is NECESSARY.**
-- **Trial #5**: chat-template-formatted training with the correct
-  `#### N` marker FIXES the Trial #4 regression but does NOT
-  exceed bare. **Format alignment is NOT SUFFICIENT.**
-- **Trial #6**: scaling training data 5x (1000 → 5000) at same
-  config intensified format rigidity but didn't change accuracy
-  (Trial #7 revision). Decoupling observed; mechanism hypothesized.
+**Key method lessons** (revised 2026-11-07 after Trial #10):
+- **Trial #4**: raw-CoT format + hardcoded template registered
+  as a regression. **Retroactive reading** (Trial #10): regression
+  was partly a format-mismatch bug + partly PEFT distorting a
+  well-tuned Instruct baseline. The "format alignment is
+  necessary" lesson still holds but is NOT sufficient.
+- **Trial #5**: chat-template-formatted training restored
+  "bare-equivalent" measurement. Retroactive reading: the bare
+  baseline it matched was itself suppressed by the inference-side
+  format mismatch. Measurement was self-consistent but absolute
+  numbers were low.
+- **Trial #6**: scaling training data 5x intensified format
+  rigidity but didn't change accuracy. Correct finding; unchanged.
 - **Trial #7**: multi-seed established ~6pt noise envelope at
-  n=200. Harness uses stochastic sampling with no explicit seed —
-  all prior single-run measurements were stochastic draws.
-- **Trial #8**: expanding LoRA target modules from 4 (attention)
-  to 7 (attention + MLP) at SAME rank 16 UNLOCKED reasoning
-  capacity. Holdout mean 53.75% (+10.75pt above bare).
-  Dual-#### retention 47% (bare-like, NOT intensified). Within-
-  structure accuracy +5.8pt above bare. **"LoRA capacity trap"
-  mechanism confirmed: reasoning capacity for math lives in MLP
-  layers; attention-only LoRA compensated with format patterns.**
-- **Trial #9**: doubling LoRA rank from 16 to 32 at attn+MLP
-  continues to help (+6.38pt over v9, marginal signal 1.70×).
-  Mean 60.12% approaches published 60-75% band. Larger adapter
-  = more seed variability (SD 4.52pt vs. v9's 2.78pt). v10
-  learns both reasoning AND format rigidity (bigger capacity =
-  doesn't have to choose). Eval-loss overfit signal at epoch 3
-  suggests rank 32 is near the overfit wall at 1000 samples ×
-  3 epochs. Methodological slip: fired without formal
-  pre-registration.
+  n=200. Core methodology lesson; unchanged. However, multi-seed
+  alone did NOT catch the format-mismatch artifact — it correctly
+  measured a signal that was an artifact. Supplementary lesson:
+  **always sanity-check your baseline against published numbers
+  for the same model + benchmark.**
+- **Trial #8**: reported as "MLP expansion unlocks reasoning
+  capacity." **Retroactive reading** (Trial #10): the apparent
+  +10.75pt gain was format-decoding compensation, not reasoning
+  unlock. The "capacity trap" mechanism was over-interpreted —
+  real measurement puts v9 at 74.4% vs bare 84.1% (−9.75pt).
+  **The LoRA capacity-trap claim is withdrawn.**
+- **Trial #9**: rank sweep from 16 to 32 reported "continues to
+  help" (+6.38pt over v9, marginal signal). **Retroactive reading**:
+  v10 (73.6%) and v9 (74.4%) are indistinguishable on fair
+  measurement. The rank sweep result was noise.
+- **Trial #10**: the lessons that REMAIN from the arc are three:
+  (a) train/eval format mismatch produces false capability gains;
+  (b) multi-seed is necessary but insufficient — baseline
+  sanity-checks against published numbers are the missing
+  discipline; (c) PEFT does not earn its keep on public benchmarks
+  flagship models have already optimized against — use it for
+  proprietary domains, novel tasks, weaker bases, or much larger
+  training data.
 
-**Cumulative narrative (so far, internal to this research arc)**:
-format alignment prevents regression; target-module reach
-(including MLP) is the capability lever. At rank 16 with
-attention+MLP, QLoRA on Llama 3.1 8B Instruct improves GSM8K
-holdout by ~11pt over bare. Not ready to publish — further
-replication (seeds/ranks/datasets) would strengthen before
-external sharing.
+**Cumulative narrative (revised 2026-11-07, post-Trial #10)**:
+the math-example research arc began as a performance search and
+ended as a methodology lesson. The nine PEFT trials against
+Llama 3.1 8B Instruct produced apparent gains that were, on fair
+measurement, format-decoding compensation. The disciplined
+negative result stands as the arc's real deliverable: TB users
+should apply PEFT where flagship models haven't already
+optimized, measure with discipline (format alignment + multi-seed
++ published-baseline sanity-check), and not trust capability
+claims on well-studied public benchmarks measured against
+suppressed baselines.
 
-**Open next-trial candidates** (series arrival-chapter complete;
-further work is refinement):
+**Next-trial candidates** (further math-example PEFT work would
+be refinement; the arc's usefulness is now the methodology
+lesson, not the pursuit of a better GSM8K score):
 
-1. Rank sweep at attn+MLP — does rank 32 at attn+MLP help further,
-   or does it regress like Trial #4's rank 32 attn-only did?
-2. Explicit-seed harness runner — strengthens Trial #8's
-   reproducibility for publication
-3. **TB-US-085** (reserved): Candidate C (full fine-tune) — now
-   a mechanism comparison, not a necessary lever
-4. External-data scale-up (MATH, MGSM, synthetic) — could push
-   toward published 60-75% band
-5. **TB-US-084** (drafted): research-methodology UI design spike —
-   package the methodology we developed into TB's UI for users
-   without Claude
-6. **TB-US-005** (Proposed): public v0.1 cut — the research arc
-   now has a positive capability-gain result; TB-US-005 is a
-   packaging decision, independent of research-readiness.
+1. ~~Rank sweep at attn+MLP~~ — resolved by Trial #10 (no signal)
+2. Explicit-seed harness runner — reproducibility improvement;
+   still valuable if the arc's methodology artifacts are shared
+3. **TB-US-085** (completed): Trial #9 close; now superseded by
+   Trial #10's re-baseline
+4. External-data scale-up (MATH, MGSM, synthetic) — meaningful
+   only if operator wants to try PEFT on a benchmark flagship
+   labs haven't saturated; same train/eval discipline would apply
+5. **TB-US-084** (drafted): research-methodology UI design spike
+   — unchanged relevance; the methodology we developed is more
+   valuable as a package since Trial #10 showed how easy it is
+   to be fooled without it
+6. **TB-US-005** (Proposed): public v0.1 cut — reframed arc is
+   now a pedagogically-useful cautionary tale; TB-US-005 can
+   fire whenever the operator decides it's ready
 
-Research is ongoing. "Positive result" ≠ "ready to publish."
-Operator picks what to fire next (if anything).
+The arc is closed. If someone picks it back up, the honest
+cumulative finding is: **PEFT on Llama 3.1 8B Instruct trained
+on 1-5K GSM8K samples at ranks 16-32 attn+MLP does not improve
+GSM8K-holdout performance; it costs ~10pt on fair measurement**.
+Methodology artifacts are the value.
 
 ---
 

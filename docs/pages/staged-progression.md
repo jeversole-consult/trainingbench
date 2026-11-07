@@ -12,22 +12,23 @@ harness. All pre-wired. Running the three experiments shows what the
 TB staged-progression workflow does and how each component is pinned
 and measured.
 
-> **Methodology correction in progress (2026-11-07).** The accuracy
-> numbers reported below (through Trial #9 / adapter v10) were
-> measured with a harness that built inference prompts via raw-string
-> concatenation (`"Question: ...\n\nAnswer:"`), while the training
+> **Methodology correction applied 2026-11-07** ([TB-US-092](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-092.md),
+> [TB-US-093](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-093.md)).
+> Nine PEFT trials run through 2026-11-06 reported adapter gains of
+> up to +17pt vs. bare Llama 3.1 8B Instruct. Those measurements
+> used a harness that built inference prompts via raw-string
+> concatenation (`"Question: ...\n\nAnswer:"`) while the training
 > script applies the Llama 3.1 Instruct chat template. That
-> train/eval format mismatch suppressed bare-Instruct baseline scores
-> (48% on our harness vs. Meta's reported ~80%+ for Llama 3.1 8B
-> Instruct on GSM8K). A fixed-harness re-baseline is underway
-> (TB-US-092). Preliminary: experiment #40 of the 12-experiment
-> re-baseline batch — bare Instruct + fixed harness — scored
-> **85.0% (170/200)**. If remaining seeds confirm, the entire
-> adapter arc below was measuring a format-decoding artifact rather
-> than real math-reasoning gain, and the +17pt lift narrative needs
-> to be withdrawn or reframed. This page will update when the batch
-> completes. See [TB-US-092 story](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-092.md)
-> for the design, hypotheses, and acceptance criteria.
+> **train/eval format mismatch** suppressed the bare-Instruct
+> baseline by ~37pt (48% on broken harness vs. 84.1% on fixed) and
+> was the entire source of the apparent lift. After fixing the
+> harness and re-measuring with multi-seed discipline, **both
+> trained adapters (v9, v10) regress ~10pt below bare Instruct**
+> on the same holdout. Adapter v10 is deprecated as of 2026-11-07;
+> the math-example demo now ships bare Llama 3.1 8B Instruct. The
+> reframed arc is more pedagogically valuable than the original
+> claim — see [*What this arc actually teaches*](#what-this-arc-actually-teaches)
+> below.
 
 ## Real baselines (shipped artifacts, measured 2026-10-25)
 
@@ -41,101 +42,158 @@ and measured.
 pedagogical artifacts. The workflow is what the first-install example
 demonstrates — not performance.
 
-## The current demo: Adapter v10 (rank 32 attn+MLP QLoRA) on Llama 3.1 8B Instruct (2026-11-06)
+## The current demo: bare Llama 3.1 8B Instruct (2026-11-07)
 
-After nine trials of training and measurement, we have
-**approached the published math-LoRA band** for the first time
-in the series. This is our pedagogical demonstration of what
-PEFT can accomplish on consumer hardware (RTX 3090, 24 GB VRAM)
-with 1000 training samples.
+After nine PEFT trials + a harness fairness fix + an honest
+re-baseline, the math-example demo ships as **bare Llama 3.1 8B
+Instruct with no PEFT adapter**. Both trained adapters we had
+previously promoted are now deprecated.
 
-| Setup | GSM8K holdout accuracy (strict `#### N`-aware harness) |
+| Setup | GSM8K-200 holdout accuracy (fixed harness, chat template) |
 |---|---|
-| **Llama 3.1 8B Instruct + adapter v10 (rank 32 attn+MLP QLoRA)** | **60.12% mean (4 draws, SD 4.52pt, range 54–64)** |
-| Llama 3.1 8B Instruct + adapter v9 (rank 16 attn+MLP QLoRA) | 53.75% mean (4 draws, SD 2.78pt) |
-| Llama 3.1 8B Instruct, no adapter (bare) | 86 / 200 (43%) on holdout |
-| Llama 3.1 8B base + our best QLoRA adapter (v3, Trial #2) | 52 / 200 (26%) on holdout |
+| **Llama 3.1 8B Instruct (bare)** | **84.1% mean** (4 draws, SD 1.4pt, range 82.5–85.5) |
+| + adapter v9 (rank 16 attn+MLP QLoRA) | 74.4% mean (SD 3.2pt) → **−9.75pt** vs. bare, 3.96× pooled SD |
+| + adapter v10 (rank 32 attn+MLP QLoRA) | 73.6% mean (SD 3.0pt) → **−10.5pt** vs. bare, 4.55× pooled SD |
 
-**Adapter v10 gains +17.1 points over bare Instruct** on the
-same 200-question GSM8K holdout subset. Multi-seed resolution
-(v10 vs. v9) is MARGINAL SIGNAL per our Trial #7 noise-envelope
-framework — direction unambiguously positive, magnitude
-uncertain at n=4 draws per adapter.
+Both adapters regress ~10pt on a correctly-measured baseline.
+The v10-vs-v9 difference is indistinguishable noise (0.24× pooled
+SD). As of 2026-11-07, adapter v10 is `state=deprecated`, the
+math-example agent runs bare, and the "+17pt" lift claimed in
+earlier versions of this page has been withdrawn.
 
-### How we got here (nine trials)
+**Our 84.1% bare-Instruct number** is in line with Meta's reported
+Llama 3.1 8B Instruct GSM8K performance (published as high-80s to
+low-90s on various GSM8K evaluations) — accounting for subset
+sampling, grader differences, and stochastic generation. See
+[Meta Llama 3.1 model card](https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/MODEL_CARD.md)
+and [Cobbe et al. 2021](https://arxiv.org/abs/2110.14168) (GSM8K).
 
-- Trial #4: first attempt at an Instruct-base adapter REGRESSED
-  accuracy by 20 points (format-mismatch bug deleted Instruct's
-  native `#### N`-at-end confirmation pattern).
-- Trial #5: chat-template-formatted training fixed the regression
-  but matched bare Instruct within noise (no capability gain).
-- Trial #6: scaling training data 5x (1000 → 5000 samples) was
-  an accuracy no-op; format rigidity intensified but accuracy
-  didn't change.
-- Trial #7: multi-seed replicate revealed a ~6-point noise
-  envelope at n=200, making prior single-draw comparisons more
-  conservative.
-- Trial #8: expanding LoRA target modules from 4 (attention only)
-  to 7 (attention + MLP) at the SAME rank 16, SAME data, SAME
-  epochs — UNLOCKED reasoning capacity. First positive result
-  (adapter v9 at 53.75% mean).
-- **Trial #9**: doubling LoRA rank from 16 to 32 at attn+MLP
-  continues to help (+6.38pt over v9, marginal signal). Reached
-  60% mean — approaches the published 60-75% math-LoRA band for
-  the first time.
+## What this arc actually teaches
 
-### The mechanism
+The math-example arc is now a research-methodology lesson, not a
+PEFT-performance demo. The useful takeaways:
 
-Attention-only LoRA at rank 16 was format-constrained. It
-compensated for inaccessible reasoning capacity by learning
-format patterns (dual-#### retention jumped from bare's 45% to
-61-75% in attention-only adapters, with no accuracy benefit).
-Adding MLP target modules at the same rank gave the adapter a
-path to reasoning capacity. **Within-structure accuracy per
-`#### N` output jumped from bare's 48.2% to adapter v9's 54.0%
-and adapter v10's 60.5%** — the adapter is actually solving
-more problems, not just producing more confident-looking
-outputs.
+### 1. Train/eval format mismatch produces false capability gains
 
-See [`mlp-expansion-results.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/mlp-expansion-results.md)
-(Trial #8 deep dive) and
-[`rank-sweep-results.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/rank-sweep-results.md)
-(Trial #9 deep dive).
+Our training pipeline applied the Llama 3.1 Instruct chat template.
+Our inference pipeline did raw-string concatenation. The model had
+to decode our informal "Question: ...\n\nAnswer:" prompts into
+something it could answer — and the adapters got extra reward for
+learning this decoding during training. Bare Instruct, denied the
+chat template, had to struggle with the raw-string format too — so
+it scored unnaturally low (48%). The +17pt "capability gain" was
+entirely format-decoding compensation.
 
-### How to reproduce
+**Check for this before trusting any PEFT measurement:** do training
+and inference use the same prompt format? If you're using a chat-
+tuned base, do both apply `tokenizer.apply_chat_template()`? If your
+baseline bare measurement sits far below published numbers, suspect
+format mismatch first.
+
+### 2. Multi-seed discipline alone doesn't catch format artifacts
+
+We established a 6pt noise envelope at n=200 via multi-seed replication
+([TB-US-081](https://github.com/jeversole-consult/trainingbench/blob/main/docs/user-stories/tb-us-081.md)).
+The adapter's +17pt gain was outside that envelope. Multi-seed told
+us the comparison was statistically clean — but the signal it was
+measuring was an artifact, not a capability. Multi-seed is necessary
+but not sufficient. **Always sanity-check your baseline against
+published numbers for the same model + benchmark.**
+
+### 3. The adapter made the model worse on fair measurement
+
+Not because fine-tuning is bad. Because we were **competing on the
+flagship labs' home turf, on a benchmark their models had already
+been trained against, with ~0.001% of their compute**:
+
+- GSM8K is a well-known public benchmark. Meta, OpenAI, Anthropic,
+  and others have optimized their models directly or indirectly
+  against it.
+- Llama 3.1 8B Instruct carries that optimization. Its 84.1% on our
+  holdout is Meta's work, not ours.
+- Our PEFT (QLoRA, rank 16-32, 1-5K training samples, single RTX
+  3090) tried to add capability a far larger-scale optimization had
+  already saturated. Modest fine-tuning in that regime doesn't add
+  — it distorts the pretrained distribution and costs more than it
+  adds.
+
+## When PEFT DOES earn its keep
+
+Our math-example arc shows what NOT to do with PEFT. Here's what
+TO do instead:
+
+| Use PEFT when… | Avoid PEFT when… |
+|---|---|
+| Your domain data is proprietary / internal / novel (customer-service corpora, internal knowledge, specialized scientific data) — things no flagship lab trained against | You're targeting a public benchmark flagship models have already been optimized against (GSM8K, MMLU, HumanEval, HellaSwag, etc.) with modest data + compute |
+| Starting from a weaker / smaller / less-tuned base model with real capability headroom to fill | Starting from a strong Instruct variant at its natural ceiling for your task |
+| Training on a reasonably-sized domain corpus (10K-100K+ labeled examples) | Training on 1-5K examples hoping to move a well-tuned model |
+| Pursuing a novel task framing the pretrained model hasn't been optimized for | Pursuing an obvious capability the pretrained model already has |
+
+**TB's value proposition for operators**: take this math-example arc
+as the cautionary tale it ends up being. Then point TB at *your* data
+— the domain nobody has trained against, where your knowledge is the
+headroom. That's where PEFT earns its keep.
+
+## The nine trials (historical)
+
+The measurements below used the pre-fix harness; they are preserved
+here as the arc record. Direct comparisons between trials are
+internally consistent (same harness bug applied to all), but the
+absolute numbers overstate everything by the format-decoding margin.
+See the Trial #10 entry in
+[`sweet-spot-search-log.md`](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/sweet-spot-search-log.md)
+for the corrected numbers against the fixed harness.
+
+- Trial #4: first attempt at an Instruct-base adapter regressed
+  accuracy by 20 points — attributed at the time to a format bug
+  deleting Instruct's `#### N` pattern. **Retroactive reading** (per
+  TB-US-092): the regression was likely a milder version of what
+  v9/v10 later did — PEFT distorting a well-tuned baseline. The
+  "format-mismatch bug" we fixed was real but not the whole story.
+- Trial #5: chat-template-formatted training restored accuracy to
+  "bare-equivalent" — which, retroactively, was still against a
+  suppressed bare baseline.
+- Trial #6: scaling training data 5x was an accuracy no-op. Correct
+  conclusion; unchanged by the re-baseline.
+- Trial #7: multi-seed replication established the ~6pt noise
+  envelope at n=200. Methodology finding; unchanged by the
+  re-baseline and still the right discipline.
+- Trial #8: expanding LoRA target modules from 4 (attention only) to
+  7 (attention + MLP) was reported as "unlocking reasoning capacity"
+  (+10.75pt vs bare). **Retroactive reading**: the apparent gain was
+  format-decoding compensation, not reasoning unlock. The adapter's
+  within-structure accuracy claim (54.0% vs bare 48.2%) was
+  measured against the same suppressed bare baseline.
+- Trial #9: doubling LoRA rank from 16 to 32 (adapter v10) added
+  another +6.38pt. **Retroactive reading**: fixed-harness means put
+  v10 at 73.6% vs. v9 at 74.4% — essentially tied (0.24× pooled SD).
+  The "rank sweep helps" conclusion was noise.
+- **Trial #10** (TB-US-092 Phase 2): re-baseline against the fixed
+  harness. Bare 84.1%, v9 74.4%, v10 73.6%. Both adapters regress.
+  Arc closes honestly.
+
+Deep dives (preserved with mismatched-harness measurements; refer
+to Trial #10 for corrected comparisons):
+
+- [Trial #8 mlp-expansion-results.md](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/mlp-expansion-results.md)
+- [Trial #9 rank-sweep-results.md](https://github.com/jeversole-consult/trainingbench/blob/main/docs/math-example/rank-sweep-results.md)
+
+## Reproduce the current demo
 
 ```python
-# Load Llama 3.1 8B Instruct + adapter v10 (QLoRA, rank 32, 7 target modules)
+# Current math-example demo: bare Llama 3.1 8B Instruct, no adapter.
+# Measured 84.1% on a 200-item GSM8K holdout via the fixed harness
+# (chat template + <|eot_id|> stop criterion).
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import PeftModel
-base = AutoModelForCausalLM.from_pretrained(
-    "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    # ... 4-bit QLoRA via bitsandbytes
-)
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3.1-8B-Instruct")
-model = PeftModel.from_pretrained(base, "adapters/math-example/v10")
-# Trained on 1000 chat-template-formatted GSM8K train-split samples,
-# target modules: q,v,k,o + gate,up,down (attention + MLP)
-# LoRA rank 32, alpha 64, lr 1e-4, 3 epochs, early-stop patience 2
-# Measured: holdout mean 60.12% across 4 multi-seed draws
+model = AutoModelForCausalLM.from_pretrained(
+    "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    # ... fp16 or 4-bit QLoRA via bitsandbytes
+)
+# Harness: backend/harnesses/math_qa_v1.py
+# Prompting: tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+# Stop criterion: eos_token_id=[<|eot_id|>, tokenizer.eos_token_id]
 ```
-
-### Can we do better than 60%?
-
-Likely yes — but our research arc closes here (2026-11-06) given
-cost + strategy constraints. Remaining levers not pursued:
-
-- **Rank 64 at attn+MLP** (overfit risk at 1000 samples; v10
-  already showed early-overfit signal at epoch 3)
-- **External-data scale-up** (MATH, MGSM, synthetic math) to
-  escape GSM8K's 7473-row training corpus
-- **Full fine-tuning** as a mechanism-comparison
-- **Best-of-N inference** (self-consistency sampling)
-- **Larger base model** (70B — out of consumer-GPU reach)
-
-Current adapter v10 is our teaching-grade baseline:
-multi-seed-validated, mechanism-explained, publicly
-reproducible, achievable on a single RTX 3090.
 
 ---
 

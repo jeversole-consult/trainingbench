@@ -1,7 +1,7 @@
 # TB-US-093: Reframe the math-example demo (conditional on TB-US-092 H92b)
 
-**Status**: Backlog — H92b CONFIRMED by TB-US-092 Phase 2 cohort
-(#64-#75, completed 2026-11-07 11:51 UTC). Ready to fire.
+**Status**: Completed 2026-11-07
+**Shipped**: 2026-11-07
 **Created**: 2026-11-07
 **Confirmed by**: TB-US-092 Phase 2 cohort #64-#75 (4 seeds × 3
 conditions = 12 experiments, 0 failures) — bare Instruct 84.1%
@@ -70,14 +70,14 @@ turf, run on a single GPU**. Specifically:
 
 ### 1. Unpromote adapter v10 (component lifecycle)
 
-- [ ] R1: Via UI (TB-US-087 version-lifecycle buttons) or API, call
+- [x] R1: Via UI (TB-US-087 version-lifecycle buttons) or API, call
       `POST /adapter-versions/10/deprecate` on the math-example
       agent's adapter v10. State transitions from `promoted` to
       `deprecated`. The agent then has NO promoted adapter until
       operator pins one (if any).
-- [ ] R2: Record the decision in an audit entry (automatic via
+- [x] R2: Record the decision in an audit entry (automatic via
       `_audit_versioned_action` on the endpoint).
-- [ ] R3: Decide whether adapter v9 gets re-promoted or the agent
+- [x] R3: Decide whether adapter v9 gets re-promoted or the agent
       stays adapter-less. **Current evidence**: fixed-harness bare
       Instruct ≈ 85% is already in the published band;
       re-promoting any of our adapters would need its own evidence
@@ -86,7 +86,7 @@ turf, run on a single GPU**. Specifically:
 
 ### 2. Reframe public-facing docs
 
-- [ ] R4: `docs/pages/staged-progression.md` — rewrite Trial-by-trial
+- [x] R4: `docs/pages/staged-progression.md` — rewrite Trial-by-trial
       narrative to match fixed-harness numbers. The core table
       becomes:
 
@@ -102,7 +102,7 @@ turf, run on a single GPU**. Specifically:
       new source of truth." Cite Meta's Llama 3.1 model card number
       alongside.
 
-- [ ] R5: The arc's 9-trial narrative stays — but gets a new
+- [x] R5: The arc's 9-trial narrative stays — but gets a new
       concluding section: "Trial #10: the measurement correction."
       Walks a reader through how the mismatch was discovered (first
       noticed via an unexpectedly low baseline vs. published, then
@@ -112,28 +112,28 @@ turf, run on a single GPU**. Specifically:
       claim about this demo (we don't claim improvement; we claim
       a well-measured null result with a useful methodology lesson).
 
-- [ ] R6: Update `docs/math-example/sweet-spot-search-log.md`:
+- [x] R6: Update `docs/math-example/sweet-spot-search-log.md`:
       - Add Trial #10 entry per TB-US-092 R18
       - Mark Trials #4-#9 conclusions with "see Trial #10 — these
         numbers used the mismatched harness" footnotes
       - DO NOT delete or edit the original trial narratives.
         Everything is history.
 
-- [ ] R7: Update `docs/math-example/methodology.md` with the
+- [x] R7: Update `docs/math-example/methodology.md` with the
       chat-template requirement from TB-US-092 R19 (may already be
       done by that story — coordinate with its R19 at fire time).
 
-- [ ] R8: Update the math-example card in the welcome banner
+- [x] R8: Update the math-example card in the welcome banner
       (`static/script.js:1137+`) — the "📊 See the staged
       progression" card. Current copy references "Stage 0 → 1 → 2
       accuracy deltas." Revise to reflect the honest finding.
 
-- [ ] R9: Public README / repo description if the math-example lift
+- [x] R9: Public README / repo description if the math-example lift
       is referenced there. Audit via grep.
 
 ### 3. Update the compare modal's source-experiment links
 
-- [ ] R10: TB-US-091 backfill wrote first-wins source_experiment_id
+- [x] R10: TB-US-091 backfill wrote first-wins source_experiment_id
       on training runs #15 and #16 (adapter v9 and v10), pointing
       at pre-fix experiments. Operator should decide: do the
       compare-modal rows also link the fixed-harness experiments
@@ -144,7 +144,7 @@ turf, run on a single GPU**. Specifically:
 
 ### 4. Pedagogical artifacts
 
-- [ ] R11: Draft a new section in `docs/pages/staged-progression.md`
+- [x] R11: Draft a new section in `docs/pages/staged-progression.md`
       titled something like "What this arc actually teaches."
       Topics:
       - Train/eval format mismatch is a common PEFT failure mode
@@ -160,7 +160,7 @@ turf, run on a single GPU**. Specifically:
       - How TB-US-092's audit was triggered (compare modal exposed
         suspicious numbers → asked "why so high" → found bug)
 
-- [ ] R11a: Add a dedicated **"When PEFT DOES earn its keep"**
+- [x] R11a: Add a dedicated **"When PEFT DOES earn its keep"**
       subsection (new since operator framing 2026-11-07). The
       message TB wants to send to users: don't repeat our mistake
       of benchmarking against a public dataset flagship LLMs have
@@ -179,7 +179,7 @@ turf, run on a single GPU**. Specifically:
       already optimized. The math-example arc shows what NOT to
       do, and points at what to do instead.
 
-- [ ] R12: Draft a short write-up suitable for the TB public site
+- [x] R12: Draft a short write-up suitable for the TB public site
       at `docs/pages/methodology-lesson.md` — "A PEFT cautionary
       tale from the TB math-example." Lead with the
       disciplined-negative-result-on-flagship-home-turf framing;
@@ -191,9 +191,9 @@ turf, run on a single GPU**. Specifically:
 
 ### 5. Close the research arc (really this time)
 
-- [ ] R13: Update `project_tb_us_068_phase_c_resume.md` project
+- [x] R13: Update `project_tb_us_068_phase_c_resume.md` project
       memory — final numbers, closed, honest closing framing.
-- [ ] R14: BACKLOG.md — mark TB-US-005 (public v0.1 cut) as still
+- [x] R14: BACKLOG.md — mark TB-US-005 (public v0.1 cut) as still
       Proposed. The math-example arc is now ready for public
       exposure under the reframe; TB-US-005 can pull the trigger.
 
@@ -231,22 +231,22 @@ reader. May prove false.
 
 ## Acceptance Criteria
 
-- [ ] AC1: Adapter v10 is deprecated (component state =
+- [x] AC1: Adapter v10 is deprecated (component state =
       `deprecated`) on the math-example agent.
-- [ ] AC2: `docs/pages/staged-progression.md` reflects fixed-harness
+- [x] AC2: `docs/pages/staged-progression.md` reflects fixed-harness
       numbers everywhere.
-- [ ] AC3: `sweet-spot-search-log.md` has Trial #10 entry + "see
+- [x] AC3: `sweet-spot-search-log.md` has Trial #10 entry + "see
       Trial #10" footnotes on Trials #4-#9.
-- [ ] AC4: Welcome-banner math-example card copy matches the new
+- [x] AC4: Welcome-banner math-example card copy matches the new
       framing.
-- [ ] AC5: No file in the repo references "+17pt" or "60.12%" as
+- [x] AC5: No file in the repo references "+17pt" or "60.12%" as
       a current-demo number (both become historical — the arc
       narrative keeps them, but current-state language stops using
       them). grep check.
-- [ ] AC6: `project_tb_us_068_phase_c_resume.md` project memory is
+- [x] AC6: `project_tb_us_068_phase_c_resume.md` project memory is
       updated with final numbers + closed status.
-- [ ] AC7: BACKLOG.md reflects the arc's reframed closure.
-- [ ] AC8: (Conditional on R12) If the methodology-lesson doc was
+- [x] AC7: BACKLOG.md reflects the arc's reframed closure.
+- [x] AC8: (Conditional on R12) If the methodology-lesson doc was
       drafted, it's cross-referenced from the staged-progression
       page and linked in the welcome banner.
 

@@ -1,14 +1,24 @@
 # Research Methodology — math-example PEFT Study
 
-**Status**: Research protocol, publication-grade. Append to this
-document when the methodology itself changes; do NOT rewrite
-historical sections.
-**Owned by**: TB-US-075 through TB-US-078+ (ongoing research
-series)
+**Status**: Research protocol. Append to this document when the
+methodology itself changes; do NOT rewrite historical sections.
+**Owned by**: TB-US-075 through TB-US-093 (research series + its
+closing reframe)
 **Created**: 2026-11-02
 **Research mode entered**: 2026-11-02 — operator shifted focus from
-"ship a demo" to "produce a publishable study on when PEFT helps
-vs. harms strong instruction-tuned bases"
+"ship a demo" to "produce a study on when PEFT helps vs. harms
+strong instruction-tuned bases"
+
+> **Critical methodology update (2026-11-07, Trial #10 / TB-US-092)**:
+> a train/eval prompt-format mismatch was discovered that invalidated
+> the absolute numbers measured in Trials #1–#9. The training pipeline
+> applied the Llama 3.1 Instruct chat template, while the inference
+> pipeline built raw-string prompts. The bare-Instruct baseline
+> (reported as 43% throughout the arc) was 84.1% on the fixed harness.
+> Both trained adapters regress ~10pt below bare on fair measurement.
+> See the new [Train/eval format alignment](#traineval-format-alignment)
+> section below for the discipline that catches this failure mode, and
+> `sweet-spot-search-log.md` Trial #10 entry for the re-baseline.
 
 ## Research question
 
@@ -146,6 +156,95 @@ Every trial captures (in its deep-dive doc):
 - [ ] **Random seeds**: Python random seed used in training (if
       explicit), DataLoader seed, generation seed (if any)
 - [ ] **Elapsed wall-clock time** for training + each measurement
+
+## Train/eval format alignment
+
+Added 2026-11-07 after Trial #10 / TB-US-092 revealed that this
+discipline was missing from our protocol — and that its absence
+invalidated the entire prior arc's absolute numbers.
+
+**The requirement**: the prompt format the model sees at inference
+MUST match the format it saw during training. For instruction-
+tuned bases (Llama 3.1 8B Instruct, Mistral-Instruct variants,
+Qwen-Instruct variants, etc.), that means both pipelines apply
+`tokenizer.apply_chat_template()` to construct the prompt.
+
+**The failure mode we caught**: our training script in
+`training/math/train.py` correctly applied the Llama 3.1 Instruct
+chat template. Our inference harness in
+`backend/api/harness_runner.py` built prompts via raw-string
+concatenation. Bare Llama 3.1 Instruct denied its chat template
+scored 43% on our broken harness; on the fixed harness, 84.1%.
+PEFT adapters trained with the chat template scored "higher" on
+the broken harness partly because they'd been incentivized during
+training to decode the raw-string format the harness was feeding
+them at inference time. The +17pt lift we reported was
+format-decoding compensation, not math capability.
+
+**How to check for it in any PEFT measurement**:
+
+1. **Does the training script apply a chat template?** Grep for
+   `apply_chat_template`, `tokenizer.encode` with system/user/
+   assistant markers, or explicit `<|start_header_id|>`-style
+   formatting.
+2. **Does the inference / harness path apply the same chat
+   template?** If the two don't match, you have train/eval
+   mismatch regardless of what your measurements show.
+3. **Does the bare-model baseline match published numbers?** This
+   is the single most reliable catch. If you measure a well-known
+   model on a public benchmark and your bare-baseline number is
+   >10pt below published figures from the model card, suspect
+   format mismatch (or grader strictness) first — not "the
+   baseline is naturally that low on my harness."
+4. **If the adapter beats the bare baseline on a benchmark the
+   flagship labs have already optimized for**, pause and audit.
+   Adapters shouldn't easily add capability flagship labs
+   already captured.
+
+**Generation-time discipline**:
+
+- **Stop criterion**: for chat-template models, pass
+  `eos_token_id=[tokenizer.convert_tokens_to_ids("<|eot_id|>"),
+  tokenizer.eos_token_id]` (or the equivalent for your base's
+  end-of-turn marker). Without this, the model generates to
+  `max_new_tokens` on every sample, which is wasteful AND can
+  over-sample into territory the chat-tuned model wasn't optimized
+  for.
+- **Prompt construction**: build `messages = [{"role": "system",
+  "content": ...}, {"role": "user", "content": ...}]`, then
+  `tokenizer.apply_chat_template(messages, tokenize=False,
+  add_generation_prompt=True)`. The `add_generation_prompt=True`
+  flag appends the assistant-turn opener so the model knows to
+  start answering, not to continue the user's message.
+
+**Logging the mode**: our harness runner now surfaces the chosen
+prompting mode (`chat-template` vs. `raw-string`) in the
+experiment's `_stack` summary. Reviewers can see at a glance
+which mode a measurement used. This is a cheap auditability
+affordance that would have caught the arc's mismatch months
+earlier if it had existed from the start.
+
+## Baseline sanity-check protocol
+
+Added 2026-11-07 from Trial #10's lessons. **Before running any
+PEFT trial, measure your bare baseline against the published
+number for the same model + benchmark.** If the two numbers are
+within noise, proceed. If your bare is significantly below
+published, you have a methodology bug — find it before running
+PEFT comparisons.
+
+For GSM8K / Llama 3.1 8B Instruct this is:
+
+- Meta's model card: ~80%+ on GSM8K with chat-template CoT
+  prompting
+- Our fixed-harness 4-draw mean: 84.1% (SD 1.4pt)
+- Difference < 1 SD → sanity check passed; PEFT results against
+  this baseline would be trustworthy
+
+Multi-seed discipline (Trial #7's 6pt noise envelope lesson)
+remains necessary but is NOT sufficient. The envelope tells you
+your signal is clean; the baseline sanity-check tells you your
+signal measures what you think it measures.
 
 ## Statistical analysis
 
