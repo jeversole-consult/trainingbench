@@ -166,20 +166,35 @@ These are the port candidates for a pre-fork downstream:
 
 ### 3.4 Reverse-port candidates (features stalite3 has that TB doesn't)
 
-Inspection found **none** worth reverse-porting into TB mainline:
+One reverse-port candidate surfaced on operator review after the
+initial inspection missed its semantic classification:
 
-- Pre-inspection memory listed *prompt classification* and
-  *spreadsheet formula extraction* as stalite-only features;
-  neither is actually present in stalite3 (see §3.1b).
-- The one domain-specific module found during inspection
-  (§3.5 below) is **deliberately client-scoped** and should
-  stay in stalite's fork per the generic TB platform ↔ private
-  fork pattern documented in [`fork-and-customize.md`](fork-and-customize.md).
+- **SL-US-010 "Configurable query-routing for category-biased
+  retrieval"** — a UI for editing regex-based query-routes that
+  bias ChromaDB retrieval toward specific content categories.
+  Stalite3 shipped this in June 2026 (committed in stalite3 at
+  `b87c623` on 2026-11-07 after sitting uncommitted). TB has had
+  the backend (TB-US-040 cache + `_maybe_augment_query`, TB-US-033
+  `/settings/query-routes` GET+PUT) since Oct 2026 but never
+  built the UI. **Ported into TB as [TB-US-095](../user-stories/tb-us-095.md)**
+  (2026-11-07) via a new drawer-admin-dropdown entry + modal
+  mirroring stalite3's pattern.
 
-In other words: there is **no capability in stalite3 that TB
-mainline is actually missing**. Everything shared between the
-two codebases is already in TB (often extended); the TB-side
-additions are all unidirectional port candidates.
+  This is effectively a form of prompt classification — the
+  initial inspection concluded "prompt classification is not in
+  stalite3" because it searched for the specific TB-US-023
+  pattern (4-category classifier with specialized handlers).
+  Stalite3's lighter regex-based routing is a different
+  implementation of the same category of feature. Memory
+  corrected 2026-11-07.
+
+The one domain-specific module found during inspection (§3.5
+below) is **deliberately client-scoped** and should stay in
+stalite's fork per the generic TB platform ↔ private fork pattern
+documented in [`fork-and-customize.md`](fork-and-customize.md).
+
+Besides the SL-US-010 UI reverse-port (now completed), TB
+mainline is not missing anything else from stalite3.
 
 ### 3.5 Client-specific code — deliberately not inspected
 

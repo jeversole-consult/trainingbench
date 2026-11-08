@@ -188,6 +188,10 @@
                 <span style="font-size: 1.15em; flex-shrink: 0;">🔑</span>
                 <span>API Keys</span>
             </div>
+            <div class="tb-nav-admin-subitem" role="button" tabindex="0" onclick="if (typeof window.openQueryRoutesManagement === 'function') window.openQueryRoutesManagement()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (typeof window.openQueryRoutesManagement === 'function') window.openQueryRoutesManagement(); }" style="padding: 10px 20px 10px 44px; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 0.9em; color: #555; transition: background 100ms;" onmouseenter="this.style.background='rgba(0,0,0,0.04)'" onmouseleave="this.style.background=''" title="Edit query routes (regex-based retrieval augmentation)">
+                <span style="font-size: 1.15em; flex-shrink: 0;">🧭</span>
+                <span>Query Routes</span>
+            </div>
         </div>
     </div>
     <div class="tb-nav-logout" role="button" tabindex="0" onclick="window.__tbNavLogout()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.__tbNavLogout(); }" style="padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; font-size: 0.95em; color: #555; border-left: 3px solid transparent; transition: background 100ms;" onmouseenter="this.style.background='rgba(0,0,0,0.04)'" onmouseleave="this.style.background=''" title="Sign out of TrainingBench">
