@@ -1,7 +1,10 @@
 # Stalite catch-up: capability-port design for pre-fork downstreams
 
-**Status**: 2026-11-06 — design draft; subject to revision against
-the actual stalite codebase (not inspected at draft time)
+**Status**: 2026-11-07 — §3 hypotheses verified against stalite3
+commit `adf59f0` (TB-US-090 inspection). Reverse-port candidates in
+new §3.4. Memory-based assumptions that didn't survive inspection
+in §3.5.
+**Earlier status**: 2026-11-06 — initial draft pre-inspection.
 **Related**: [`fork-and-customize.md`](fork-and-customize.md),
 [`backend-feature-audit.md`](backend-feature-audit.md) (TB side),
 [`agent-architecture.md`](agent-architecture.md),
@@ -84,56 +87,116 @@ at the fork point and stalite should already have them.
 
 ## 3. Capability inventory
 
-Legend for **Stalite status**:
+Legend for **Stalite status** (verified 2026-11-07 against
+stalite3 commit `adf59f0`):
 
-- **present (pre-fork, flat layer)** — stalite should have this at
-  the pre-agent flat layer; shape differs from TB but capability
-  parity exists
-- **absent (TB-added post-fork)** — port candidate; needs migration
-- **stalite-only** — stalite has it; TB is the one that would need
-  to port
-- **unknown** — needs inspection of stalite's code
+- **present** — verified present in stalite3
+- **absent** — verified absent in stalite3 (port candidate)
+- **differs** — present but in a different shape than TB
+- **stalite-only (client-specific)** — present but domain-tied;
+  should not be ported into TB mainline
 
-### 3.1 Platform core
+### 3.1 Platform core (verified)
 
-| Capability | TB implementation | Stalite status (hypothesis) | Port direction |
+| Capability | TB implementation | Stalite3 status | Port direction |
 |---|---|---|---|
-| RAG query + vector store | `backend/rag/rag_system.py`, `/query` | present (pre-fork) | — |
-| Multi-LLM backbone (HuggingFace / Ollama / OpenAI) | `_init_llm()` in rag_system | present (pre-fork) | — |
-| Multi-DB (ChromaDB collections) | `database_manager.py` + `/databases/*` | present (pre-fork) | — |
-| PowerSearch (fan-out to external LLMs) | `power_search.py`, `/power-search` | present (pre-fork) | — |
-| Compare Results (A/B) | `/query` with different pins + Compare tab | present (pre-fork) | — |
-| Document processing (PDF/DOCX/XLSX + OCR) | `document_processor.py` | present (pre-fork) | — |
-| Spreadsheet calculator (xlsx formula invocation) | `spreadsheet_calculator.py` | present (pre-fork) | — |
-| Spreadsheet formula EXTRACTION | — (gap in TB per audit) | **stalite-only** | TB would port *from* stalite; not required for training |
-| Prompt classification (qualitative/quantitative/lookup/mixed) | — (TB-US-023 Proposed; zero matches today) | **stalite-only** | TB would port *from* stalite; not required for training |
-| Query logger | `query_logger.py` | present (pre-fork) | — |
+| RAG query + vector store | `backend/rag/rag_system.py`, `/query` | **present** | — |
+| Multi-LLM backbone (HF / Ollama / OpenAI / PEFT / HF-PEFT) | `_init_llm()` in rag_system | **present** (5 providers) | — |
+| Multi-DB (ChromaDB collections) | `database_manager.py` + `/databases/*` | **present** | — |
+| PowerSearch (fan-out to external LLMs) | `power_search.py`, `/power-search` | **present** (Gemini, ChatGPT, Grok) | — |
+| Compare Results (A/B) | `/query` with different pins + Compare tab | **present** | — |
+| Document processing (PDF/DOCX/XLSX + OCR) | `document_processor.py` | **present** | — |
+| Query routes (regex category-biased retrieval augmentation) | `route_version_manager.py` + app-settings path | **present** (`_maybe_augment_query` in rag_system) | — (TB has versioned variant; stalite's is flatter) |
+| Query logger | `query_logger.py` | **present** | — |
+| Legacy training-set manager | `training_manager.py` (pre-versioning) | **present** | — (TB keeps the flat path alongside the versioned one) |
+| Legacy training-run tracker | `training_run_tracker.py` | **present** | **differs** — TB extended it with agent_id FK + cancel + startup_reconcile + progress_json; stalite's version is pre-extension |
+| User management (CRUD + auth) | `user_manager.py` | **present** | **differs** — TB-US-017/041 added CRUD endpoints + admin_audit table; stalite's is pre-v2 |
+| Session tracking | `session_tracker.py` | **present** | — |
 
-### 3.2 TB additions (post-fork)
+### 3.1b Capabilities expected to be stalite-only — finding at inspection
+
+The initial draft recorded two "stalite-only" capabilities that
+would be reverse-port candidates. Both turned out to be
+memory-based assumptions that didn't survive inspection:
+
+- **Prompt classification**: NOT present in stalite3 (grep across
+  `backend/` found zero class definitions, zero `classify_*`
+  functions, zero `qualitative/quantitative/lookup/mixed`
+  references). Stalite3 has `_maybe_augment_query` (regex query
+  routing) in `rag_system.py` — the same capability TB has at a
+  versioned layer. There is **no distinct four-category classifier
+  with specialized handlers** in stalite3. The memory that "stalite
+  has prompt classification TB doesn't" and the TB-US-086 audit
+  footnote that cited stalite as the source for this are both
+  **incorrect** at least for stalite3. TB-US-023 (prompt-classifier
+  arc) remains net-new backend work; it is not a reverse-port.
+- **Spreadsheet formula extraction**: NOT present in stalite3. The
+  memory that "stalite has a generic xlsx formula-extraction
+  capability TB doesn't" is **incorrect**. Stalite3 has a
+  **client-specific hardcoded calculator** (see §3.4 below), which
+  is a different kind of module and should not be ported into
+  TB mainline. TB's `SpreadsheetCalculator` (generic xlsx formula
+  invocation via openpyxl + pandas) is the capability at the
+  "spreadsheet" row, and stalite3 has nothing equivalent.
+
+### 3.2 TB additions (post-fork, verified absent in stalite3)
 
 These are the port candidates for a pre-fork downstream:
 
-| Capability | TB implementation | Stalite status (hypothesis) | Priority for "run training on stalite" |
+| Capability | TB implementation | Stalite3 status | Priority for "run training on stalite" |
 |---|---|---|---|
-| **Agent entity** (top-level `agents` table; agent_id FKs everywhere) | `agent_manager.py`, TB-US-051 schema, TB-US-048 CRUD | absent | **critical** — all versioning is agent-scoped |
-| **Versioning schema** (schema_migrations infra, `*_versions` tables, draft/released/promoted/deprecated states) | `schema_migrations.py`, 5 version managers | absent | **critical** |
-| **Agent-components mapping** (which prompt/RAG/adapter is promoted for an agent) | `agent_components` table | absent | critical for Sweet Spot; optional for one-off training |
-| **Training-set versioning** (sidecar JSONL, SHA-256 anchored) | `training_set_version_manager.py`, `/training-set-versions/*` | absent (legacy `/training/sets` flat path likely exists) | **critical** |
-| **Adapter versioning** (register, release, promote, promote-displaces-prior) | `adapter_version_manager.py`, auto-registration on run completion (TB-US-065) | absent | **critical** |
-| **Prompt / RAG / Route / Harness versioning** | 4 more version managers | absent | **important** for Sweet Spot; optional for one-off training |
-| **Training-run tracker** (launch, progress, cancel, startup reconcile) | `training_run_tracker.py`, TB-US-065 cancel | may have pre-fork variant; needs inspection | moderate — can proceed with stalite's existing training path if any, or port TB's |
-| **Experiments pivot** (bind prompt + RAG + LLM + adapter + harness → measurement) | `experiment_manager.py`, TB-US-056 | absent | **critical** for Sweet Spot methodology |
-| **Harness runner** (background task executes harness module against a stack) | `harness_runner.py`, TB-US-069 stack-building, TB-US-070 progress heartbeat | absent | **critical** |
-| **Math-example harness** (GSM8K eval loop; CoT-aware answer extraction) | `backend/harnesses/math_qa_v1.py` | absent, but domain-irrelevant | low — write a stalite-domain harness instead |
-| **UI overhaul** (left-nav drawer, white theme) | `static/left_nav.js`, `static/style.css`, TB-US-018/042 | stalite has pre-overhaul UI | **low for training, moderate for demo** |
-| **Agent management modal** | `agent_management.js`, TB-US-048 | absent | moderate — needed once agents exist |
-| **Version lifecycle UI** (release / promote / deprecate buttons) | `version_lifecycle.js`, TB-US-087 | absent | moderate — needed for operator ergonomics |
-| **Training-run strip** (sticky top banner during active run) | `active_run_strip.js`, TB-US-066 | absent | low — nice-to-have |
-| **Experiments UI** (strip + list + detail) | `active_experiment_strip.js`, `experiments.html`, TB-US-070 | absent | moderate — needed once Sweet Spot methodology is in play |
-| **API-key mechanism** | `api_key_manager.py`, `/api-keys/*`, TB-US-063 | may exist pre-fork or not; needs inspection | moderate — needed for research automation |
-| **User management v2** (CRUD + audit log) | `user_manager.py`, TB-US-017/041 | may have pre-fork variant | low |
+| **Agent entity** (top-level `agents` table; agent_id FKs everywhere) | `agent_manager.py`, TB-US-051 schema, TB-US-048 CRUD | **absent** | **critical** — all versioning is agent-scoped |
+| **Versioning schema** (schema_migrations infra, `*_versions` tables, draft/released/promoted/deprecated states) | `schema_migrations.py`, 5 version managers | **absent** | **critical** |
+| **Agent-components mapping** (which prompt/RAG/adapter is promoted for an agent) | `agent_components` table | **absent** | critical for Sweet Spot; optional for one-off training |
+| **Training-set versioning** (sidecar JSONL, SHA-256 anchored) | `training_set_version_manager.py`, `/training-set-versions/*` | **absent** (legacy `/training/sets` IS present; versioned layer is not) | **critical** |
+| **Adapter versioning** (register, release, promote, promote-displaces-prior) | `adapter_version_manager.py`, auto-registration on run completion (TB-US-065) | **absent** | **critical** |
+| **Prompt / RAG / Route / Harness versioning** | 4 more version managers | **absent** | **important** for Sweet Spot; optional for one-off training |
+| **Training-run tracker extensions** (agent_id FK, cancel, startup_reconcile, progress_json, source_experiment_id) | `training_run_tracker.py` + schema_migrations TB-US-065/070/091 | **differs** (base `training_run_tracker.py` present; extensions absent) | moderate — can proceed with stalite's existing tracker or port TB's extensions |
+| **Experiments pivot** (bind prompt + RAG + LLM + adapter + harness → measurement) | `experiment_manager.py`, TB-US-056 | **absent** | **critical** for Sweet Spot methodology |
+| **Harness runner** (background task executes harness module against a stack; chat-template prompt discipline per TB-US-092) | `harness_runner.py`, TB-US-069 stack-building, TB-US-070 progress heartbeat, TB-US-092 chat-template fix | **absent** | **critical** — note: port the TB-US-092 fix with it; don't repeat our mistake |
+| **Math-example harness** (GSM8K eval loop; CoT-aware answer extraction) | `backend/harnesses/math_qa_v1.py` | **absent**, domain-irrelevant | low — write a stalite-domain harness instead |
+| **UI overhaul** (left-nav drawer, white theme) | `static/left_nav.js`, `static/style.css`, TB-US-018/042 | **absent** — stalite3's `static/` has only `login.js` + `script.js`, no left-nav/agent-mgmt/api-key modules | **low for training, moderate for demo** |
+| **Agent management modal** | `agent_management.js`, TB-US-048 | **absent** | moderate — needed once agents exist |
+| **Version lifecycle UI** (release / promote / deprecate buttons) | `version_lifecycle.js`, TB-US-087 | **absent** | moderate — needed for operator ergonomics |
+| **Training-run strip** (sticky top banner during active run) | `active_run_strip.js`, TB-US-066 | **absent** | low — nice-to-have |
+| **Experiments UI** (strip + list + detail) | `active_experiment_strip.js`, `experiments.html`, TB-US-070 | **absent** | moderate — needed once Sweet Spot methodology is in play |
+| **API-key mechanism** | `api_key_manager.py`, `/api-keys/*`, TB-US-063 | **absent** (no `api_key_manager.py`, no `/api-keys/*` endpoints) | moderate — needed for research automation |
+| **User management v2** (CRUD + audit log) | `user_manager.py`, TB-US-017/041 | **differs** — `user_manager.py` present with basic CRUD but without TB-US-017's admin_audit table or TB-US-041's modal patterns | low |
+| **Auto-reload banner** (`/version/build` + client poll) | `version_check.js` + `/version/build` endpoint | **absent** | low — infra polish |
 
-### 3.3 Reads vs. writes vs. shape differences
+### 3.4 Reverse-port candidates (features stalite3 has that TB doesn't)
+
+Inspection found **none** worth reverse-porting into TB mainline:
+
+- Pre-inspection memory listed *prompt classification* and
+  *spreadsheet formula extraction* as stalite-only features;
+  neither is actually present in stalite3 (see §3.1b).
+- The one domain-specific module found during inspection
+  (§3.5 below) is **deliberately client-scoped** and should
+  stay in stalite's fork per the generic TB platform ↔ private
+  fork pattern documented in [`fork-and-customize.md`](fork-and-customize.md).
+
+In other words: there is **no capability in stalite3 that TB
+mainline is actually missing**. Everything shared between the
+two codebases is already in TB (often extended); the TB-side
+additions are all unidirectional port candidates.
+
+### 3.5 Client-specific code — deliberately not inspected
+
+Stalite3 has one module (`backend/api/mix_design_handler.py`
+and its collaborator `backend/api/formula_calculator.py` with
+class `StaliteCalculator`) containing domain-specific logic for
+stalite's customer business. Per the TB-public-repo carve-out
+(TB-US-090 AC5), these files were **not inspected** during this
+spike and their contents are **not reproduced** in this doc.
+
+The pattern they follow is the one `fork-and-customize.md`
+recommends: client-specific endpoints and handlers live in the
+operator's private fork (`backend/api/your_client_handler.py`
+in §5.3 of that doc). Stalite follows this pattern correctly.
+No port direction applies.
+
+### 3.6 Reads vs. writes vs. shape differences
 
 Important caveat: **"present pre-fork"** does **not** mean "zero
 work to adopt TB's additions." The TB additions reshape pre-fork
