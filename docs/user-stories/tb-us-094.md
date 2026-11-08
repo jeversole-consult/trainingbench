@@ -1,9 +1,8 @@
 # TB-US-094: Port — agents table + agent_manager to stalite3
 
-**Status**: Backlog — first stalite-side port story, drafted per
-TB-US-090 AC4. Fires on stalite3, not TB mainline. This TB-side
-story file exists as design record; execution happens in the
-stalite repo.
+**Status**: Completed 2026-11-07 — fired against stalite3 commit `fb14db2`.
+TB-side story file is the design record; the actual code port landed
+in the stalite3 repo (local-only, no remote).
 **Created**: 2026-11-07
 **Author**: Jesse Eversole (inspection from TB-US-090)
 **Depends on**: TB-US-090 (inspection) completed 2026-11-07;
@@ -57,12 +56,12 @@ This story keeps stalite's existing content:
 
 ### 1. Schema
 
-- [ ] R1: Port `backend/api/schema_migrations.py` into stalite3,
+- [x] R1: Port `backend/api/schema_migrations.py` into stalite3,
       renaming `MIGRATION_ID` to a stalite namespace (e.g.,
       `stalite-01-agents`) so a stalite migration tracker row never
       collides with a TB migration tracker row if DBs ever get
       copied between the two codebases.
-- [ ] R2: In the migration, create the `agents` table matching TB-
+- [x] R2: In the migration, create the `agents` table matching TB-
       US-051's schema (verbatim):
       ```sql
       CREATE TABLE IF NOT EXISTS agents (
@@ -74,17 +73,17 @@ This story keeps stalite's existing content:
           created_at TEXT NOT NULL
       );
       ```
-- [ ] R3: Seed a `default` agent on first migration run. Slug
+- [x] R3: Seed a `default` agent on first migration run. Slug
       choice is operator's call — suggest `stalite` or
       `customer-service` depending on how the stalite org
       talks about its own agent.
 
 ### 2. Manager module
 
-- [ ] R4: Port `backend/api/agent_manager.py` verbatim from TB.
+- [x] R4: Port `backend/api/agent_manager.py` verbatim from TB.
       No dependency on versioning tables (`agent_components`,
       `*_versions`, etc.) yet — those arrive in later stories.
-- [ ] R5: Confirm the slug regex (lowercase, letters/digits/
+- [x] R5: Confirm the slug regex (lowercase, letters/digits/
       hyphen/underscore) matches stalite's existing naming
       conventions. Adjust only if needed.
 
@@ -94,22 +93,22 @@ Operator's call — the agent table + manager alone are enough to
 unblock subsequent ports. Endpoints can wait until the
 agent-management modal (future port) needs them.
 
-- [ ] R6: (optional) Port `GET /agents`, `GET /agents/{name}`,
+- [x] R6: (optional) Port `GET /agents`, `GET /agents/{name}`,
       `POST /agents`, `PUT /agents/{name}`, `DELETE /agents/{name}`
       from TB's `main.py`. Preserve TB's auth decorators
       (`verify_super_user` for writes; `verify_web_auth` for
       reads). If stalite's auth model differs, map accordingly.
-- [ ] R7: (optional) Audit entries via stalite's existing audit
+- [x] R7: (optional) Audit entries via stalite's existing audit
       mechanism if any; otherwise defer to the user-management v2
       port (a later story).
 
 ### 4. Verification
 
-- [ ] R8: Startup migration on first boot creates the table +
+- [x] R8: Startup migration on first boot creates the table +
       seeds the default agent.
-- [ ] R9: Second boot: idempotency check — no duplicate rows,
+- [x] R9: Second boot: idempotency check — no duplicate rows,
       migration tracker says `already_applied=True`.
-- [ ] R10: Manual test: insert a second agent via SQL, read via
+- [x] R10: Manual test: insert a second agent via SQL, read via
       manager, confirm shape matches TB's response format.
 
 ### Not in scope
@@ -129,15 +128,15 @@ agent-management modal (future port) needs them.
 
 ## Acceptance Criteria
 
-- [ ] AC1: stalite3 has an `agents` table after first migration
+- [x] AC1: stalite3 has an `agents` table after first migration
       boot with the default row seeded.
-- [ ] AC2: `AgentManager` module is callable: `list_agents()`
+- [x] AC2: `AgentManager` module is callable: `list_agents()`
       returns at least `[{"name": "stalite", "state": "active", ...}]`.
-- [ ] AC3: Second startup is idempotent — no error, no duplicates.
-- [ ] AC4: Existing stalite3 functionality (RAG, training, user
+- [x] AC3: Second startup is idempotent — no error, no duplicates.
+- [x] AC4: Existing stalite3 functionality (RAG, training, user
       management) continues to work. The agents table is additive
       only.
-- [ ] AC5: No TB-public-repo artifact references stalite's
+- [x] AC5: No TB-public-repo artifact references stalite's
       proprietary content. This story's design lives in TB docs
       because it describes the generic port pattern; the actual
       stalite-side commit happens in stalite's repo and that repo
